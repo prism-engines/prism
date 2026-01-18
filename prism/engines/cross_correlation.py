@@ -1,7 +1,7 @@
 """
 PRISM Cross-Correlation Engine
 
-Measures lead/lag relationships between indicators.
+Measures lead/lag relationships between signals.
 
 Measures:
 - Pairwise correlation at various lags
@@ -66,7 +66,7 @@ class CrossCorrelationEngine(BaseEngine):
         Run cross-correlation analysis.
         
         Args:
-            df: Normalized indicator data
+            df: Normalized signal data
             run_id: Unique run identifier
             max_lag: Maximum lag to compute (default 20)
             store_full_lags: Store full lag structure (default False, just optimal)
@@ -75,8 +75,8 @@ class CrossCorrelationEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = list(df_clean.columns)
-        n = len(indicators)
+        signals = list(df_clean.columns)
+        n = len(signals)
         
         window_start, window_end = get_window_dates(df_clean)
         
@@ -87,8 +87,8 @@ class CrossCorrelationEngine(BaseEngine):
         # Compute cross-correlations with lags
         lag_results = []
         
-        for i, ind1 in enumerate(indicators):
-            for j, ind2 in enumerate(indicators):
+        for i, ind1 in enumerate(signals):
+            for j, ind2 in enumerate(signals):
                 if i >= j:  # Skip self and duplicates
                     continue
                 
@@ -103,8 +103,8 @@ class CrossCorrelationEngine(BaseEngine):
                 optimal_corr = xcorr.loc[xcorr["lag"] == optimal_lag, "correlation"].values[0]
                 
                 lag_results.append({
-                    "indicator_id_1": ind1,
-                    "indicator_id_2": ind2,
+                    "signal_id_1": ind1,
+                    "signal_id_2": ind2,
                     "window_start": window_start,
                     "window_end": window_end,
                     "optimal_lag": int(optimal_lag),
@@ -128,7 +128,7 @@ class CrossCorrelationEngine(BaseEngine):
             lagging_pairs = 0
         
         metrics = {
-            "n_indicators": n,
+            "n_signals": n,
             "n_pairs": len(lag_results),
             "avg_abs_correlation": float(avg_abs_corr),
             "max_correlation": float(corr_matrix.abs().values[np.triu_indices(n, k=1)].max()) if n > 1 else 0,
@@ -190,15 +190,15 @@ class CrossCorrelationEngine(BaseEngine):
     ):
         """Store correlation matrix to results.correlation_matrix."""
         records = []
-        indicators = list(corr_matrix.columns)
+        signals = list(corr_matrix.columns)
         
-        for i, ind1 in enumerate(indicators):
-            for j, ind2 in enumerate(indicators):
+        for i, ind1 in enumerate(signals):
+            for j, ind2 in enumerate(signals):
                 if i > j:  # Store lower triangle only
                     continue
                 records.append({
-                    "indicator_id_1": ind1,
-                    "indicator_id_2": ind2,
+                    "signal_id_1": ind1,
+                    "signal_id_2": ind2,
                     "window_start": window_start,
                     "window_end": window_end,
                     "correlation": float(corr_matrix.loc[ind1, ind2]),
@@ -223,8 +223,8 @@ class CrossCorrelationEngine(BaseEngine):
 def compute_cross_correlation_with_derivation(
     x: np.ndarray,
     y: np.ndarray,
-    indicator_x: str = "X",
-    indicator_y: str = "Y",
+    signal_x: str = "X",
+    signal_y: str = "Y",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -236,8 +236,8 @@ def compute_cross_correlation_with_derivation(
     Args:
         x: First signal topology
         y: Second signal topology
-        indicator_x: Name of X indicator
-        indicator_y: Name of Y indicator
+        signal_x: Name of X signal
+        signal_y: Name of Y signal
         window_id: Window identifier
         window_start, window_end: Date range
         max_lag: Maximum lag to compute
@@ -252,7 +252,7 @@ def compute_cross_correlation_with_derivation(
     deriv = Derivation(
         engine_name="cross_correlation",
         method_name="Cross-Correlation Analysis",
-        indicator_id=f"{indicator_x}_vs_{indicator_y}",
+        signal_id=f"{signal_x}_vs_{signal_y}",
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -264,11 +264,11 @@ def compute_cross_correlation_with_derivation(
     deriv.add_step(
         title="Input Signal Topology",
         equation="x = {x₁, x₂, ..., xₙ}, y = {y₁, y₂, ..., yₙ}",
-        calculation=f"Series {indicator_x}:\n"
+        calculation=f"Series {signal_x}:\n"
                     f"  n = {n} observations\n"
                     f"  mean = {np.mean(x):.6f}\n"
                     f"  std = {np.std(x):.6f}\n\n"
-                    f"Series {indicator_y}:\n"
+                    f"Series {signal_y}:\n"
                     f"  n = {n} observations\n"
                     f"  mean = {np.mean(y):.6f}\n"
                     f"  std = {np.std(y):.6f}",
@@ -287,8 +287,8 @@ def compute_cross_correlation_with_derivation(
         title="Standardize Series (Z-score)",
         equation="z_x = (x - μ_x) / σ_x,  z_y = (y - μ_y) / σ_y",
         calculation=f"Standardization:\n"
-                    f"  z_{indicator_x} = ({indicator_x} - {x_mean:.4f}) / {x_std:.4f}\n"
-                    f"  z_{indicator_y} = ({indicator_y} - {y_mean:.4f}) / {y_std:.4f}\n\n"
+                    f"  z_{signal_x} = ({signal_x} - {x_mean:.4f}) / {x_std:.4f}\n"
+                    f"  z_{signal_y} = ({signal_y} - {y_mean:.4f}) / {y_std:.4f}\n\n"
                     f"After standardization:\n"
                     f"  mean(z_x) = {np.mean(x_norm):.6f} ≈ 0\n"
                     f"  std(z_x) = {np.std(x_norm):.6f} ≈ 1",
@@ -376,10 +376,10 @@ def compute_cross_correlation_with_derivation(
                     f"  k* = {optimal_lag}\n"
                     f"  r(k*) = {optimal_corr:.6f}\n\n"
                     f"Lead/Lag interpretation:\n"
-                    f"  k* < 0: {indicator_y} leads {indicator_x} by {abs(optimal_lag)} periods\n"
+                    f"  k* < 0: {signal_y} leads {signal_x} by {abs(optimal_lag)} periods\n"
                     f"  k* = 0: Synchronous relationship\n"
-                    f"  k* > 0: {indicator_x} leads {indicator_y} by {optimal_lag} periods\n\n"
-                    f"Result: {'Synchronous' if optimal_lag == 0 else f'{indicator_x} leads by {optimal_lag}' if optimal_lag > 0 else f'{indicator_y} leads by {abs(optimal_lag)}'}",
+                    f"  k* > 0: {signal_x} leads {signal_y} by {optimal_lag} periods\n\n"
+                    f"Result: {'Synchronous' if optimal_lag == 0 else f'{signal_x} leads by {optimal_lag}' if optimal_lag > 0 else f'{signal_y} leads by {abs(optimal_lag)}'}",
         result=optimal_lag,
         result_name="k*",
         notes="Optimal lag reveals lead/lag structure"
@@ -422,11 +422,11 @@ def compute_cross_correlation_with_derivation(
 
     # Interpretation
     if optimal_lag == 0:
-        interp = f"**Synchronous**: {indicator_x} and {indicator_y} move together (r={corr_0:.3f})."
+        interp = f"**Synchronous**: {signal_x} and {signal_y} move together (r={corr_0:.3f})."
     elif optimal_lag > 0:
-        interp = f"**{indicator_x} leads** {indicator_y} by {optimal_lag} periods (r={optimal_corr:.3f})."
+        interp = f"**{signal_x} leads** {signal_y} by {optimal_lag} periods (r={optimal_corr:.3f})."
     else:
-        interp = f"**{indicator_y} leads** {indicator_x} by {abs(optimal_lag)} periods (r={optimal_corr:.3f})."
+        interp = f"**{signal_y} leads** {signal_x} by {abs(optimal_lag)} periods (r={optimal_corr:.3f})."
 
     if is_significant:
         interp += " Relationship is statistically significant."

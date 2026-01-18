@@ -41,12 +41,12 @@ def load_all_data(domain: str):
     """Load all TEP data sources."""
     from prism.db.parquet_store import get_parquet_path
 
-    vec_df = pl.read_parquet(get_parquet_path('vector', 'indicator', domain))
+    vec_df = pl.read_parquet(get_parquet_path('vector', 'signal', domain))
     obs_df = pl.read_parquet(get_parquet_path('raw', 'observations', domain))
 
     # Try to load field and modes if available
-    field_path = get_parquet_path('vector', 'indicator_field', domain)
-    modes_path = get_parquet_path('vector', 'indicator_modes', domain)
+    field_path = get_parquet_path('vector', 'signal_field', domain)
+    modes_path = get_parquet_path('vector', 'signal_modes', domain)
 
     field_df = pl.read_parquet(field_path) if field_path.exists() else None
     modes_df = pl.read_parquet(modes_path) if modes_path.exists() else None
@@ -56,7 +56,7 @@ def load_all_data(domain: str):
 
 def get_fault_events(obs_df: pl.DataFrame) -> pl.DataFrame:
     """Get fault onset and recovery events."""
-    fault_df = obs_df.filter(pl.col('indicator_id') == 'TEP_FAULT').select([
+    fault_df = obs_df.filter(pl.col('signal_id') == 'TEP_FAULT').select([
         'obs_date', pl.col('value').alias('fault_code')
     ]).group_by('obs_date').agg(
         pl.col('fault_code').mode().first()
@@ -99,15 +99,15 @@ def get_what_features(vec_df: pl.DataFrame, date: 'date') -> Dict[str, float]:
 
     day_data = vec_df.filter(
         (pl.col('obs_date') == date) &
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT') &
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT') &
         pl.col('metric_name').is_in(key_metrics)
     )
 
     if len(day_data) == 0:
         return {}
 
-    # Aggregate across indicators
+    # Aggregate across signals
     agg = day_data.group_by('metric_name').agg([
         pl.col('metric_value').mean().alias('mean'),
         pl.col('metric_value').std().alias('std'),
@@ -136,15 +136,15 @@ def get_when_features(vec_df: pl.DataFrame, date: 'date') -> Dict[str, float]:
 
     day_data = vec_df.filter(
         (pl.col('obs_date') == date) &
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT') &
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT') &
         pl.col('metric_name').is_in(break_metrics)
     )
 
     if len(day_data) == 0:
         return {}
 
-    # Sum breaks across indicators (total system discontinuity)
+    # Sum breaks across signals (total system discontinuity)
     agg = day_data.group_by('metric_name').agg([
         pl.col('metric_value').sum().alias('sum'),
         pl.col('metric_value').max().alias('max'),
@@ -170,8 +170,8 @@ def get_mode_features(modes_df: pl.DataFrame, date: 'date') -> Dict[str, float]:
 
     day_data = modes_df.filter(
         (pl.col('obs_date') == date) &
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT')
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT')
     )
 
     if len(day_data) == 0:
@@ -194,13 +194,13 @@ def get_mode_features(modes_df: pl.DataFrame, date: 'date') -> Dict[str, float]:
             features['mode_entropy_mean'] = float(entropy.mean())
             features['mode_entropy_max'] = float(entropy.max())
 
-    # Mode distribution (how many indicators in each mode)
+    # Mode distribution (how many signals in each mode)
     if 'mode_id' in day_data.columns:
         mode_counts = day_data.group_by('mode_id').len()
         n_modes = len(mode_counts)
         features['mode_n_active'] = n_modes
 
-        # Mode concentration (high = most indicators in one mode)
+        # Mode concentration (high = most signals in one mode)
         if n_modes > 0:
             counts = mode_counts['len'].to_numpy()
             max_frac = np.max(counts) / np.sum(counts)
@@ -211,10 +211,10 @@ def get_mode_features(modes_df: pl.DataFrame, date: 'date') -> Dict[str, float]:
 
 def compute_mode_trajectory(modes_df: pl.DataFrame) -> pl.DataFrame:
     """
-    Compute mode trajectory for each indicator over time.
+    Compute mode trajectory for each signal over time.
 
     Returns DataFrame with:
-    - indicator_id
+    - signal_id
     - obs_date
     - mode_id
     - mode_affinity
@@ -226,17 +226,17 @@ def compute_mode_trajectory(modes_df: pl.DataFrame) -> pl.DataFrame:
         return None
 
     tep_modes = modes_df.filter(
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT')
-    ).sort(['indicator_id', 'obs_date'])
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT')
+    ).sort(['signal_id', 'obs_date'])
 
     if len(tep_modes) == 0:
         return None
 
-    # Compute changes per indicator
+    # Compute changes per signal
     trajectory = tep_modes.with_columns([
-        pl.col('mode_id').shift(1).over('indicator_id').alias('prev_mode'),
-        pl.col('mode_affinity').shift(1).over('indicator_id').alias('prev_affinity'),
+        pl.col('mode_id').shift(1).over('signal_id').alias('prev_mode'),
+        pl.col('mode_affinity').shift(1).over('signal_id').alias('prev_affinity'),
     ])
 
     trajectory = trajectory.with_columns([
@@ -258,7 +258,7 @@ def get_mode1_signal(modes_df: pl.DataFrame, date: 'date') -> Dict:
     Mode 1 is a rare (~4%) transitional mode that appears:
     - Before fault onsets (20.4%)
     - At fault onsets (7.8%)
-    - Dominated by XMEAS03 (D Feed - upstream indicator)
+    - Dominated by XMEAS03 (D Feed - upstream signal)
 
     Returns:
         Dict with mode1 detection info
@@ -268,8 +268,8 @@ def get_mode1_signal(modes_df: pl.DataFrame, date: 'date') -> Dict:
 
     day_data = modes_df.filter(
         (pl.col('obs_date') == date) &
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT')
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT')
     )
 
     if len(day_data) == 0:
@@ -279,11 +279,11 @@ def get_mode1_signal(modes_df: pl.DataFrame, date: 'date') -> Dict:
     mode1_data = day_data.filter(pl.col('mode_id') == 1)
     mode1_count = len(mode1_data)
 
-    # Get indicators in Mode 1
-    mode1_indicators = mode1_data['indicator_id'].to_list() if mode1_count > 0 else []
+    # Get signals in Mode 1
+    mode1_signals = mode1_data['signal_id'].to_list() if mode1_count > 0 else []
 
-    # Check if XMEAS03 is in Mode 1 (the dominant indicator)
-    xmeas03_in_mode1 = any('XMEAS03' in ind for ind in mode1_indicators)
+    # Check if XMEAS03 is in Mode 1 (the dominant signal)
+    xmeas03_in_mode1 = any('XMEAS03' in ind for ind in mode1_signals)
 
     # Mode 1 affinity (lower = more uncertainty)
     mode1_affinity = float(mode1_data['mode_affinity'].mean()) if mode1_count > 0 else None
@@ -291,7 +291,7 @@ def get_mode1_signal(modes_df: pl.DataFrame, date: 'date') -> Dict:
     return {
         'mode1_count': mode1_count,
         'mode1_present': mode1_count > 0,
-        'mode1_indicators': mode1_indicators[:5],  # Top 5 for display
+        'mode1_signals': mode1_signals[:5],  # Top 5 for display
         'mode1_xmeas03': xmeas03_in_mode1,
         'mode1_affinity': mode1_affinity,
     }
@@ -311,13 +311,13 @@ def get_mode1_warning(modes_df: pl.DataFrame, onset_date: 'date', window_days: i
     # Check window before onset
     before_dates = [onset_date - timedelta(days=d) for d in range(1, window_days + 1)]
     mode1_before = 0
-    mode1_before_indicators = []
+    mode1_before_signals = []
 
     for d in before_dates:
         signal = get_mode1_signal(modes_df, d)
         if signal['mode1_present']:
             mode1_before += signal['mode1_count']
-            mode1_before_indicators.extend(signal.get('mode1_indicators', []))
+            mode1_before_signals.extend(signal.get('mode1_signals', []))
 
     # Check at onset
     at_signal = get_mode1_signal(modes_df, onset_date)
@@ -326,15 +326,15 @@ def get_mode1_warning(modes_df: pl.DataFrame, onset_date: 'date', window_days: i
     # Mode 1 warning: present before OR at onset
     mode1_warning = (mode1_before > 0) or (mode1_at > 0)
 
-    # Unique indicators that entered Mode 1
-    unique_mode1_indicators = list(set(mode1_before_indicators + at_signal.get('mode1_indicators', [])))
+    # Unique signals that entered Mode 1
+    unique_mode1_signals = list(set(mode1_before_signals + at_signal.get('mode1_signals', [])))
 
     return {
         'mode1_warning': mode1_warning,
         'mode1_before': mode1_before,
         'mode1_at': mode1_at,
         'mode1_total': mode1_before + mode1_at,
-        'mode1_indicators': unique_mode1_indicators[:10],  # Top 10
+        'mode1_signals': unique_mode1_signals[:10],  # Top 10
     }
 
 
@@ -497,7 +497,7 @@ def run_integrated_assessment(domain: str):
         if signals.get('mode1_warning', False):
             mode1_warnings += 1
 
-        # Print summary with Mode 1 indicator
+        # Print summary with Mode 1 signal
         disc = signals.get('total_discontinuities', 0)
         aff = signals.get('affinity_trend', 0)
         m1 = "M1!" if signals.get('mode1_warning') else ""
@@ -566,20 +566,20 @@ def run_integrated_assessment(domain: str):
         # Mode 1 breakdown
         total_m1_before = sum(r['signals'].get('mode1_before', 0) for r in results)
         total_m1_at = sum(r['signals'].get('mode1_at', 0) for r in results)
-        print(f"  Mode 1 before onset: {total_m1_before} indicator-days")
-        print(f"  Mode 1 at onset:     {total_m1_at} indicator-days")
+        print(f"  Mode 1 before onset: {total_m1_before} signal-days")
+        print(f"  Mode 1 at onset:     {total_m1_at} signal-days")
         print()
 
-        # Which indicators triggered Mode 1 warnings
-        all_mode1_indicators = []
+        # Which signals triggered Mode 1 warnings
+        all_mode1_signals = []
         for r in results:
             if 'mode1_info' in r and r['mode1_info']:
-                all_mode1_indicators.extend(r['mode1_info'].get('mode1_indicators', []))
+                all_mode1_signals.extend(r['mode1_info'].get('mode1_signals', []))
 
-        if all_mode1_indicators:
+        if all_mode1_signals:
             from collections import Counter
-            mode1_counter = Counter(all_mode1_indicators)
-            print("Top Mode 1 indicators (precursors):")
+            mode1_counter = Counter(all_mode1_signals)
+            print("Top Mode 1 signals (precursors):")
             for ind, count in mode1_counter.most_common(5):
                 print(f"    {ind}: {count} occurrences")
         print()

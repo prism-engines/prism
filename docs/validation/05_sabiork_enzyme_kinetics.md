@@ -15,7 +15,7 @@ This document validates PRISM against enzyme kinetics data from the SABIO-RK dat
 **Michaelis-Menten Subset:**
 - Entries: 31,649 with Michaelis-Menten kinetics
 - Fetched: 50 entries (11 with valid Km and Vmax)
-- Indicators: 33 (3 regimes per entry)
+- Signals: 33 (3 regimes per entry)
 - Observations: 3,300 (100 points per trajectory)
 
 ## Reproducibility
@@ -191,19 +191,19 @@ PRISM successfully distinguishes Michaelis-Menten kinetic regimes:
 data/sabiork/
 ├── raw/
 │   ├── observations.parquet   # Velocity signal topology
-│   └── indicators.parquet     # Enzyme metadata
+│   └── signals.parquet     # Enzyme metadata
 ├── config/
 │   ├── cohorts.parquet
 │   └── cohort_members.parquet
 └── vector/
-    └── indicator.parquet      # PRISM metrics
+    └── signal.parquet      # PRISM metrics
 ```
 
-### Indicator Schema
+### Signal Schema
 
 | Column | Description |
 |--------|-------------|
-| indicator_id | sabiork_{entry_id}_{regime} |
+| signal_id | sabiork_{entry_id}_{regime} |
 | enzyme_name | Enzyme or substrate name |
 | km | Michaelis constant |
 | vmax | Maximum velocity |

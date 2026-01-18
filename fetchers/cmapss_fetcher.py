@@ -22,7 +22,7 @@ Usage:
     observations = fetch(config)
 
 Returns:
-    list[dict] with keys: indicator_id, observed_at, value, source, unit_id, rul
+    list[dict] with keys: signal_id, observed_at, value, source, unit_id, rul
 """
 
 import io
@@ -190,13 +190,13 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
         config: Dict with keys:
             - datasets: List of datasets to fetch (default: ["FD001"])
             - data_type: "train" or "test" (default: "train")
-            - include_rul: Include RUL as separate indicator (default: True)
+            - include_rul: Include RUL as separate signal (default: True)
             - include_ops: Include operating conditions (default: True)
             - cache_dir: Directory for cached downloads
 
     Returns:
         List of observation dicts with keys:
-            indicator_id, observed_at, value, source
+            signal_id, observed_at, value, source
             Plus: unit_id, dataset, cycle (for reference)
     """
     datasets = config.get("datasets", ["FD001"])
@@ -258,7 +258,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
                     value = row[sensor]
                     if pd.notna(value):
                         all_observations.append({
-                            "indicator_id": f"CMAPSS_{sensor}_{dataset}_U{unit_id:03d}",
+                            "signal_id": f"CMAPSS_{sensor}_{dataset}_U{unit_id:03d}",
                             "observed_at": obs_date,
                             "value": float(value),
                             "source": SOURCE,
@@ -271,7 +271,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
                         value = row[op]
                         if pd.notna(value):
                             all_observations.append({
-                                "indicator_id": f"CMAPSS_{op}_{dataset}_U{unit_id:03d}",
+                                "signal_id": f"CMAPSS_{op}_{dataset}_U{unit_id:03d}",
                                 "observed_at": obs_date,
                                 "value": float(value),
                                 "source": SOURCE,
@@ -280,7 +280,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
             # RUL (optional - useful for validation)
             if include_rul and 'RUL' in df.columns and pd.notna(row.get('RUL')):
                 all_observations.append({
-                    "indicator_id": f"CMAPSS_RUL_{dataset}_U{unit_id:03d}",
+                    "signal_id": f"CMAPSS_RUL_{dataset}_U{unit_id:03d}",
                     "observed_at": obs_date,
                     "value": float(row['RUL']),
                     "source": SOURCE,

@@ -61,7 +61,7 @@ except ImportError:
 
 def compute_dfa_with_derivation(
     values: np.ndarray,
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -77,7 +77,7 @@ def compute_dfa_with_derivation(
     deriv = Derivation(
         engine_name="dfa",
         method_name="Detrended Fluctuation Analysis (DFA)",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -239,7 +239,7 @@ from prism.engines.engine_mapping import (
 @dataclass
 class CharacterizationResult:
     """Result of characterization computation."""
-    indicator_id: str
+    signal_id: str
     window_end: date
     window_size: int
 
@@ -285,7 +285,7 @@ class CharacterizationResult:
 
     def to_dict(self) -> dict:
         return {
-            'indicator_id': self.indicator_id,
+            'signal_id': self.signal_id,
             'window_end': self.window_end,
             'window_size': self.window_size,
             'ax_stationarity': self.ax_stationarity,
@@ -332,8 +332,8 @@ class Characterizer:
     3. How should metrics be weighted?
     """
 
-    # Class-level cache for return_method per indicator
-    # This ensures consistency across windows for the same indicator
+    # Class-level cache for return_method per signal
+    # This ensures consistency across windows for the same signal
     _return_method_cache: Dict[str, str] = {}
 
     def __init__(self):
@@ -345,14 +345,14 @@ class Characterizer:
         cls._return_method_cache = {}
 
     @classmethod
-    def set_return_method(cls, indicator_id: str, method: str):
-        """Manually set return_method for an indicator (for configuration override)."""
-        cls._return_method_cache[indicator_id] = method
+    def set_return_method(cls, signal_id: str, method: str):
+        """Manually set return_method for an signal (for configuration override)."""
+        cls._return_method_cache[signal_id] = method
 
     def compute(
         self,
         values: np.ndarray,
-        indicator_id: str = '',
+        signal_id: str = '',
         window_end: Optional[date] = None,
         dates: Optional[np.ndarray] = None,
     ) -> CharacterizationResult:
@@ -361,7 +361,7 @@ class Characterizer:
 
         Args:
             values: Signal values (1D array)
-            indicator_id: Identifier for this indicator
+            signal_id: Identifier for this signal
             window_end: End date of window
             dates: Observation dates (optional, for frequency detection)
 
@@ -407,12 +407,12 @@ class Characterizer:
         metric_weights = self._compute_weights(axes, valid_engines)
 
         # Determine return method
-        return_method = self._determine_return_method(values, indicator_id)
+        return_method = self._determine_return_method(values, signal_id)
 
         # Data handling detection (PR 015)
         frequency, avg_gap_days, max_gap_days = self._detect_frequency(dates)
         is_step, step_duration_mean, unique_ratio, change_ratio = self._detect_step_function(values, dates)
-        quote_convention = self._detect_quote_convention(indicator_id)
+        quote_convention = self._detect_quote_convention(signal_id)
 
         # Gate RQA for step functions - remove from valid engines
         if is_step and 'rqa' in valid_engines:
@@ -437,7 +437,7 @@ class Characterizer:
                 break_metrics = get_break_metrics(values)
                 n_breaks = int(break_metrics.get('break_n', 0))
                 break_rate = break_metrics.get('break_rate', 0.0)
-                # Determine pattern from indicator flags
+                # Determine pattern from signal flags
                 if break_metrics.get('break_is_periodic', 0) > 0:
                     break_pattern = 'PERIODIC'
                 elif break_metrics.get('break_is_accelerating', 0) > 0:
@@ -483,7 +483,7 @@ class Characterizer:
         elapsed_ms = int((time.time() - start) * 1000)
 
         return CharacterizationResult(
-            indicator_id=indicator_id,
+            signal_id=signal_id,
             window_end=window_end,
             window_size=n,
             ax_stationarity=ax_stationarity,
@@ -1094,11 +1094,11 @@ class Characterizer:
         except Exception:
             return 0.0
 
-    def _determine_return_method(self, values: np.ndarray, indicator_id: str = '') -> str:
+    def _determine_return_method(self, values: np.ndarray, signal_id: str = '') -> str:
         """
         Determine appropriate change calculation method.
 
-        IMPORTANT: Once determined for an indicator, the method is cached and
+        IMPORTANT: Once determined for an signal, the method is cached and
         reused for all subsequent windows. This prevents method-flip discontinuities
         where a series fluctuating near threshold boundaries (e.g., values near 0.01)
         would use different methods in different windows, creating artificial
@@ -1109,22 +1109,22 @@ class Characterizer:
             'simple_diff': For rates/spreads/unbounded series
 
         Cache behavior:
-            - First call for an indicator: compute and cache result
+            - First call for an signal: compute and cache result
             - Subsequent calls: return cached result
             - Use clear_return_method_cache() to reset
             - Use set_return_method() to override
         """
         # Check cache first - ensures consistency across windows
-        if indicator_id and indicator_id in self._return_method_cache:
-            return self._return_method_cache[indicator_id]
+        if signal_id and signal_id in self._return_method_cache:
+            return self._return_method_cache[signal_id]
 
         # Determine method based on value characteristics
         method = self._compute_return_method(values)
 
-        # Cache for this indicator if we have an ID
-        if indicator_id:
-            self._return_method_cache[indicator_id] = method
-            logger.debug(f"Cached return_method for {indicator_id}: {method}")
+        # Cache for this signal if we have an ID
+        if signal_id:
+            self._return_method_cache[signal_id] = method
+            logger.debug(f"Cached return_method for {signal_id}: {method}")
 
         return method
 
@@ -1306,12 +1306,12 @@ class Characterizer:
         except Exception:
             return False, None, None, None
 
-    def _detect_quote_convention(self, indicator_id: str) -> Optional[str]:
+    def _detect_quote_convention(self, signal_id: str) -> Optional[str]:
         """
-        Detect quote convention from indicator ID.
+        Detect quote convention from signal ID.
 
         Args:
-            indicator_id: The indicator identifier
+            signal_id: The signal identifier
 
         Returns:
             Quote convention string or None if not applicable
@@ -1414,7 +1414,7 @@ if __name__ == '__main__':
         noise = np.random.randn(500) * 2
         trend_series = trend + noise
 
-        result = char.compute(trend_series, indicator_id='TREND_001')
+        result = char.compute(trend_series, signal_id='TREND_001')
         print(f"\n1. Trending series (sensor degradation):")
         print(f"   Class: {result.dynamical_class}")
         print(f"   Axes: stat={result.ax_stationarity:.2f}, mem={result.ax_memory:.2f}, "
@@ -1427,7 +1427,7 @@ if __name__ == '__main__':
         t = np.linspace(0, 10 * np.pi, 500)
         oscillatory = np.sin(t * 8) + 0.5 * np.sin(t * 13) + 0.3 * np.random.randn(500)
 
-        result = char.compute(oscillatory, indicator_id='VIBRATION_001')
+        result = char.compute(oscillatory, signal_id='VIBRATION_001')
         print(f"\n2. Oscillatory series (vibration sensor):")
         print(f"   Class: {result.dynamical_class}")
         print(f"   Axes: stat={result.ax_stationarity:.2f}, mem={result.ax_memory:.2f}, "
@@ -1441,7 +1441,7 @@ if __name__ == '__main__':
         for i in range(1, 500):
             mean_rev[i] = mean_rev[i-1] * 0.9 + np.random.randn() * 0.5
 
-        result = char.compute(mean_rev, indicator_id='MEAN_REV')
+        result = char.compute(mean_rev, signal_id='MEAN_REV')
         print(f"\n3. Mean-reverting series:")
         print(f"   Class: {result.dynamical_class}")
         print(f"   Axes: stat={result.ax_stationarity:.2f}, mem={result.ax_memory:.2f}, "
@@ -1452,7 +1452,7 @@ if __name__ == '__main__':
         # Test 4: Random walk
         random_walk = np.cumsum(np.random.randn(500))
 
-        result = char.compute(random_walk, indicator_id='RANDOM_WALK')
+        result = char.compute(random_walk, signal_id='RANDOM_WALK')
         print(f"\n4. Random walk:")
         print(f"   Class: {result.dynamical_class}")
         print(f"   Axes: stat={result.ax_stationarity:.2f}, mem={result.ax_memory:.2f}, "
@@ -1467,7 +1467,7 @@ if __name__ == '__main__':
         bounded_pos = np.clip(bounded_pos, 0, 10)  # Keep in bounded range
         bounded_pos[100:200] = 0.1  # Near-zero period
 
-        result = char.compute(bounded_pos, indicator_id='EFFICIENCY_001')
+        result = char.compute(bounded_pos, signal_id='EFFICIENCY_001')
         print(f"\n5. Bounded positive series (efficiency ratio):")
         print(f"   Class: {result.dynamical_class}")
         print(f"   Values: min={bounded_pos.min():.2f}, max={bounded_pos.max():.2f}")
@@ -1475,7 +1475,7 @@ if __name__ == '__main__':
 
         # Test 6: Unbounded series (can be negative, e.g., temperature differential)
         differential = np.random.randn(500) * 0.5 + 0.5  # Can go negative
-        result = char.compute(differential, indicator_id='TEMP_DIFF_001')
+        result = char.compute(differential, signal_id='TEMP_DIFF_001')
         print(f"\n6. Unbounded series (temperature differential):")
         print(f"   Values: min={differential.min():.2f}, max={differential.max():.2f}")
         print(f"   Change method: {result.return_method}")

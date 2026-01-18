@@ -29,7 +29,7 @@
 | **Problem** | Detect sepsis 6 hours before clinical diagnosis |
 | **Why Unsolved** | Current models not reliable enough for clinical use. People die daily. |
 | **Data** | MIMIC-IV (PhysioNet) - 60K+ ICU stays, free |
-| **Indicators** | HR, BP, temp, O2, respiratory rate, labs (~15 channels) |
+| **Signals** | HR, BP, temp, O2, respiratory rate, labs (~15 channels) |
 | **PRISM Fit** | Regime detection on vitals. "Stable → Deteriorating → Septic" |
 | **Size** | ~2-3 GB, Mac Mini friendly |
 | **Outcome** | Life or death. Hospitals will pay. |
@@ -58,7 +58,7 @@ Model: Random Forest on PRISM features
 | **Problem** | Predict remaining useful life of lithium-ion batteries |
 | **Why Unsolved** | Tesla, everyone still guessing. Billions at stake. |
 | **Data** | NASA Battery Dataset, CALCE, Oxford Battery |
-| **Indicators** | Voltage, current, temperature, capacity per cycle |
+| **Signals** | Voltage, current, temperature, capacity per cycle |
 | **PRISM Fit** | Identical to C-MAPSS. Degradation = regime transition. |
 | **Size** | Small datasets, trivial compute |
 | **Outcome** | EV range prediction, grid storage, phones |
@@ -85,7 +85,7 @@ Already beat NASA on turbofans. Batteries are easier.
 | **Problem** | Predict blackouts/instability before they cascade |
 | **Why Unsolved** | Texas 2021, California rolling blackouts, still happens |
 | **Data** | UCI Electrical Grid Stability, various utility datasets |
-| **Indicators** | Frequency, voltage, load, generation across nodes |
+| **Signals** | Frequency, voltage, load, generation across nodes |
 | **PRISM Fit** | Source/sink topology IS the grid. Generation=sources, consumption=sinks. |
 | **Size** | Moderate, Mac Mini OK |
 | **Outcome** | Prevent cascading failures |
@@ -115,7 +115,7 @@ Trigger: Imbalance detection → alert
 | **Problem** | Seconds to minutes of warning before major quake |
 | **Why Unsolved** | Japan gets seconds. Prediction is basically impossible. |
 | **Data** | USGS earthquake catalog, seismic networks |
-| **Indicators** | Seismometer readings, foreshock patterns |
+| **Signals** | Seismometer readings, foreshock patterns |
 | **PRISM Fit** | Regime detection in seismic signals |
 | **Size** | Can be large, needs filtering |
 | **Outcome** | Seconds save lives |
@@ -142,7 +142,7 @@ Foreshock patterns → regime transition detection
 | **Problem** | Predict fire spread for evacuation/resource deployment |
 | **Why Unsolved** | California burns every year |
 | **Data** | Satellite, weather, fuel moisture |
-| **Indicators** | Temp, humidity, wind, fuel, terrain |
+| **Signals** | Temp, humidity, wind, fuel, terrain |
 | **PRISM Fit** | More spatial than temporal. Not ideal. |
 | **Size** | Large imagery data |
 | **Outcome** | Save lives, property |
@@ -170,7 +170,7 @@ Fuel condition characterization
 |-----------|---------|
 | **Problem** | Predict seizures, detect stroke onset |
 | **Data** | PhysioNet EEG datasets, hospital data |
-| **Indicators** | EEG channels (19-256), ECG |
+| **Signals** | EEG channels (19-256), ECG |
 | **PRISM Fit** | Brain states = regimes. Frequency bands = native sampling. |
 | **Prize/Value** | Medical device market, research funding |
 
@@ -184,7 +184,7 @@ Fuel condition characterization
 |-----------|---------|
 | **Problem** | Detect El Niño, tipping points, regime changes |
 | **Data** | NOAA, ERA5 reanalysis, paleoclimate |
-| **Indicators** | SST, pressure, indices (NAO, PDO, ENSO) |
+| **Signals** | SST, pressure, indices (NAO, PDO, ENSO) |
 | **PRISM Fit** | Long signal topology, regime detection |
 | **Prize/Value** | Research grants, policy influence |
 
@@ -204,7 +204,7 @@ Geometry: ocean-atmosphere coupling
 | **Problem** | Predict supply chain breaks before they cascade |
 | **Why Unsolved** | COVID exposed everyone |
 | **Data** | Shipping data, commodity prices, inventory |
-| **Indicators** | Lead times, prices, volumes |
+| **Signals** | Lead times, prices, volumes |
 | **PRISM Fit** | Network stress = geometry |
 | **Prize/Value** | Massive commercial value |
 
@@ -253,10 +253,10 @@ ls data/mimic/raw/
 python -m prism.runners.characterize --domain mimic
 
 # Vector
-python -m prism.runners.indicator_vector --domain mimic
+python -m prism.runners.signal_vector --domain mimic
 
 # Check results
-python -c "import polars as pl; print(pl.read_parquet('data/mimic/vector/indicator.parquet').describe())"
+python -c "import polars as pl; print(pl.read_parquet('data/mimic/vector/signal.parquet').describe())"
 ```
 
 **Sunday Morning:**

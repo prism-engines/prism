@@ -116,7 +116,7 @@ E = T + V = constant
 
 ## 3. Key Findings
 
-1. **Angular velocity (ω₁) is the best chaos indicator** - not angle (θ₁). The angle is bounded while velocity can grow unboundedly in chaotic regimes.
+1. **Angular velocity (ω₁) is the best chaos signal** - not angle (θ₁). The angle is bounded while velocity can grow unboundedly in chaotic regimes.
 
 2. **Sample Entropy is most sensitive** to chaos transition, showing 75% increase from regular to chaotic motion.
 
@@ -206,6 +206,6 @@ data/double_pendulum/
 ├── raw/
 │   └── observations.parquet    # Signal (θ₁, ω₁, θ₂, ω₂, x₂, y₂)
 └── vector/
-    ├── indicator.parquet       # PRISM metrics per variable
+    ├── signal.parquet       # PRISM metrics per variable
     └── trajectory_summary.parquet  # Ground truth labels
 ```

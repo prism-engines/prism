@@ -1,11 +1,11 @@
 """
 PRISM Cohort Definitions
 
-Cohort classification for indicators by domain.
+Cohort classification for signals by domain.
 Used for memory-efficient batched geometry and categorization.
 
 Hierarchy:
-    Domain (data/raw/) → Cohort → Indicator
+    Domain (data/raw/) → Cohort → Signal
 """
 
 from prism.cohorts.climate import (
@@ -16,19 +16,19 @@ from prism.cohorts.climate import (
 )
 
 
-def get_cohort(indicator_id: str, domain: str) -> str:
+def get_cohort(signal_id: str, domain: str) -> str:
     """
-    Get cohort for an indicator.
+    Get cohort for an signal.
 
     Args:
-        indicator_id: The indicator ID
+        signal_id: The signal ID
         domain: Domain name ('climate', etc.)
 
     Returns:
         Cohort name or 'other' if not classified
     """
     if domain == 'climate':
-        return get_climate_cohort(indicator_id)
+        return get_climate_cohort(signal_id)
     else:
         return 'other'
 

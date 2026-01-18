@@ -5,10 +5,10 @@ C-MAPSS: Load into PRISM with proper cohort structure.
 Structure:
 - Domain: cmapss_fd001 (one dataset)
 - Cohorts: u001, u002, ... u100 (one per engine)
-- Indicators: u001_s1, u001_s2, ... (21 sensors per engine)
+- Signals: u001_s1, u001_s2, ... (21 sensors per engine)
 
 This matches PRISM's design:
-- Indicators = individual sensors
+- Signals = individual sensors
 - Cohort = one engine unit (21 sensors)
 - Domain = all engines of same type
 """
@@ -66,7 +66,7 @@ def create_prism_domain(dataset: str) -> str:
     units = sorted(df['unit'].unique())
     print(f"  Units: {len(units)}")
     print(f"  Sensors per unit: {len(SENSOR_COLS)}")
-    print(f"  Total indicators: {len(units) * len(SENSOR_COLS)}")
+    print(f"  Total signals: {len(units) * len(SENSOR_COLS)}")
 
     # ==========================================================================
     # 1. OBSERVATIONS: One row per (unit, cycle, sensor)
@@ -81,7 +81,7 @@ def create_prism_domain(dataset: str) -> str:
 
         for sensor in SENSOR_COLS:
             obs_records.append({
-                'indicator_id': f"u{unit:03d}_{sensor}",
+                'signal_id': f"u{unit:03d}_{sensor}",
                 'obs_date': obs_date,
                 'value': float(row[sensor]),
             })
@@ -91,21 +91,21 @@ def create_prism_domain(dataset: str) -> str:
     print(f"  Observations: {len(observations):,} rows")
 
     # ==========================================================================
-    # 2. INDICATORS: Metadata for each indicator
+    # 2. INDICATORS: Metadata for each signal
     # ==========================================================================
-    indicator_records = []
+    signal_records = []
     for unit in units:
         for sensor in SENSOR_COLS:
-            indicator_records.append({
-                'indicator_id': f"u{unit:03d}_{sensor}",
+            signal_records.append({
+                'signal_id': f"u{unit:03d}_{sensor}",
                 'name': f"Unit {unit} {sensor}",
                 'unit': unit,
                 'sensor': sensor,
             })
 
-    indicators = pl.DataFrame(indicator_records)
-    indicators.write_parquet(domain_dir / 'indicators.parquet')
-    print(f"  Indicators: {len(indicators):,}")
+    signals = pl.DataFrame(signal_records)
+    signals.write_parquet(domain_dir / 'signals.parquet')
+    print(f"  Signals: {len(signals):,}")
 
     # ==========================================================================
     # 3. COHORTS: One cohort per engine unit
@@ -127,14 +127,14 @@ def create_prism_domain(dataset: str) -> str:
     print(f"  Cohorts: {len(cohorts):,}")
 
     # ==========================================================================
-    # 4. COHORT_MEMBERS: Map indicators to cohorts
+    # 4. COHORT_MEMBERS: Map signals to cohorts
     # ==========================================================================
     member_records = []
     for unit in units:
         for sensor in SENSOR_COLS:
             member_records.append({
                 'cohort_id': f"u{unit:03d}",
-                'indicator_id': f"u{unit:03d}_{sensor}",
+                'signal_id': f"u{unit:03d}_{sensor}",
             })
 
     cohort_members = pl.DataFrame(member_records)
@@ -179,7 +179,7 @@ def main():
     print("Structure:")
     print("  Domain: one per dataset")
     print("  Cohorts: one per engine unit")
-    print("  Indicators: 21 sensors per engine")
+    print("  Signals: 21 sensors per engine")
     print()
 
     domain = create_prism_domain(args.dataset)
@@ -188,7 +188,7 @@ def main():
     print(f"Domain created: {domain}")
     print()
     print("Next steps:")
-    print(f"  python -m prism.entry_points.indicator_vector --indicator --domain {domain} --testing")
+    print(f"  python -m prism.entry_points.signal_vector --signal --domain {domain} --testing")
     print(f"  python -m prism.entry_points.cohort_geometry --domain {domain}")
 
 

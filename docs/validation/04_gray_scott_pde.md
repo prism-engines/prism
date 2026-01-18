@@ -204,19 +204,19 @@ PRISM successfully distinguishes Gray-Scott pattern regimes from spatially-avera
 data/the_well/
 ├── raw/
 │   ├── observations.parquet   # Spatial mean signal topology
-│   └── indicators.parquet     # Regime labels
+│   └── signals.parquet     # Regime labels
 ├── config/
 │   ├── cohorts.parquet
 │   └── cohort_members.parquet
 └── vector/
-    └── indicator.parquet      # PRISM metrics
+    └── signal.parquet      # PRISM metrics
 ```
 
-### Indicator Schema
+### Signal Schema
 
 | Column | Description |
 |--------|-------------|
-| indicator_id | gs_{regime}_{traj}_{species}_mean |
+| signal_id | gs_{regime}_{traj}_{species}_mean |
 | regime | Pattern type (gliders, bubbles, etc.) |
 | species | Chemical species (A or B) |
 | trajectory | Trajectory index within regime |

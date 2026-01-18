@@ -3,13 +3,13 @@ Laplacian Pre-Filter
 ====================
 
 Use Laplacian on raw observations to quickly identify
-which indicators are worth running engines on.
+which signals are worth running engines on.
 
 O(n) instead of O(n × engines × 2)
 
 Pipeline:
 ---------
-observations → prefilter.py → filtered_indicators → indicator_vector.py
+observations → prefilter.py → filtered_signals → signal_vector.py
 
 Usage:
 ------
@@ -28,7 +28,7 @@ from prism.db.polars_io import write_parquet_atomic
 
 def laplacian_prefilter(
     observations: pl.DataFrame,
-    indicator_col: str = 'indicator_id',
+    signal_col: str = 'signal_id',
     date_col: str = 'obs_date',
     value_col: str = 'value',
     min_variance: float = 0.001,
@@ -39,7 +39,7 @@ def laplacian_prefilter(
     Fast filter using Laplacian on raw observations.
 
     Returns:
-        (keep_indicators, skip_indicators)
+        (keep_signals, skip_signals)
     """
 
     if verbose:
@@ -47,28 +47,28 @@ def laplacian_prefilter(
         print("LAPLACIAN PRE-FILTER")
         print("=" * 70)
 
-    # Compute Laplacian per indicator
+    # Compute Laplacian per signal
     result = (
         observations
-        .sort([indicator_col, date_col])
+        .sort([signal_col, date_col])
         .with_columns([
             # Raw Laplacian: x(t+1) - 2*x(t) + x(t-1)
             (
-                pl.col(value_col).shift(-1).over(indicator_col) -
+                pl.col(value_col).shift(-1).over(signal_col) -
                 2 * pl.col(value_col) +
-                pl.col(value_col).shift(1).over(indicator_col)
+                pl.col(value_col).shift(1).over(signal_col)
             ).alias('laplacian'),
 
             # First difference (velocity)
-            (pl.col(value_col) - pl.col(value_col).shift(1).over(indicator_col))
+            (pl.col(value_col) - pl.col(value_col).shift(1).over(signal_col))
                 .alias('velocity'),
         ])
     )
 
-    # Aggregate stats per indicator
+    # Aggregate stats per signal
     stats = (
         result
-        .group_by(indicator_col)
+        .group_by(signal_col)
         .agg([
             # Value stats
             pl.col(value_col).std().alias('value_std'),
@@ -101,23 +101,23 @@ def laplacian_prefilter(
         (pl.col('cv') > min_variance) &  # Has variance
         (pl.col('relative_curvature') > min_curvature) &  # Has curvature
         (pl.col('n_obs') >= 100)  # Enough data
-    )[indicator_col].to_list()
+    )[signal_col].to_list()
 
     skip = stats.filter(
         (pl.col('cv') <= min_variance) |
         (pl.col('relative_curvature') <= min_curvature) |
         (pl.col('n_obs') < 100)
-    )[indicator_col].to_list()
+    )[signal_col].to_list()
 
     if verbose:
-        print(f"\n  Total indicators: {len(keep) + len(skip)}")
+        print(f"\n  Total signals: {len(keep) + len(skip)}")
         print(f"  Keep (has signal): {len(keep)}")
         print(f"  Skip (flat/constant): {len(skip)}")
 
         if skip:
-            print(f"\n  Skipped indicators:")
+            print(f"\n  Skipped signals:")
             for ind in skip[:10]:
-                row = stats.filter(pl.col(indicator_col) == ind).to_dicts()[0]
+                row = stats.filter(pl.col(signal_col) == ind).to_dicts()[0]
                 print(f"    {ind}: CV={row['cv']:.4f}, Curv={row['relative_curvature']:.4f}")
             if len(skip) > 10:
                 print(f"    ... and {len(skip) - 10} more")
@@ -127,20 +127,20 @@ def laplacian_prefilter(
 
 def identify_duplicates(
     observations: pl.DataFrame,
-    indicator_col: str = 'indicator_id',
+    signal_col: str = 'signal_id',
     date_col: str = 'obs_date',
     value_col: str = 'value',
     correlation_threshold: float = 0.99,
     verbose: bool = True,
 ) -> dict:
     """
-    Use Laplacian correlation to find near-duplicate indicators.
+    Use Laplacian correlation to find near-duplicate signals.
 
-    If two indicators have nearly identical Laplacian patterns,
+    If two signals have nearly identical Laplacian patterns,
     they're measuring the same thing.
 
     Returns:
-        {indicator: [list of duplicates]}
+        {signal: [list of duplicates]}
     """
 
     if verbose:
@@ -148,22 +148,22 @@ def identify_duplicates(
         print("DUPLICATE DETECTION (Laplacian Correlation)")
         print("=" * 70)
 
-    # Compute Laplacian per indicator
+    # Compute Laplacian per signal
     with_lap = (
         observations
-        .sort([indicator_col, date_col])
+        .sort([signal_col, date_col])
         .with_columns([
             (
-                pl.col(value_col).shift(-1).over(indicator_col) -
+                pl.col(value_col).shift(-1).over(signal_col) -
                 2 * pl.col(value_col) +
-                pl.col(value_col).shift(1).over(indicator_col)
+                pl.col(value_col).shift(1).over(signal_col)
             ).alias('laplacian'),
         ])
     )
 
     # Pivot to wide format for correlation
-    # Each column = indicator's Laplacian series
-    indicators = with_lap[indicator_col].unique().to_list()
+    # Each column = signal's Laplacian series
+    signals = with_lap[signal_col].unique().to_list()
 
     # Build correlation matrix via pairwise comparison
     # (More efficient methods exist, but this is clear)
@@ -171,26 +171,26 @@ def identify_duplicates(
     duplicates = {}
     checked = set()
 
-    for i, ind_a in enumerate(indicators):
+    for i, ind_a in enumerate(signals):
         if ind_a in checked:
             continue
 
         series_a = (
             with_lap
-            .filter(pl.col(indicator_col) == ind_a)
+            .filter(pl.col(signal_col) == ind_a)
             .select([date_col, 'laplacian'])
             .rename({'laplacian': 'lap_a'})
         )
 
         dups = []
 
-        for ind_b in indicators[i+1:]:
+        for ind_b in signals[i+1:]:
             if ind_b in checked:
                 continue
 
             series_b = (
                 with_lap
-                .filter(pl.col(indicator_col) == ind_b)
+                .filter(pl.col(signal_col) == ind_b)
                 .select([date_col, 'laplacian'])
                 .rename({'laplacian': 'lap_b'})
             )
@@ -225,14 +225,14 @@ def identify_duplicates(
 
 def smart_filter(
     observations: pl.DataFrame,
-    indicator_col: str = 'indicator_id',
+    signal_col: str = 'signal_id',
     date_col: str = 'obs_date',
     value_col: str = 'value',
     verbose: bool = True,
 ) -> pl.DataFrame:
     """
     Combined smart filter:
-    1. Remove flat/constant indicators (Laplacian pre-filter)
+    1. Remove flat/constant signals (Laplacian pre-filter)
     2. Remove near-duplicates (keep one representative)
 
     Returns filtered observations ready for engine computation.
@@ -242,39 +242,39 @@ def smart_filter(
         print("=" * 70)
         print("SMART FILTER (Laplacian-based)")
         print("=" * 70)
-        print(f"\n  Input: {observations[indicator_col].n_unique()} indicators")
+        print(f"\n  Input: {observations[signal_col].n_unique()} signals")
 
-    # Step 1: Remove flat indicators
+    # Step 1: Remove flat signals
     keep, skip_flat = laplacian_prefilter(
         observations,
-        indicator_col,
+        signal_col,
         date_col,
         value_col,
         verbose=verbose,
     )
 
-    filtered = observations.filter(pl.col(indicator_col).is_in(keep))
+    filtered = observations.filter(pl.col(signal_col).is_in(keep))
 
     # Step 2: Remove duplicates
     duplicates = identify_duplicates(
         filtered,
-        indicator_col,
+        signal_col,
         date_col,
         value_col,
         verbose=verbose,
     )
 
-    # Get all duplicate indicators (keep the first, remove the rest)
+    # Get all duplicate signals (keep the first, remove the rest)
     remove_dups = set()
     for ind, dups in duplicates.items():
         for dup, _ in dups:
             remove_dups.add(dup)
 
-    final = filtered.filter(~pl.col(indicator_col).is_in(remove_dups))
+    final = filtered.filter(~pl.col(signal_col).is_in(remove_dups))
 
     if verbose:
-        print(f"\n  Final: {final[indicator_col].n_unique()} indicators")
-        print(f"  Removed: {observations[indicator_col].n_unique() - final[indicator_col].n_unique()}")
+        print(f"\n  Final: {final[signal_col].n_unique()} signals")
+        print(f"  Removed: {observations[signal_col].n_unique() - final[signal_col].n_unique()}")
         print(f"    - Flat/constant: {len(skip_flat)}")
         print(f"    - Duplicates: {len(remove_dups)}")
 
@@ -293,8 +293,8 @@ def main():
 O(n) pre-filter before running O(n × engines × 2) engine computation.
 
 Uses Laplacian on raw observations to:
-1. Skip flat/constant indicators (no signal)
-2. Identify near-duplicate indicators (same Laplacian pattern)
+1. Skip flat/constant signals (no signal)
+2. Identify near-duplicate signals (same Laplacian pattern)
 
   python -m prism.entry_points.prefilter
         """
@@ -339,12 +339,12 @@ Uses Laplacian on raw observations to:
         verbose=not args.quiet
     )
 
-    # Save filtered indicator list
-    keep_indicators = filtered['indicator_id'].unique().to_list()
+    # Save filtered signal list
+    keep_signals = filtered['signal_id'].unique().to_list()
 
     filter_df = pl.DataFrame({
-        'indicator_id': keep_indicators,
-        'status': ['keep'] * len(keep_indicators)
+        'signal_id': keep_signals,
+        'status': ['keep'] * len(keep_signals)
     })
 
     output_path = get_parquet_path('config', 'prefilter')
@@ -352,7 +352,7 @@ Uses Laplacian on raw observations to:
 
     if not args.quiet:
         print(f"\nSaved: {output_path}")
-        print(f"Indicators to process: {len(keep_indicators)}")
+        print(f"Signals to process: {len(keep_signals)}")
 
 
 if __name__ == '__main__':

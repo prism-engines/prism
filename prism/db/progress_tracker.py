@@ -2,12 +2,12 @@
 PRISM Progress Tracker
 
 Simple progress tracking for incremental computation.
-Tracks completion at indicator+tier level (not per-window).
+Tracks completion at signal+tier level (not per-window).
 
 Schema:
     schema: str (vector, geometry, state)
-    table: str (indicators, cohorts, pairs)
-    item_id: str (indicator_id or cohort_id)
+    table: str (signals, cohorts, pairs)
+    item_id: str (signal_id or cohort_id)
     tier: str (anchor, bridge, scout, micro)
     status: str (pending, in_progress, completed, failed)
     rows_written: int
@@ -15,7 +15,7 @@ Schema:
     completed_at: datetime (nullable)
 
 Usage:
-    tracker = ProgressTracker("vector", "indicators")
+    tracker = ProgressTracker("vector", "signals")
 
     # Check what's already done
     completed = tracker.get_completed("anchor")
@@ -47,7 +47,7 @@ class ProgressTracker:
 
         Args:
             schema: e.g., "vector", "geometry", "state"
-            table: e.g., "indicators", "cohorts", "pairs"
+            table: e.g., "signals", "cohorts", "pairs"
         """
         self.schema = schema
         self.table = table

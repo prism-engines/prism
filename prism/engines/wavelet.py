@@ -326,7 +326,7 @@ def compute_wavelets(
 
 def compute_wavelets_with_derivation(
     values: np.ndarray,
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -344,7 +344,7 @@ def compute_wavelets_with_derivation(
     deriv = Derivation(
         engine_name="wavelet",
         method_name="Continuous Wavelet Transform (CWT)",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -741,7 +741,7 @@ class WaveletEngine(BaseEngine):
         Run wavelet coherence analysis.
 
         Args:
-            df: Indicator data
+            df: Signal data
             run_id: Unique run identifier
             wavelet: Wavelet type (None = auto-select)
             scales: Wavelet scales (default: logarithmic range)
@@ -751,8 +751,8 @@ class WaveletEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = list(df_clean.columns)
-        n = len(indicators)
+        signals = list(df_clean.columns)
+        n = len(signals)
         n_samples = len(df_clean)
 
         if n_samples < 128:
@@ -772,8 +772,8 @@ class WaveletEngine(BaseEngine):
         results = []
         wavelets_used = set()
 
-        for i, ind1 in enumerate(indicators):
-            for j, ind2 in enumerate(indicators):
+        for i, ind1 in enumerate(signals):
+            for j, ind2 in enumerate(signals):
                 if i >= j:
                     continue
 
@@ -797,8 +797,8 @@ class WaveletEngine(BaseEngine):
                 coherence_summary['wavelet_used'] = use_wavelet
 
                 results.append({
-                    "indicator_id_1": ind1,
-                    "indicator_id_2": ind2,
+                    "signal_id_1": ind1,
+                    "signal_id_2": ind2,
                     "window_start": window_start,
                     "window_end": window_end,
                     **coherence_summary,
@@ -813,7 +813,7 @@ class WaveletEngine(BaseEngine):
         df_results = pd.DataFrame(results)
 
         metrics = {
-            "n_indicators": n,
+            "n_signals": n,
             "n_pairs": len(results),
             "n_samples": n_samples,
             "n_scales": len(scales),

@@ -40,7 +40,7 @@ print(f"Granger p-value: {result['p_value']:.4f}")
 
 ### Vector Engines (9)
 
-Single-indicator intrinsic properties. Input: 1D array. Output: dict of metrics.
+Single-signal intrinsic properties. Input: 1D array. Output: dict of metrics.
 
 | Engine | Function | Measures |
 |--------|----------|----------|
@@ -49,7 +49,7 @@ Single-indicator intrinsic properties. Input: 1D array. Output: dict of metrics.
 | **GARCH** | `compute_garch(values)` | Volatility clustering (alpha, beta) |
 | **Wavelet** | `compute_wavelets(values)` | Multi-scale energy distribution |
 | **Spectral** | `compute_spectral(values)` | Frequency content via FFT |
-| **Lyapunov** | `compute_lyapunov(values)` | Chaos indicator (> 0 = chaotic) |
+| **Lyapunov** | `compute_lyapunov(values)` | Chaos signal (> 0 = chaotic) |
 | **RQA** | `compute_rqa(values)` | Recurrence patterns in phase space |
 | **Realized Vol** | `compute_realized_vol(values)` | Volatility, drawdown, distribution |
 | **Hilbert** | `compute_hilbert(values)` | Amplitude, phase, instantaneous frequency |
@@ -64,7 +64,7 @@ from prism.engines import (
 
 ### Geometry Engines (9)
 
-Multi-indicator relational structure. Input: 2D matrix (observations x indicators). Output: structural metrics.
+Multi-signal relational structure. Input: 2D matrix (observations x signals). Output: structural metrics.
 
 | Engine | Class | Measures |
 |--------|-------|----------|
@@ -88,7 +88,7 @@ from prism.engines import (
 
 ### State Engines (7)
 
-Multi-indicator temporal dynamics. Input: paired signal topology. Output: dynamic relationship metrics.
+Multi-signal temporal dynamics. Input: paired signal topology. Output: dynamic relationship metrics.
 
 | Engine | Class | Measures |
 |--------|-------|----------|

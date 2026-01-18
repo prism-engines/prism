@@ -50,7 +50,7 @@ class TensionDynamicsEngine:
     Compute temporal dynamics of system tension.
 
     Tension is derived from geometry.structure.total_dispersion which measures
-    the average disagreement between timescales across all indicators.
+    the average disagreement between timescales across all signals.
 
     Tension building = system becoming unstable, regime shift possible
     Tension releasing = system converging, stability returning

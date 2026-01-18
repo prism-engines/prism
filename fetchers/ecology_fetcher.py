@@ -2,14 +2,14 @@
 """
 PRISM Ecology Data Fetcher
 
-Fetches ecological and ecosystem health indicators from multiple sources:
+Fetches ecological and ecosystem health signals from multiple sources:
 - NASA MODIS/VIIRS: Vegetation indices, fire, ocean color
 - NOAA: Ocean pH, marine heatwaves
 - WWF: Living Planet Index
 - FAO: Food price index, crop data
 - Global Forest Watch: Deforestation
 
-These indicators show climate consequences on living systems.
+These signals show climate consequences on living systems.
 """
 
 import logging
@@ -32,35 +32,35 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Main fetch function called by prism.entry_points.fetch.
     """
-    indicators = config.get("indicators", [])
+    signals = config.get("signals", [])
     start_date = config.get("start_date", "1970-01-01")
     end_date = config.get("end_date", datetime.now().strftime("%Y-%m-%d"))
 
     all_observations = []
 
-    # Group indicators by source
-    groups = _group_indicators(indicators)
+    # Group signals by source
+    groups = _group_signals(signals)
 
-    for source, source_indicators in groups.items():
-        logger.info(f"Fetching {len(source_indicators)} indicators from {source}")
+    for source, source_signals in groups.items():
+        logger.info(f"Fetching {len(source_signals)} signals from {source}")
 
         try:
             if source == "fao":
-                obs = _fetch_fao(source_indicators, start_date, end_date)
+                obs = _fetch_fao(source_signals, start_date, end_date)
             elif source == "wwf":
-                obs = _fetch_wwf(source_indicators, start_date, end_date)
+                obs = _fetch_wwf(source_signals, start_date, end_date)
             elif source == "nasa_fire":
-                obs = _fetch_nasa_fire(source_indicators, start_date, end_date)
+                obs = _fetch_nasa_fire(source_signals, start_date, end_date)
             elif source == "noaa_ocean":
-                obs = _fetch_noaa_ocean(source_indicators, start_date, end_date)
+                obs = _fetch_noaa_ocean(source_signals, start_date, end_date)
             elif source == "vegetation":
-                obs = _fetch_vegetation(source_indicators, start_date, end_date)
+                obs = _fetch_vegetation(source_signals, start_date, end_date)
             elif source == "phenology":
-                obs = _fetch_phenology(source_indicators, start_date, end_date)
+                obs = _fetch_phenology(source_signals, start_date, end_date)
             elif source == "forest":
-                obs = _fetch_forest(source_indicators, start_date, end_date)
+                obs = _fetch_forest(source_signals, start_date, end_date)
             else:
-                obs = _fetch_derived(source_indicators, start_date, end_date)
+                obs = _fetch_derived(source_signals, start_date, end_date)
 
             all_observations.extend(obs)
             time.sleep(REQUEST_DELAY)
@@ -72,8 +72,8 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     return all_observations
 
 
-def _group_indicators(indicators: List[str]) -> Dict[str, List[str]]:
-    """Group indicators by data source."""
+def _group_signals(signals: List[str]) -> Dict[str, List[str]]:
+    """Group signals by data source."""
     groups = {
         "fao": [],
         "wwf": [],
@@ -117,7 +117,7 @@ def _group_indicators(indicators: List[str]) -> Dict[str, List[str]]:
         "CARBON_SINK": "forest",
     }
 
-    for ind in indicators:
+    for ind in signals:
         assigned = False
         for prefix, source in mapping.items():
             if ind.startswith(prefix):
@@ -134,12 +134,12 @@ def _group_indicators(indicators: List[str]) -> Dict[str, List[str]]:
 # FAO - Food and Agriculture
 # =============================================================================
 
-def _fetch_fao(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_fao(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch FAO food price and crop data."""
     observations = []
 
     # FAO Food Price Index - publicly available
-    if "FOOD_PRICE_INDEX" in indicators:
+    if "FOOD_PRICE_INDEX" in signals:
         try:
             # FAO Food Price Index historical data
             url = "https://www.fao.org/fileadmin/templates/worldfood/Reports_and_docs/Food_price_indices_data_jul24.csv"
@@ -172,21 +172,21 @@ def _fetch_fao(indicators: List[str], start_date: str, end_date: str) -> List[Di
                         obs_date = date(year, month, 15)
                         if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                             observations.append({
-                                "indicator_id": "FOOD_PRICE_INDEX",
+                                "signal_id": "FOOD_PRICE_INDEX",
                                 "observed_at": obs_date,
                                 "value": float(monthly_val),
                                 "source": "fao",
                                 "domain": "ecology",
                             })
 
-            logger.info(f"  Fetched FOOD_PRICE_INDEX: {len([o for o in observations if o['indicator_id'] == 'FOOD_PRICE_INDEX'])} obs")
+            logger.info(f"  Fetched FOOD_PRICE_INDEX: {len([o for o in observations if o['signal_id'] == 'FOOD_PRICE_INDEX'])} obs")
 
         except Exception as e:
             logger.error(f"  Error fetching FAO FPI: {e}")
 
     # Crop yields - use historical approximations based on FAO data
-    crop_indicators = [ind for ind in indicators if ind.startswith("CROP_YIELD")]
-    if crop_indicators:
+    crop_signals = [ind for ind in signals if ind.startswith("CROP_YIELD")]
+    if crop_signals:
         # Global crop yield indices (1961=100 base)
         yield_trends = {
             "CROP_YIELD_GLOBAL": {"base": 100, "growth": 2.0},  # ~2% annual growth
@@ -196,7 +196,7 @@ def _fetch_fao(indicators: List[str], start_date: str, end_date: str) -> List[Di
         }
 
         np.random.seed(42)
-        for ind_id in crop_indicators:
+        for ind_id in crop_signals:
             if ind_id not in yield_trends:
                 continue
 
@@ -214,7 +214,7 @@ def _fetch_fao(indicators: List[str], start_date: str, end_date: str) -> List[Di
                 obs_date = date(year, 7, 1)  # Annual, mid-year
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": ind_id,
+                        "signal_id": ind_id,
                         "observed_at": obs_date,
                         "value": float(value),
                         "source": "fao",
@@ -230,7 +230,7 @@ def _fetch_fao(indicators: List[str], start_date: str, end_date: str) -> List[Di
 # WWF - Living Planet Index & Biodiversity
 # =============================================================================
 
-def _fetch_wwf(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_wwf(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch WWF Living Planet Index and biodiversity data."""
     observations = []
 
@@ -245,7 +245,7 @@ def _fetch_wwf(indicators: List[str], start_date: str, end_date: str) -> List[Di
 
     np.random.seed(123)
 
-    for ind_id in indicators:
+    for ind_id in signals:
         if ind_id in lpi_data:
             params = lpi_data[ind_id]
             start_val = params["1970"]
@@ -263,7 +263,7 @@ def _fetch_wwf(indicators: List[str], start_date: str, end_date: str) -> List[Di
                 obs_date = date(year, 1, 1)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": ind_id,
+                        "signal_id": ind_id,
                         "observed_at": obs_date,
                         "value": float(value),
                         "source": "wwf",
@@ -273,7 +273,7 @@ def _fetch_wwf(indicators: List[str], start_date: str, end_date: str) -> List[Di
             logger.info(f"  Fetched {ind_id}")
 
     # Bird population index (NA breeding bird survey shows ~30% decline since 1970)
-    if "BIRD_POPULATION_NA" in indicators:
+    if "BIRD_POPULATION_NA" in signals:
         for year in range(1970, 2025):
             years_since = year - 1970
             # ~0.7% annual decline on average
@@ -284,7 +284,7 @@ def _fetch_wwf(indicators: List[str], start_date: str, end_date: str) -> List[Di
             obs_date = date(year, 6, 1)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "BIRD_POPULATION_NA",
+                    "signal_id": "BIRD_POPULATION_NA",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "bbs",
@@ -294,7 +294,7 @@ def _fetch_wwf(indicators: List[str], start_date: str, end_date: str) -> List[Di
         logger.info(f"  Fetched BIRD_POPULATION_NA")
 
     # Insect biomass (studies show 75% decline in some regions since 1989)
-    if "INSECT_BIOMASS_INDEX" in indicators:
+    if "INSECT_BIOMASS_INDEX" in signals:
         for year in range(1989, 2025):
             years_since = year - 1989
             # ~2.5% annual decline
@@ -305,7 +305,7 @@ def _fetch_wwf(indicators: List[str], start_date: str, end_date: str) -> List[Di
             obs_date = date(year, 7, 1)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "INSECT_BIOMASS_INDEX",
+                    "signal_id": "INSECT_BIOMASS_INDEX",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "research",
@@ -321,7 +321,7 @@ def _fetch_wwf(indicators: List[str], start_date: str, end_date: str) -> List[Di
 # NASA FIRMS - Fire Data
 # =============================================================================
 
-def _fetch_nasa_fire(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_nasa_fire(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch fire and burned area data."""
     observations = []
 
@@ -337,7 +337,7 @@ def _fetch_nasa_fire(indicators: List[str], start_date: str, end_date: str) -> L
 
     np.random.seed(456)
 
-    for ind_id in indicators:
+    for ind_id in signals:
         if ind_id in fire_patterns:
             params = fire_patterns[ind_id]
 
@@ -352,7 +352,7 @@ def _fetch_nasa_fire(indicators: List[str], start_date: str, end_date: str) -> L
                 obs_date = date(year, 12, 31)  # Annual total
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": ind_id,
+                        "signal_id": ind_id,
                         "observed_at": obs_date,
                         "value": float(value),
                         "source": "modis_firms",
@@ -362,7 +362,7 @@ def _fetch_nasa_fire(indicators: List[str], start_date: str, end_date: str) -> L
             logger.info(f"  Fetched {ind_id}")
 
     # Fire emissions
-    if "FIRE_EMISSIONS_CO2" in indicators:
+    if "FIRE_EMISSIONS_CO2" in signals:
         for year in range(2000, 2025):
             # ~2-3 PgC/year from fires
             base = 2.5
@@ -373,7 +373,7 @@ def _fetch_nasa_fire(indicators: List[str], start_date: str, end_date: str) -> L
             obs_date = date(year, 12, 31)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "FIRE_EMISSIONS_CO2",
+                    "signal_id": "FIRE_EMISSIONS_CO2",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "gfed",
@@ -389,14 +389,14 @@ def _fetch_nasa_fire(indicators: List[str], start_date: str, end_date: str) -> L
 # NOAA - Ocean Biology
 # =============================================================================
 
-def _fetch_noaa_ocean(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_noaa_ocean(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch ocean biological and chemistry data."""
     observations = []
 
     np.random.seed(789)
 
     # Ocean pH (acidification trend: ~0.02 pH units/decade decline)
-    if "OCEAN_PH_GLOBAL" in indicators:
+    if "OCEAN_PH_GLOBAL" in signals:
         for year in range(1990, 2025):
             for month in range(1, 13):
                 years_since = year - 1990
@@ -409,7 +409,7 @@ def _fetch_noaa_ocean(indicators: List[str], start_date: str, end_date: str) -> 
                 obs_date = date(year, month, 15)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": "OCEAN_PH_GLOBAL",
+                        "signal_id": "OCEAN_PH_GLOBAL",
                         "observed_at": obs_date,
                         "value": float(value),
                         "source": "noaa",
@@ -419,7 +419,7 @@ def _fetch_noaa_ocean(indicators: List[str], start_date: str, end_date: str) -> 
         logger.info(f"  Fetched OCEAN_PH_GLOBAL")
 
     # Chlorophyll-a (ocean productivity)
-    chlorophyll_inds = [ind for ind in indicators if ind.startswith("CHLOROPHYLL")]
+    chlorophyll_inds = [ind for ind in signals if ind.startswith("CHLOROPHYLL")]
     for ind_id in chlorophyll_inds:
         base_values = {
             "CHLOROPHYLL_GLOBAL": 0.25,  # mg/m³
@@ -443,7 +443,7 @@ def _fetch_noaa_ocean(indicators: List[str], start_date: str, end_date: str) -> 
                 obs_date = date(year, month, 15)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": ind_id,
+                        "signal_id": ind_id,
                         "observed_at": obs_date,
                         "value": float(value),
                         "source": "modis_ocean",
@@ -453,7 +453,7 @@ def _fetch_noaa_ocean(indicators: List[str], start_date: str, end_date: str) -> 
         logger.info(f"  Fetched {ind_id}")
 
     # Coral bleaching stress
-    if "CORAL_BLEACHING_INDEX" in indicators:
+    if "CORAL_BLEACHING_INDEX" in signals:
         for year in range(1985, 2025):
             # Increasing bleaching events
             base = 0.1
@@ -466,7 +466,7 @@ def _fetch_noaa_ocean(indicators: List[str], start_date: str, end_date: str) -> 
             obs_date = date(year, 9, 1)  # Peak bleaching season
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "CORAL_BLEACHING_INDEX",
+                    "signal_id": "CORAL_BLEACHING_INDEX",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "noaa_crw",
@@ -476,7 +476,7 @@ def _fetch_noaa_ocean(indicators: List[str], start_date: str, end_date: str) -> 
         logger.info(f"  Fetched CORAL_BLEACHING_INDEX")
 
     # Marine heatwave days
-    if "MARINE_HEATWAVE_DAYS" in indicators:
+    if "MARINE_HEATWAVE_DAYS" in signals:
         for year in range(1982, 2025):
             # Increasing trend in MHW days
             base = 20
@@ -487,7 +487,7 @@ def _fetch_noaa_ocean(indicators: List[str], start_date: str, end_date: str) -> 
             obs_date = date(year, 12, 31)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "MARINE_HEATWAVE_DAYS",
+                    "signal_id": "MARINE_HEATWAVE_DAYS",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "noaa",
@@ -503,7 +503,7 @@ def _fetch_noaa_ocean(indicators: List[str], start_date: str, end_date: str) -> 
 # Vegetation Indices
 # =============================================================================
 
-def _fetch_vegetation(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_vegetation(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch vegetation index data."""
     observations = []
 
@@ -516,7 +516,7 @@ def _fetch_vegetation(indicators: List[str], start_date: str, end_date: str) -> 
         "NDVI_BOREAL": {"mean": 0.45, "trend": 0.002},  # Greening
     }
 
-    for ind_id in indicators:
+    for ind_id in signals:
         if ind_id in ndvi_regions:
             params = ndvi_regions[ind_id]
 
@@ -533,7 +533,7 @@ def _fetch_vegetation(indicators: List[str], start_date: str, end_date: str) -> 
                     obs_date = date(year, month, 15)
                     if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                         observations.append({
-                            "indicator_id": ind_id,
+                            "signal_id": ind_id,
                             "observed_at": obs_date,
                             "value": float(value),
                             "source": "modis",
@@ -543,7 +543,7 @@ def _fetch_vegetation(indicators: List[str], start_date: str, end_date: str) -> 
             logger.info(f"  Fetched {ind_id}")
 
     # GPP - Gross Primary Productivity
-    if "GPP_GLOBAL" in indicators:
+    if "GPP_GLOBAL" in signals:
         for year in range(2000, 2025):
             # ~120 PgC/year with slight increase
             base = 120
@@ -554,7 +554,7 @@ def _fetch_vegetation(indicators: List[str], start_date: str, end_date: str) -> 
             obs_date = date(year, 12, 31)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "GPP_GLOBAL",
+                    "signal_id": "GPP_GLOBAL",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "fluxcom",
@@ -570,16 +570,16 @@ def _fetch_vegetation(indicators: List[str], start_date: str, end_date: str) -> 
 # Phenology
 # =============================================================================
 
-def _fetch_phenology(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_phenology(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch phenology (seasonal timing) data."""
     observations = []
 
     np.random.seed(222)
 
     # Spring green-up is advancing ~2-3 days/decade
-    if "GREENUP_NH" in indicators or "GREENUP_NA" in indicators:
+    if "GREENUP_NH" in signals or "GREENUP_NA" in signals:
         for ind_id in ["GREENUP_NH", "GREENUP_NA"]:
-            if ind_id not in indicators:
+            if ind_id not in signals:
                 continue
 
             for year in range(1980, 2025):
@@ -591,7 +591,7 @@ def _fetch_phenology(indicators: List[str], start_date: str, end_date: str) -> L
                 obs_date = date(year, 4, 1)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": ind_id,
+                        "signal_id": ind_id,
                         "observed_at": obs_date,
                         "value": float(value),
                         "source": "modis_phenology",
@@ -601,7 +601,7 @@ def _fetch_phenology(indicators: List[str], start_date: str, end_date: str) -> L
             logger.info(f"  Fetched {ind_id}")
 
     # Growing season length increasing
-    if "GROWING_SEASON_LENGTH" in indicators:
+    if "GROWING_SEASON_LENGTH" in signals:
         for year in range(1980, 2025):
             # Base ~180 days, increasing ~0.5 days/year
             base = 180
@@ -612,7 +612,7 @@ def _fetch_phenology(indicators: List[str], start_date: str, end_date: str) -> L
             obs_date = date(year, 10, 1)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "GROWING_SEASON_LENGTH",
+                    "signal_id": "GROWING_SEASON_LENGTH",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "modis_phenology",
@@ -628,7 +628,7 @@ def _fetch_phenology(indicators: List[str], start_date: str, end_date: str) -> L
 # Forest Loss
 # =============================================================================
 
-def _fetch_forest(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_forest(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch forest loss and carbon sink data."""
     observations = []
 
@@ -642,7 +642,7 @@ def _fetch_forest(indicators: List[str], start_date: str, end_date: str) -> List
         "FOREST_LOSS_CONGO": {"mean": 0.5, "trend": 0.03},
     }
 
-    for ind_id in indicators:
+    for ind_id in signals:
         if ind_id in forest_loss:
             params = forest_loss[ind_id]
 
@@ -655,7 +655,7 @@ def _fetch_forest(indicators: List[str], start_date: str, end_date: str) -> List
                 obs_date = date(year, 12, 31)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": ind_id,
+                        "signal_id": ind_id,
                         "observed_at": obs_date,
                         "value": float(value),
                         "source": "gfw",
@@ -665,7 +665,7 @@ def _fetch_forest(indicators: List[str], start_date: str, end_date: str) -> List
             logger.info(f"  Fetched {ind_id}")
 
     # Carbon sinks
-    if "CARBON_SINK_LAND" in indicators:
+    if "CARBON_SINK_LAND" in signals:
         for year in range(1960, 2025):
             # Land sink ~3 GtC/year with variability
             base = 2.5
@@ -676,7 +676,7 @@ def _fetch_forest(indicators: List[str], start_date: str, end_date: str) -> List
             obs_date = date(year, 12, 31)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "CARBON_SINK_LAND",
+                    "signal_id": "CARBON_SINK_LAND",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "gcb",
@@ -685,7 +685,7 @@ def _fetch_forest(indicators: List[str], start_date: str, end_date: str) -> List
 
         logger.info(f"  Fetched CARBON_SINK_LAND")
 
-    if "CARBON_SINK_OCEAN" in indicators:
+    if "CARBON_SINK_OCEAN" in signals:
         for year in range(1960, 2025):
             # Ocean sink ~2.5 GtC/year, steadily increasing
             base = 1.5
@@ -696,7 +696,7 @@ def _fetch_forest(indicators: List[str], start_date: str, end_date: str) -> List
             obs_date = date(year, 12, 31)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "CARBON_SINK_OCEAN",
+                    "signal_id": "CARBON_SINK_OCEAN",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "gcb",
@@ -709,17 +709,17 @@ def _fetch_forest(indicators: List[str], start_date: str, end_date: str) -> List
 
 
 # =============================================================================
-# Derived/Other Indicators
+# Derived/Other Signals
 # =============================================================================
 
-def _fetch_derived(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
-    """Fetch derived ecological indicators."""
+def _fetch_derived(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
+    """Fetch derived ecological signals."""
     observations = []
 
     np.random.seed(444)
 
     # Mosquito suitability (expanding with warming)
-    if "MOSQUITO_SUITABILITY" in indicators:
+    if "MOSQUITO_SUITABILITY" in signals:
         for year in range(1950, 2025):
             # Index 0-1, increasing with temperature
             base = 0.3
@@ -730,7 +730,7 @@ def _fetch_derived(indicators: List[str], start_date: str, end_date: str) -> Lis
             obs_date = date(year, 7, 1)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "MOSQUITO_SUITABILITY",
+                    "signal_id": "MOSQUITO_SUITABILITY",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "research",
@@ -740,7 +740,7 @@ def _fetch_derived(indicators: List[str], start_date: str, end_date: str) -> Lis
         logger.info(f"  Fetched MOSQUITO_SUITABILITY")
 
     # Lake temperature anomaly
-    if "LAKE_TEMP_ANOMALY" in indicators:
+    if "LAKE_TEMP_ANOMALY" in signals:
         for year in range(1985, 2025):
             # Lakes warming faster than air
             trend = 0.04 * (year - 1985)
@@ -750,7 +750,7 @@ def _fetch_derived(indicators: List[str], start_date: str, end_date: str) -> Lis
             obs_date = date(year, 8, 1)
             if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                 observations.append({
-                    "indicator_id": "LAKE_TEMP_ANOMALY",
+                    "signal_id": "LAKE_TEMP_ANOMALY",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": "research",
@@ -771,7 +771,7 @@ def _parse_date(date_str: str) -> date:
 
 if __name__ == "__main__":
     config = {
-        "indicators": [
+        "signals": [
             "LIVING_PLANET_INDEX", "LPI_FRESHWATER", "LPI_MARINE",
             "NDVI_GLOBAL", "NDVI_AMAZON",
             "FIRE_AREA_GLOBAL", "FIRE_AREA_US",
@@ -787,6 +787,6 @@ if __name__ == "__main__":
     print(f"\nTotal: {len(observations)} observations")
 
     from collections import Counter
-    counts = Counter(o["indicator_id"] for o in observations)
+    counts = Counter(o["signal_id"] for o in observations)
     for ind, cnt in sorted(counts.items()):
         print(f"  {ind}: {cnt}")

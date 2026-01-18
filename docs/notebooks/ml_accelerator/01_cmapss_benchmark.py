@@ -55,8 +55,8 @@ def load_official_data() -> Tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     return train_df, test_df, rul_df
 
 
-def extract_unit_from_indicator(df: pl.DataFrame, id_col: str = 'indicator_id') -> pl.DataFrame:
-    """Extract unit number from indicator_id."""
+def extract_unit_from_signal(df: pl.DataFrame, id_col: str = 'signal_id') -> pl.DataFrame:
+    """Extract unit number from signal_id."""
     return df.with_columns(
         pl.when(pl.col(id_col).str.contains(r'FD001_(\d+)_'))
         .then(pl.col(id_col).str.extract(r'FD001_(\d+)_', 1).cast(pl.Int64))
@@ -67,13 +67,13 @@ def extract_unit_from_indicator(df: pl.DataFrame, id_col: str = 'indicator_id') 
 
 def load_prism_vector_features() -> pl.DataFrame:
     """Load PRISM vector features."""
-    vec_path = PRISM_DIR / 'vector' / 'indicator.parquet'
+    vec_path = PRISM_DIR / 'vector' / 'signal.parquet'
     if not vec_path.exists():
         print(f"WARNING: Vector features not found at {vec_path}")
         return pl.DataFrame()
 
     vec = pl.read_parquet(vec_path)
-    vec = extract_unit_from_indicator(vec)
+    vec = extract_unit_from_signal(vec)
 
     print(f"\n=== PRISM Vector Features ===")
     print(f"Shape: {vec.shape}")
@@ -85,13 +85,13 @@ def load_prism_vector_features() -> pl.DataFrame:
 
 def load_prism_laplace_features() -> pl.DataFrame:
     """Load PRISM Laplace field features (geometry)."""
-    field_path = PRISM_DIR / 'vector' / 'indicator_field.parquet'
+    field_path = PRISM_DIR / 'vector' / 'signal_field.parquet'
     if not field_path.exists():
         print(f"WARNING: Laplace features not found at {field_path}")
         return pl.DataFrame()
 
     field = pl.read_parquet(field_path)
-    field = extract_unit_from_indicator(field)
+    field = extract_unit_from_signal(field)
 
     print(f"\n=== PRISM Laplace Features (Geometry) ===")
     print(f"Shape: {field.shape}")

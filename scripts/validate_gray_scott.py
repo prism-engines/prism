@@ -48,15 +48,15 @@ DATA_DIR = Path('/Users/jasonrudder/prism-mac/data/the_well')
 def load_data():
     """Load Gray-Scott data in PRISM format."""
     obs = pl.read_parquet(DATA_DIR / 'raw' / 'observations.parquet')
-    indicators = pl.read_parquet(DATA_DIR / 'raw' / 'indicators.parquet')
-    return obs, indicators
+    signals = pl.read_parquet(DATA_DIR / 'raw' / 'signals.parquet')
+    return obs, signals
 
 
-def get_values(obs: pl.DataFrame, indicator_id: str) -> np.ndarray:
-    """Extract values for indicator."""
+def get_values(obs: pl.DataFrame, signal_id: str) -> np.ndarray:
+    """Extract values for signal."""
     return (
         obs
-        .filter(pl.col('indicator_id') == indicator_id)
+        .filter(pl.col('signal_id') == signal_id)
         .sort('obs_date')
         .select('value')
         .to_numpy()
@@ -109,9 +109,9 @@ def run_validation():
 
     # Load data
     print("[1] Loading data...")
-    obs, indicators = load_data()
+    obs, signals = load_data()
     print(f"    Observations: {len(obs):,}")
-    print(f"    Indicators: {len(indicators)}")
+    print(f"    Signals: {len(signals)}")
     print()
 
     # Compute PRISM metrics
@@ -120,24 +120,24 @@ def run_validation():
     print("=" * 80)
 
     results = []
-    for row in indicators.iter_rows(named=True):
-        indicator_id = row['indicator_id']
-        values = get_values(obs, indicator_id)
+    for row in signals.iter_rows(named=True):
+        signal_id = row['signal_id']
+        values = get_values(obs, signal_id)
 
         if len(values) < 20:
             continue
 
         metrics = compute_metrics(values)
-        metrics['indicator_id'] = indicator_id
+        metrics['signal_id'] = signal_id
         metrics['regime'] = row['regime']
         metrics['species'] = row['species']
         metrics['trajectory'] = row['trajectory']
         results.append(metrics)
 
-        print(f"  {indicator_id}: n={len(values)}")
+        print(f"  {signal_id}: n={len(values)}")
 
     df = pl.DataFrame(results)
-    print(f"\nComputed metrics for {len(df)} indicators")
+    print(f"\nComputed metrics for {len(df)} signals")
 
     # === TEST: Can PRISM distinguish regimes? ===
     print()
@@ -219,8 +219,8 @@ KEY METRICS:
 """)
 
     # Save results
-    df.write_parquet(DATA_DIR / 'vector' / 'indicator.parquet')
-    print(f"Saved: {DATA_DIR / 'vector' / 'indicator.parquet'}")
+    df.write_parquet(DATA_DIR / 'vector' / 'signal.parquet')
+    print(f"Saved: {DATA_DIR / 'vector' / 'signal.parquet'}")
 
 
 if __name__ == '__main__':

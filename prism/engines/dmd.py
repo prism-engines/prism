@@ -6,7 +6,7 @@ Dynamic Mode Decomposition for dynamic mode results.
 Measures:
 - Eigenvalues (growth/decay rates, frequencies)
 - Mode amplitudes/energies
-- Reconstruction error (structural change indicator)
+- Reconstruction error (structural change signal)
 - Dominant oscillatory modes
 
 Phase: Structure
@@ -72,7 +72,7 @@ class DMDEngine(BaseEngine):
         Run DMD analysis.
         
         Args:
-            df: Normalized indicator data
+            df: Normalized signal data
             run_id: Unique run identifier
             rank: Truncation rank (None = auto via SVD threshold)
             delay_embedding: Time-delay embedding (1 = no embedding)
@@ -271,7 +271,7 @@ class DMDEngine(BaseEngine):
         records = []
         for i, mode in enumerate(sorted_modes[:10]):  # Top 10 modes
             records.append({
-                "indicator_id": f"dmd_mode_{i}",
+                "signal_id": f"dmd_mode_{i}",
                 "window_start": window_start,
                 "window_end": window_end,
                 "dimension": "growth_rate",
@@ -279,7 +279,7 @@ class DMDEngine(BaseEngine):
                 "run_id": run_id,
             })
             records.append({
-                "indicator_id": f"dmd_mode_{i}",
+                "signal_id": f"dmd_mode_{i}",
                 "window_start": window_start,
                 "window_end": window_end,
                 "dimension": "frequency",
@@ -287,7 +287,7 @@ class DMDEngine(BaseEngine):
                 "run_id": run_id,
             })
             records.append({
-                "indicator_id": f"dmd_mode_{i}",
+                "signal_id": f"dmd_mode_{i}",
                 "window_start": window_start,
                 "window_end": window_end,
                 "dimension": "energy",

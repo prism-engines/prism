@@ -1,7 +1,7 @@
 """
 PRISM Distance Engine
 
-Computes geometric distances between indicators.
+Computes geometric distances between signals.
 
 Measures:
 - Euclidean distance
@@ -41,9 +41,9 @@ def _euclidean_distance_matrix(df: pd.DataFrame) -> np.ndarray:
     """
     Compute pairwise Euclidean distances.
 
-    Treats each indicator as a vector in time-space.
+    Treats each signal as a vector in time-space.
     """
-    X = df.values.T  # (n_indicators, n_samples)
+    X = df.values.T  # (n_signals, n_samples)
     n = X.shape[0]
 
     distances = np.zeros((n, n))
@@ -61,13 +61,13 @@ def _mahalanobis_distance_matrix(df: pd.DataFrame) -> np.ndarray:
     Compute pairwise Mahalanobis distances.
 
     Accounts for covariance structure of the data.
-    Uses time-wise covariance (treating indicators as features at each time point).
+    Uses time-wise covariance (treating signals as features at each time point).
     """
-    X = df.values  # (n_samples, n_indicators)
-    n_indicators = X.shape[1]
+    X = df.values  # (n_samples, n_signals)
+    n_signals = X.shape[1]
 
-    # Compute covariance matrix across indicators (correlation structure)
-    cov = np.cov(X.T)  # (n_indicators, n_indicators)
+    # Compute covariance matrix across signals (correlation structure)
+    cov = np.cov(X.T)  # (n_signals, n_signals)
 
     # Handle 1D case
     if cov.ndim == 0:
@@ -78,17 +78,17 @@ def _mahalanobis_distance_matrix(df: pd.DataFrame) -> np.ndarray:
         cov_inv = np.linalg.inv(cov)
     except np.linalg.LinAlgError:
         # Regularize
-        cov_inv = np.linalg.inv(cov + 0.01 * np.eye(n_indicators))
+        cov_inv = np.linalg.inv(cov + 0.01 * np.eye(n_signals))
 
-    # Compute mean vectors for each indicator (its signal topology)
+    # Compute mean vectors for each signal (its signal topology)
     # Then compute Mahalanobis distance between mean-centered representations
-    means = X.mean(axis=0)  # (n_indicators,)
+    means = X.mean(axis=0)  # (n_signals,)
 
-    distances = np.zeros((n_indicators, n_indicators))
-    for i in range(n_indicators):
-        for j in range(i + 1, n_indicators):
+    distances = np.zeros((n_signals, n_signals))
+    for i in range(n_signals):
+        for j in range(i + 1, n_signals):
             # Use the difference in loadings/correlation space
-            diff = np.zeros(n_indicators)
+            diff = np.zeros(n_signals)
             diff[i] = 1
             diff[j] = -1
             dist = np.sqrt(np.abs(diff @ cov_inv @ diff))
@@ -104,7 +104,7 @@ def _cosine_distance_matrix(df: pd.DataFrame) -> np.ndarray:
 
     Measures directional similarity (1 - cosine similarity).
     """
-    X = df.values.T  # (n_indicators, n_samples)
+    X = df.values.T  # (n_signals, n_samples)
     n = X.shape[0]
 
     # Normalize to unit vectors
@@ -143,7 +143,7 @@ class DistanceEngine(BaseEngine):
     """
     Distance engine.
 
-    Computes multiple geometric distance metrics between indicators.
+    Computes multiple geometric distance metrics between signals.
 
     Outputs:
         - results.distances: Pairwise distance matrices
@@ -168,7 +168,7 @@ class DistanceEngine(BaseEngine):
         Run distance analysis.
 
         Args:
-            df: Normalized indicator data
+            df: Normalized signal data
             run_id: Unique run identifier
             methods: List of distance methods (default: all)
 
@@ -179,8 +179,8 @@ class DistanceEngine(BaseEngine):
             methods = ["euclidean", "mahalanobis", "cosine", "correlation"]
 
         df_clean = df
-        indicators = df_clean.columns.tolist()
-        n_indicators = len(indicators)
+        signals = df_clean.columns.tolist()
+        n_signals = len(signals)
 
         window_start, window_end = get_window_dates(df_clean)
 
@@ -204,11 +204,11 @@ class DistanceEngine(BaseEngine):
 
         # Store results
         records = []
-        for i in range(n_indicators):
-            for j in range(i + 1, n_indicators):
+        for i in range(n_signals):
+            for j in range(i + 1, n_signals):
                 record = {
-                    "indicator_1": indicators[i],
-                    "indicator_2": indicators[j],
+                    "signal_1": signals[i],
+                    "signal_2": signals[j],
                     "window_start": window_start,
                     "window_end": window_end,
                     "run_id": run_id,
@@ -225,7 +225,7 @@ class DistanceEngine(BaseEngine):
 
         # Summary metrics
         metrics = {
-            "n_indicators": n_indicators,
+            "n_signals": n_signals,
             "n_pairs": len(records),
             "n_samples": len(df_clean),
             "methods": methods,
@@ -238,7 +238,7 @@ class DistanceEngine(BaseEngine):
             metrics[f"min_{method}_distance"] = float(np.min(condensed))
 
         logger.info(
-            f"Distance complete: {n_indicators} indicators, "
+            f"Distance complete: {n_signals} signals, "
             f"methods={methods}"
         )
 
@@ -252,8 +252,8 @@ class DistanceEngine(BaseEngine):
 def compute_distance_with_derivation(
     x: np.ndarray,
     y: np.ndarray,
-    indicator_x: str = "X",
-    indicator_y: str = "Y",
+    signal_x: str = "X",
+    signal_y: str = "Y",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -265,8 +265,8 @@ def compute_distance_with_derivation(
     Args:
         x: First signal topology
         y: Second signal topology
-        indicator_x: Name of X indicator
-        indicator_y: Name of Y indicator
+        signal_x: Name of X signal
+        signal_y: Name of Y signal
         window_id: Window identifier
         window_start, window_end: Date range
         method: 'euclidean', 'cosine', or 'correlation'
@@ -281,7 +281,7 @@ def compute_distance_with_derivation(
     deriv = Derivation(
         engine_name="distance",
         method_name=f"{method.title()} Distance",
-        indicator_id=f"{indicator_x}_vs_{indicator_y}",
+        signal_id=f"{signal_x}_vs_{signal_y}",
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -293,11 +293,11 @@ def compute_distance_with_derivation(
     deriv.add_step(
         title="Input Vectors",
         equation="x, y ∈ ℝⁿ (signal topology as n-dimensional vectors)",
-        calculation=f"Series {indicator_x}:\n"
+        calculation=f"Series {signal_x}:\n"
                     f"  n = {n} dimensions (time points)\n"
                     f"  mean = {np.mean(x):.6f}\n"
                     f"  norm = ||x|| = {np.linalg.norm(x):.6f}\n\n"
-                    f"Series {indicator_y}:\n"
+                    f"Series {signal_y}:\n"
                     f"  n = {n} dimensions\n"
                     f"  mean = {np.mean(y):.6f}\n"
                     f"  norm = ||y|| = {np.linalg.norm(y):.6f}",
@@ -365,8 +365,8 @@ def compute_distance_with_derivation(
             title="Vector Norms",
             equation="||v|| = √Σᵢvᵢ²",
             calculation=f"Norms:\n"
-                        f"  ||{indicator_x}|| = √Σxᵢ² = {norm_x:.6f}\n"
-                        f"  ||{indicator_y}|| = √Σyᵢ² = {norm_y:.6f}",
+                        f"  ||{signal_x}|| = √Σxᵢ² = {norm_x:.6f}\n"
+                        f"  ||{signal_y}|| = √Σyᵢ² = {norm_y:.6f}",
             result=norm_x,
             result_name="||x||",
             notes="L2 norm measures vector magnitude"
@@ -488,13 +488,13 @@ def compute_distance_with_derivation(
 
     # Interpretation
     if distance < 0.1:
-        interp = f"**Very similar**: {indicator_x} and {indicator_y} ({method} distance = {distance:.4f})."
+        interp = f"**Very similar**: {signal_x} and {signal_y} ({method} distance = {distance:.4f})."
     elif distance < 0.3:
-        interp = f"**Similar**: {indicator_x} and {indicator_y} ({method} distance = {distance:.4f})."
+        interp = f"**Similar**: {signal_x} and {signal_y} ({method} distance = {distance:.4f})."
     elif distance < 0.7:
-        interp = f"**Moderately different**: {indicator_x} and {indicator_y} ({method} distance = {distance:.4f})."
+        interp = f"**Moderately different**: {signal_x} and {signal_y} ({method} distance = {distance:.4f})."
     else:
-        interp = f"**Very different**: {indicator_x} and {indicator_y} ({method} distance = {distance:.4f})."
+        interp = f"**Very different**: {signal_x} and {signal_y} ({method} distance = {distance:.4f})."
 
     deriv.interpretation = interp
 

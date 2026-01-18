@@ -40,7 +40,7 @@ def analyze_prism_lag(domain: str = 'pendulum_regime',
     print(f"Detection threshold: μ + {threshold_sigma}σ")
 
     # Load vector results
-    df = pl.read_parquet(get_parquet_path('vector', 'indicator', domain=domain))
+    df = pl.read_parquet(get_parquet_path('vector', 'signal', domain=domain))
 
     # Convert obs_date to row number (days since 2020-01-01)
     base_date = date(2020, 1, 1)
@@ -48,9 +48,9 @@ def analyze_prism_lag(domain: str = 'pendulum_regime',
         ((pl.col('obs_date') - pl.lit(base_date)).dt.total_days()).alias('row_num')
     ])
 
-    # Get unique indicators
-    indicators = df['indicator_id'].unique().sort().to_list()
-    print(f"\nIndicators: {indicators}")
+    # Get unique signals
+    signals = df['signal_id'].unique().sort().to_list()
+    print(f"\nSignals: {signals}")
 
     # Key signals to test for regime detection
     detection_signals = [
@@ -89,9 +89,9 @@ def analyze_prism_lag(domain: str = 'pendulum_regime',
     print("DETECTION ANALYSIS")
     print("-" * 70)
 
-    for indicator in indicators:
-        print(f"\n[{indicator}]")
-        df_ind = df.filter(pl.col('indicator_id') == indicator)
+    for signal in signals:
+        print(f"\n[{signal}]")
+        df_ind = df.filter(pl.col('signal_id') == signal)
 
         for engine, metric in detection_signals:
             # Get this metric's signal topology
@@ -143,7 +143,7 @@ def analyze_prism_lag(domain: str = 'pendulum_regime',
                 lag_time = lag_rows * 0.01  # dt = 0.01 time units
 
                 result = {
-                    'indicator': indicator,
+                    'signal': signal,
                     'engine': engine,
                     'metric': metric,
                     'baseline_mean': mu,
@@ -161,7 +161,7 @@ def analyze_prism_lag(domain: str = 'pendulum_regime',
                           f"(lag: {lag_rows} rows = {lag_time:.2f}s)")
             else:
                 results.append({
-                    'indicator': indicator,
+                    'signal': signal,
                     'engine': engine,
                     'metric': metric,
                     'baseline_mean': mu,
@@ -189,11 +189,11 @@ def analyze_prism_lag(domain: str = 'pendulum_regime',
 
         print("\nTop 10 Fastest Detections:")
         print("-" * 70)
-        print(f"{'Indicator':<15} {'Engine':<15} {'Metric':<25} {'Lag (rows)':<10} {'Lag (t)':<10}")
+        print(f"{'Signal':<15} {'Engine':<15} {'Metric':<25} {'Lag (rows)':<10} {'Lag (t)':<10}")
         print("-" * 70)
 
         for row in best.iter_rows(named=True):
-            print(f"{row['indicator']:<15} {row['engine']:<15} {row['metric']:<25} "
+            print(f"{row['signal']:<15} {row['engine']:<15} {row['metric']:<25} "
                   f"{row['lag_rows']:<10} {row['lag_time']:.4f}s")
 
         # Average lag by engine

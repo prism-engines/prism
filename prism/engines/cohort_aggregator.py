@@ -2,26 +2,26 @@
 PRISM Cohort Aggregator Engine
 ==============================
 
-Aggregates indicator-level geometry metrics to cohort level.
+Aggregates signal-level geometry metrics to cohort level.
 
-This engine transforms indicator-level barycenters, dispersions, and alignments
+This engine transforms signal-level barycenters, dispersions, and alignments
 into cohort-level summaries for cross-cohort analysis.
 
-Input: geometry.indicators data grouped by cohort
+Input: geometry.signals data grouped by cohort
 Output: Cohort-level aggregate metrics
 
 Key Aggregations:
     - Mean/median dispersion per cohort
     - Mean/median alignment per cohort
-    - Cohort barycenter (centroid of indicator barycenters)
+    - Cohort barycenter (centroid of signal barycenters)
     - Internal cohort coherence
-    - Leading/lagging indicators within cohort
+    - Leading/lagging signals within cohort
 
 Usage:
     from prism.engines.cohort_aggregator import CohortAggregatorEngine
 
     engine = CohortAggregatorEngine()
-    result = engine.run(indicators_df, cohort_members)
+    result = engine.run(signals_df, cohort_members)
 """
 
 import numpy as np
@@ -35,22 +35,22 @@ from scipy.spatial.distance import pdist, euclidean
 class CohortAggregateResult:
     """Result from cohort aggregation."""
     cohort_id: str
-    n_indicators: int
+    n_signals: int
     barycenter: np.ndarray
     dispersion_mean: float
     dispersion_std: float
     alignment_mean: float
     alignment_std: float
     internal_coherence: float
-    spread: float  # How spread out are indicators?
+    spread: float  # How spread out are signals?
     metrics: Dict[str, float]
 
 
 class CohortAggregatorEngine:
     """
-    Aggregate indicator-level metrics to cohort level.
+    Aggregate signal-level metrics to cohort level.
 
-    Takes indicator barycenters and metrics from geometry.indicators
+    Takes signal barycenters and metrics from geometry.signals
     and produces cohort-level summaries for cross-cohort analysis.
     """
 
@@ -59,32 +59,32 @@ class CohortAggregatorEngine:
 
     def run(
         self,
-        indicator_data: pd.DataFrame,
-        cohort_indicators: List[str]
+        signal_data: pd.DataFrame,
+        cohort_signals: List[str]
     ) -> CohortAggregateResult:
         """
         Aggregate metrics for a single cohort.
 
         Args:
-            indicator_data: DataFrame with columns:
-                - indicator_id
+            signal_data: DataFrame with columns:
+                - signal_id
                 - barycenter (as array)
                 - timescale_dispersion
                 - timescale_alignment
-            cohort_indicators: List of indicator IDs in this cohort
+            cohort_signals: List of signal IDs in this cohort
 
         Returns:
             CohortAggregateResult
         """
-        # Filter to cohort indicators
-        cohort_data = indicator_data[
-            indicator_data['indicator_id'].isin(cohort_indicators)
+        # Filter to cohort signals
+        cohort_data = signal_data[
+            signal_data['signal_id'].isin(cohort_signals)
         ]
 
         if cohort_data.empty or len(cohort_data) < 2:
             return CohortAggregateResult(
                 cohort_id='',
-                n_indicators=len(cohort_data),
+                n_signals=len(cohort_data),
                 barycenter=np.array([]),
                 dispersion_mean=0.0,
                 dispersion_std=0.0,
@@ -95,7 +95,7 @@ class CohortAggregatorEngine:
                 metrics={}
             )
 
-        n_indicators = len(cohort_data)
+        n_signals = len(cohort_data)
 
         # Aggregate dispersions
         dispersions = cohort_data['timescale_dispersion'].values
@@ -107,7 +107,7 @@ class CohortAggregatorEngine:
         alignment_mean = float(np.mean(alignments))
         alignment_std = float(np.std(alignments))
 
-        # Compute cohort barycenter (centroid of indicator barycenters)
+        # Compute cohort barycenter (centroid of signal barycenters)
         barycenters = []
         for _, row in cohort_data.iterrows():
             bc = row['barycenter']
@@ -142,7 +142,7 @@ class CohortAggregatorEngine:
 
         return CohortAggregateResult(
             cohort_id='',
-            n_indicators=n_indicators,
+            n_signals=n_signals,
             barycenter=cohort_barycenter,
             dispersion_mean=dispersion_mean,
             dispersion_std=dispersion_std,
@@ -155,23 +155,23 @@ class CohortAggregatorEngine:
 
     def aggregate_all_cohorts(
         self,
-        indicator_data: pd.DataFrame,
+        signal_data: pd.DataFrame,
         cohort_membership: Dict[str, List[str]]
     ) -> Dict[str, CohortAggregateResult]:
         """
         Aggregate metrics for all cohorts.
 
         Args:
-            indicator_data: Full indicator data
-            cohort_membership: Dict mapping cohort_id -> list of indicator_ids
+            signal_data: Full signal data
+            cohort_membership: Dict mapping cohort_id -> list of signal_ids
 
         Returns:
             Dict mapping cohort_id -> CohortAggregateResult
         """
         results = {}
 
-        for cohort_id, indicators in cohort_membership.items():
-            result = self.run(indicator_data, indicators)
+        for cohort_id, signals in cohort_membership.items():
+            result = self.run(signal_data, signals)
             result.cohort_id = cohort_id
             results[cohort_id] = result
 
@@ -210,8 +210,8 @@ class CohortAggregatorEngine:
 
 
 def aggregate_cohort(
-    indicator_data: pd.DataFrame,
-    cohort_indicators: List[str]
+    signal_data: pd.DataFrame,
+    cohort_signals: List[str]
 ) -> Dict[str, Any]:
     """
     Functional interface for cohort aggregation.
@@ -219,10 +219,10 @@ def aggregate_cohort(
     Returns dict with cohort aggregate metrics.
     """
     engine = CohortAggregatorEngine()
-    result = engine.run(indicator_data, cohort_indicators)
+    result = engine.run(signal_data, cohort_signals)
 
     return {
-        'n_indicators': result.n_indicators,
+        'n_signals': result.n_signals,
         'barycenter': result.barycenter.tolist() if len(result.barycenter) > 0 else [],
         'dispersion_mean': result.dispersion_mean,
         'dispersion_std': result.dispersion_std,

@@ -2,7 +2,7 @@
 TEP Modes Computation
 =====================
 
-Compute behavioral modes for TEP indicators using Laplace fingerprints.
+Compute behavioral modes for TEP signals using Laplace fingerprints.
 Lightweight version that samples dates to avoid OOM.
 
 Usage:
@@ -25,7 +25,7 @@ warnings.filterwarnings('ignore')
 
 def compute_tep_modes(domain: str, sample_dates: int = 50):
     """
-    Compute modes for TEP indicators.
+    Compute modes for TEP signals.
 
     Uses lazy evaluation and date sampling to avoid OOM.
     """
@@ -37,7 +37,7 @@ def compute_tep_modes(domain: str, sample_dates: int = 50):
     print("=" * 100)
     print()
 
-    field_path = get_parquet_path('vector', 'indicator_field', domain)
+    field_path = get_parquet_path('vector', 'signal_field', domain)
 
     if not field_path.exists():
         print(f"ERROR: Field data not found at {field_path}")
@@ -50,8 +50,8 @@ def compute_tep_modes(domain: str, sample_dates: int = 50):
 
     # Filter to TEP only
     tep_lf = lf.filter(
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT')
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT')
     )
 
     # Get unique dates
@@ -85,8 +85,8 @@ def compute_tep_modes(domain: str, sample_dates: int = 50):
             pl.scan_parquet(field_path)
             .filter(
                 (pl.col('window_end') == date) &
-                pl.col('indicator_id').str.starts_with('TEP_') &
-                ~pl.col('indicator_id').str.contains('FAULT')
+                pl.col('signal_id').str.starts_with('TEP_') &
+                ~pl.col('signal_id').str.contains('FAULT')
             )
             .collect()
         )
@@ -94,12 +94,12 @@ def compute_tep_modes(domain: str, sample_dates: int = 50):
         if len(date_data) < 10:
             continue
 
-        # Aggregate fingerprint per indicator
+        # Aggregate fingerprint per signal
         agg_exprs = [pl.col(c).mean().alias(c) for c in fingerprint_cols if c in date_data.columns]
         if not agg_exprs:
             continue
 
-        fingerprints = date_data.group_by('indicator_id').agg(agg_exprs)
+        fingerprints = date_data.group_by('signal_id').agg(agg_exprs)
 
         if len(fingerprints) < 5:
             continue
@@ -134,10 +134,10 @@ def compute_tep_modes(domain: str, sample_dates: int = 50):
             entropies = -np.sum(probs * np.log(probs + 1e-10), axis=1)
 
             # Build result
-            indicators = fingerprints['indicator_id'].to_list()
-            for j, ind in enumerate(indicators):
+            signals = fingerprints['signal_id'].to_list()
+            for j, ind in enumerate(signals):
                 all_modes.append({
-                    'indicator_id': ind,
+                    'signal_id': ind,
                     'obs_date': date,
                     'mode_id': int(mode_ids[j]),
                     'mode_affinity': float(affinities[j]),
@@ -161,7 +161,7 @@ def compute_tep_modes(domain: str, sample_dates: int = 50):
     print(f"\nModes computed: {len(modes_df):,} rows")
 
     # Save
-    output_path = get_parquet_path('vector', 'indicator_modes', domain)
+    output_path = get_parquet_path('vector', 'signal_modes', domain)
     write_parquet_atomic(modes_df, output_path)
     print(f"Saved to: {output_path}")
 

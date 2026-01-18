@@ -11,7 +11,7 @@ Usage:
     deriv = Derivation(
         engine_name="hurst_exponent",
         method_name="Rescaled Range (R/S) Analysis",
-        indicator_id="lorenz_x",
+        signal_id="lorenz_x",
         window_id="47",
         sample_size=252
     )

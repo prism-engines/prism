@@ -23,10 +23,10 @@ DATA_DIR = Path("/Users/jasonrudder/prism-mac/data") / DOMAIN
 
 def extract_vector_fingerprint(
     vectors: pl.DataFrame,
-    indicator_id: str,
+    signal_id: str,
 ) -> Optional[Dict]:
     """Extract fingerprint from vector metrics (not field)."""
-    subset = vectors.filter(pl.col('indicator_id') == indicator_id)
+    subset = vectors.filter(pl.col('signal_id') == signal_id)
 
     if len(subset) < 5:
         return None
@@ -34,7 +34,7 @@ def extract_vector_fingerprint(
     # Key metrics for fingerprint
     metrics = ['hurst_exponent', 'sample_entropy', 'realized_vol', 'signal_to_noise']
 
-    fingerprint = {'indicator_id': indicator_id}
+    fingerprint = {'signal_id': signal_id}
 
     for metric in metrics:
         metric_data = subset.filter(pl.col('metric_name') == metric)['metric_value'].drop_nulls()
@@ -77,14 +77,14 @@ def find_optimal_modes(X: np.ndarray, max_modes: int = 10) -> int:
 def discover_cohort_modes(
     vectors: pl.DataFrame,
     cohort_id: str,
-    indicators: List[str],
+    signals: List[str],
     max_modes: int = 10
 ) -> Optional[pd.DataFrame]:
     """Discover modes for a cohort from vector fingerprints."""
 
     # Extract fingerprints
     fingerprints = []
-    for ind in indicators:
+    for ind in signals:
         fp = extract_vector_fingerprint(vectors, ind)
         if fp:
             fp['cohort_id'] = cohort_id
@@ -97,7 +97,7 @@ def discover_cohort_modes(
     fp_df = pd.DataFrame(fingerprints)
 
     # Feature columns
-    feature_cols = [c for c in fp_df.columns if c not in ['indicator_id', 'cohort_id']]
+    feature_cols = [c for c in fp_df.columns if c not in ['signal_id', 'cohort_id']]
 
     X = fp_df[feature_cols].fillna(0).values
     scaler = StandardScaler()
@@ -117,7 +117,7 @@ def discover_cohort_modes(
     mode_affinity = np.max(probs, axis=1)
     mode_entropy = -np.sum(probs * np.log(probs + 1e-10), axis=1)
 
-    result = fp_df[['indicator_id', 'cohort_id']].copy()
+    result = fp_df[['signal_id', 'cohort_id']].copy()
     result['domain_id'] = DOMAIN
     result['mode_id'] = mode_id
     result['mode_affinity'] = mode_affinity
@@ -128,7 +128,7 @@ def discover_cohort_modes(
     for col in feature_cols:
         result[f'fingerprint_{col}'] = fp_df[col].values
 
-    logger.info(f"Cohort {cohort_id}: {best_n} modes from {len(fingerprints)} indicators")
+    logger.info(f"Cohort {cohort_id}: {best_n} modes from {len(fingerprints)} signals")
 
     return result
 
@@ -140,11 +140,11 @@ def main():
 
     # Load data
     print("\n[1] Loading data...")
-    vectors = pl.read_parquet(DATA_DIR / 'vector' / 'indicator.parquet')
+    vectors = pl.read_parquet(DATA_DIR / 'vector' / 'signal.parquet')
     cohort_members = pl.read_parquet(DATA_DIR / 'config' / 'cohort_members.parquet')
 
     vectors = vectors.with_columns([
-        pl.col('indicator_id').str.extract(r'u(\d+)_').cast(pl.Int64).alias('unit'),
+        pl.col('signal_id').str.extract(r'u(\d+)_').cast(pl.Int64).alias('unit'),
     ])
 
     cohorts = cohort_members['cohort_id'].unique().sort().to_list()
@@ -156,11 +156,11 @@ def main():
     all_modes = []
 
     for cohort_id in cohorts:
-        indicators = cohort_members.filter(
+        signals = cohort_members.filter(
             pl.col('cohort_id') == cohort_id
-        )['indicator_id'].to_list()
+        )['signal_id'].to_list()
 
-        modes_df = discover_cohort_modes(vectors, cohort_id, indicators)
+        modes_df = discover_cohort_modes(vectors, cohort_id, signals)
         if modes_df is not None:
             all_modes.append(modes_df)
 

@@ -1,13 +1,13 @@
 """
 PRISM Minimum Spanning Tree Engine
 
-Builds the minimum spanning tree of indicators in behavioral space.
+Builds the minimum spanning tree of signals in behavioral space.
 
 Measures:
 - Total MST weight (sum of edge lengths)
 - Average edge length
 - Max edge length (weakest link)
-- Hub indicators (highest degree in MST)
+- Hub signals (highest degree in MST)
 - MST diameter (longest path)
 
 Phase: Structure
@@ -16,7 +16,7 @@ Normalization: Z-score preferred
 Interpretation:
 - Contracting MST (shorter edges) = behavioral convergence
 - Expanding MST (longer edges) = behavioral divergence
-- High-degree nodes = "bridge" indicators connecting clusters
+- High-degree nodes = "bridge" signals connecting clusters
 """
 
 import logging
@@ -128,9 +128,9 @@ class MSTEngine(BaseEngine):
     """
     Minimum Spanning Tree engine for behavioral space.
     
-    Builds the MST connecting all indicators with minimum total
+    Builds the MST connecting all signals with minimum total
     distance in behavioral space. Reveals structural relationships
-    and "bridge" indicators.
+    and "bridge" signals.
     
     Outputs:
         - results.mst_edges: MST edge list
@@ -156,24 +156,24 @@ class MSTEngine(BaseEngine):
         Run MST analysis on behavioral space.
         
         Args:
-            df: Behavioral vectors (rows=dimensions, cols=indicators)
+            df: Behavioral vectors (rows=dimensions, cols=signals)
             run_id: Unique run identifier
             distance_metric: Distance metric for scipy.pdist
         
         Returns:
             Dict with summary metrics
         """
-        indicators = list(df.columns)
-        n_indicators = len(indicators)
+        signals = list(df.columns)
+        n_signals = len(signals)
         
-        if n_indicators < 2:
-            raise ValueError(f"Need at least 3 indicators for MST, got {n_indicators}")
+        if n_signals < 2:
+            raise ValueError(f"Need at least 3 signals for MST, got {n_signals}")
         
         window_start, window_end = get_window_dates(df)
         
         # Compute pairwise distances
-        # df.T gives us (n_indicators, n_dimensions) for pdist
-        X = df.T.values  # Each row is an indicator's behavioral vector
+        # df.T gives us (n_signals, n_dimensions) for pdist
+        X = df.T.values  # Each row is an signal's behavioral vector
         distances = pdist(X, metric=distance_metric)
         distance_matrix = squareform(distances)
         
@@ -182,7 +182,7 @@ class MSTEngine(BaseEngine):
         
         if not edges:
             logger.warning("MST has no edges")
-            return {"n_indicators": n_indicators, "n_edges": 0}
+            return {"n_signals": n_signals, "n_edges": 0}
         
         # Compute metrics
         edge_weights = [w for _, _, w in edges]
@@ -193,10 +193,10 @@ class MSTEngine(BaseEngine):
         std_weight = np.std(edge_weights)
         
         # Node degrees (connectivity in MST)
-        degrees = _compute_node_degrees(edges, n_indicators)
+        degrees = _compute_node_degrees(edges, n_signals)
         max_degree = max(degrees.values())
         hub_nodes = [i for i, d in degrees.items() if d == max_degree]
-        hub_indicators = [indicators[i] for i in hub_nodes]
+        hub_signals = [signals[i] for i in hub_nodes]
         
         # Leaf nodes (degree 1)
         leaf_count = sum(1 for d in degrees.values() if d == 1)
@@ -206,17 +206,17 @@ class MSTEngine(BaseEngine):
         
         # Store edge list
         self._store_edges(
-            edges, indicators, window_start, window_end, run_id
+            edges, signals, window_start, window_end, run_id
         )
         
         # Store hub information
         self._store_hubs(
-            degrees, indicators, window_start, window_end, run_id
+            degrees, signals, window_start, window_end, run_id
         )
         
         metrics = {
-            "n_indicators": n_indicators,
-            "n_edges": len(edges),  # Should be n_indicators - 1
+            "n_signals": n_signals,
+            "n_edges": len(edges),  # Should be n_signals - 1
             "total_weight": float(total_weight),
             "avg_edge_weight": float(avg_weight),
             "max_edge_weight": float(max_weight),
@@ -230,10 +230,10 @@ class MSTEngine(BaseEngine):
         }
         
         logger.info(
-            f"MST complete: {n_indicators} indicators, "
+            f"MST complete: {n_signals} signals, "
             f"total_weight={total_weight:.4f}, "
             f"diameter={diameter}, "
-            f"hubs={hub_indicators[:3]}"
+            f"hubs={hub_signals[:3]}"
         )
         
         return metrics
@@ -241,7 +241,7 @@ class MSTEngine(BaseEngine):
     def _store_edges(
         self,
         edges: List[Tuple[int, int, float]],
-        indicators: List[str],
+        signals: List[str],
         window_start: date,
         window_end: date,
         run_id: str,
@@ -250,8 +250,8 @@ class MSTEngine(BaseEngine):
         records = []
         for i, j, weight in edges:
             records.append({
-                "indicator_1": indicators[i],
-                "indicator_2": indicators[j],
+                "signal_1": signals[i],
+                "signal_2": signals[j],
                 "window_start": window_start,
                 "window_end": window_end,
                 "edge_weight": float(weight),
@@ -265,7 +265,7 @@ class MSTEngine(BaseEngine):
     def _store_hubs(
         self,
         degrees: Dict[int, int],
-        indicators: List[str],
+        signals: List[str],
         window_start: date,
         window_end: date,
         run_id: str,
@@ -274,7 +274,7 @@ class MSTEngine(BaseEngine):
         records = []
         for node_idx, degree in degrees.items():
             records.append({
-                "indicator_id": indicators[node_idx],
+                "signal_id": signals[node_idx],
                 "window_start": window_start,
                 "window_end": window_end,
                 "mst_degree": int(degree),

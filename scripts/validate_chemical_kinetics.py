@@ -37,16 +37,16 @@ DATA_DIR = Path('/Users/jasonrudder/prism-mac/data/chemical_kinetics')
 def load_data():
     """Load chemical kinetics data."""
     obs = pl.read_parquet(DATA_DIR / 'raw' / 'observations.parquet')
-    indicators = pl.read_parquet(DATA_DIR / 'raw' / 'indicators.parquet')
+    signals = pl.read_parquet(DATA_DIR / 'raw' / 'signals.parquet')
     summary = pl.read_parquet(DATA_DIR / 'raw' / 'trajectory_summary.parquet')
-    return obs, indicators, summary
+    return obs, signals, summary
 
 
-def get_values(obs: pl.DataFrame, indicator_id: str) -> np.ndarray:
-    """Extract values for indicator."""
+def get_values(obs: pl.DataFrame, signal_id: str) -> np.ndarray:
+    """Extract values for signal."""
     return (
         obs
-        .filter(pl.col('indicator_id') == indicator_id)
+        .filter(pl.col('signal_id') == signal_id)
         .sort('obs_date')
         .select('value')
         .to_numpy()
@@ -100,9 +100,9 @@ def run_validation():
 
     # Load data
     print("[1] Loading data...")
-    obs, indicators, summary = load_data()
+    obs, signals, summary = load_data()
     print(f"    Observations: {len(obs):,}")
-    print(f"    Indicators: {len(indicators)}")
+    print(f"    Signals: {len(signals)}")
     print()
 
     # === TEST 1: First-Order Rate Constant Recovery ===
@@ -117,8 +117,8 @@ def run_validation():
 
     for row in first_order.iter_rows(named=True):
         traj = row['trajectory']
-        indicator_id = f"{traj}_concentration"
-        values = get_values(obs, indicator_id)
+        signal_id = f"{traj}_concentration"
+        values = get_values(obs, signal_id)
 
         if len(values) == 0:
             continue
@@ -171,8 +171,8 @@ def run_validation():
 
     for row in second_order.iter_rows(named=True):
         traj = row['trajectory']
-        indicator_id = f"{traj}_concentration"
-        values = get_values(obs, indicator_id)
+        signal_id = f"{traj}_concentration"
+        values = get_values(obs, signal_id)
 
         if len(values) == 0:
             continue
@@ -224,8 +224,8 @@ def run_validation():
 
     for row in oscillating.iter_rows(named=True):
         traj = row['trajectory']
-        indicator_id = f"{traj}_X"
-        values = get_values(obs, indicator_id)
+        signal_id = f"{traj}_X"
+        values = get_values(obs, signal_id)
 
         if len(values) == 0:
             continue
@@ -285,8 +285,8 @@ Key Finding:
 
     # Save results
     all_df = pl.DataFrame(all_results + results_osc, infer_schema_length=None)
-    all_df.write_parquet(DATA_DIR / 'vector' / 'indicator.parquet')
-    print(f"Saved: {DATA_DIR / 'vector' / 'indicator.parquet'}")
+    all_df.write_parquet(DATA_DIR / 'vector' / 'signal.parquet')
+    print(f"Saved: {DATA_DIR / 'vector' / 'signal.parquet'}")
 
 
 if __name__ == '__main__':

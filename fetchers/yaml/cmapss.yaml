@@ -30,10 +30,10 @@ datasets:
 # Data type: "train" has full run-to-failure, "test" is truncated
 data_type: train
 
-# Include RUL (Remaining Useful Life) as indicator for validation
+# Include RUL (Remaining Useful Life) as signal for validation
 include_rul: true
 
-# Include operating conditions as indicators
+# Include operating conditions as signals
 include_ops: true
 
 # Cache directory for downloaded data (optional)

@@ -5,18 +5,18 @@ PRISM Physics Runner
 Tests universal physics laws on signal topology behavioral geometry.
 
 INPUT:
-    state/indicator.parquet    (indicator position over time)
+    state/signal.parquet    (signal position over time)
     state/cohort.parquet       (cohort position over time)
 
 OUTPUT:
-    physics/indicator.parquet  (energy, momentum, action per indicator)
+    physics/signal.parquet  (energy, momentum, action per signal)
     physics/cohort.parquet     (energy, momentum, action per cohort)
     physics/conservation.parquet (system-level conservation tests)
 
 PIPELINE POSITION:
-    indicator_vector → cohort_geometry → cohort_vector → domain_geometry
+    signal_vector → cohort_geometry → cohort_vector → domain_geometry
                                                               ↓
-                                            indicator_state → cohort_state
+                                            signal_state → cohort_state
                                                               ↓
                                                           physics.py
                                                               ↓
@@ -97,7 +97,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # Key columns for upsert
-INDICATOR_PHYSICS_KEY_COLS = ['indicator_id', 'obs_date', 'target_obs']
+INDICATOR_PHYSICS_KEY_COLS = ['signal_id', 'obs_date', 'target_obs']
 COHORT_PHYSICS_KEY_COLS = ['cohort_id', 'obs_date', 'target_obs']
 CONSERVATION_KEY_COLS = ['level', 'entity_id', 'target_obs', 'test_type']
 
@@ -115,11 +115,11 @@ MIN_WINDOWS_FOR_CONSERVATION_TEST = 10
 # DATA LOADING
 # =============================================================================
 
-def load_indicator_state() -> pl.DataFrame:
-    """Load indicator state over time."""
-    path = get_parquet_path('state', 'indicator')
+def load_signal_state() -> pl.DataFrame:
+    """Load signal state over time."""
+    path = get_parquet_path('state', 'signal')
     if not path.exists():
-        raise FileNotFoundError(f"Indicator state not found at {path}")
+        raise FileNotFoundError(f"Signal state not found at {path}")
     return pl.read_parquet(path)
 
 
@@ -303,25 +303,25 @@ def compute_action(
 # PHYSICS COMPUTATIONS - ENTITY LEVEL
 # =============================================================================
 
-def compute_indicator_physics(
-    indicator_id: str,
+def compute_signal_physics(
+    signal_id: str,
     state_df: pl.DataFrame,
     target_obs: int,
 ) -> List[Dict[str, Any]]:
     """
-    Compute physics metrics for a single indicator over time.
+    Compute physics metrics for a single signal over time.
 
     Args:
-        indicator_id: The indicator
-        state_df: Full indicator state DataFrame
+        signal_id: The signal
+        state_df: Full signal state DataFrame
         target_obs: Window size to analyze
 
     Returns:
         List of physics metric dicts (one per time point with sufficient history)
     """
-    # Filter to this indicator and window size
+    # Filter to this signal and window size
     filtered = state_df.filter(
-        (pl.col('indicator_id') == indicator_id) &
+        (pl.col('signal_id') == signal_id) &
         (pl.col('target_obs') == target_obs)
     ).sort('obs_date')
 
@@ -378,7 +378,7 @@ def compute_indicator_physics(
         momentum = compute_momentum(vel)
 
         result = {
-            'indicator_id': indicator_id,
+            'signal_id': signal_id,
             'cohort_id': row.get('cohort_id'),
             'obs_date': row['obs_date'],
             'target_obs': target_obs,
@@ -708,55 +708,55 @@ def run_physics(
     if verbose:
         print("Loading state data...", flush=True)
 
-    indicator_state = load_indicator_state()
+    signal_state = load_signal_state()
     cohort_state = load_cohort_state()
 
     # Filter by date if specified
     if start_date:
-        indicator_state = indicator_state.filter(pl.col('obs_date') >= start_date)
+        signal_state = signal_state.filter(pl.col('obs_date') >= start_date)
         cohort_state = cohort_state.filter(pl.col('obs_date') >= start_date)
     if end_date:
-        indicator_state = indicator_state.filter(pl.col('obs_date') <= end_date)
+        signal_state = signal_state.filter(pl.col('obs_date') <= end_date)
         cohort_state = cohort_state.filter(pl.col('obs_date') <= end_date)
 
-    # Get unique indicators and cohorts
-    all_indicators = indicator_state.select('indicator_id').unique().to_series().to_list()
+    # Get unique signals and cohorts
+    all_signals = signal_state.select('signal_id').unique().to_series().to_list()
     all_cohorts = cohort_state.select('cohort_id').unique().to_series().to_list()
 
     if cohorts:
-        # Filter indicators to those in specified cohorts
-        indicator_cohort_map = dict(
-            indicator_state
-            .select(['indicator_id', 'cohort_id'])
+        # Filter signals to those in specified cohorts
+        signal_cohort_map = dict(
+            signal_state
+            .select(['signal_id', 'cohort_id'])
             .unique()
             .iter_rows()
         )
-        all_indicators = [i for i in all_indicators if indicator_cohort_map.get(i) in cohorts]
+        all_signals = [i for i in all_signals if signal_cohort_map.get(i) in cohorts]
         all_cohorts = [c for c in all_cohorts if c in cohorts]
 
     if verbose:
-        print(f"Indicators to process: {len(all_indicators)}", flush=True)
+        print(f"Signals to process: {len(all_signals)}", flush=True)
         print(f"Cohorts to process: {len(all_cohorts)}", flush=True)
 
     # Get window sizes
-    target_obs_list = indicator_state.select('target_obs').unique().to_series().to_list()
+    target_obs_list = signal_state.select('target_obs').unique().to_series().to_list()
 
     if verbose:
         print(f"Window sizes: {target_obs_list}", flush=True)
 
-    # Process indicators
-    indicator_physics_rows = []
+    # Process signals
+    signal_physics_rows = []
 
     if verbose:
-        print("\nComputing indicator physics...", flush=True)
+        print("\nComputing signal physics...", flush=True)
 
-    for i, indicator_id in enumerate(all_indicators):
+    for i, signal_id in enumerate(all_signals):
         for target_obs in target_obs_list:
-            rows = compute_indicator_physics(indicator_id, indicator_state, target_obs)
-            indicator_physics_rows.extend(rows)
+            rows = compute_signal_physics(signal_id, signal_state, target_obs)
+            signal_physics_rows.extend(rows)
 
         if verbose and (i + 1) % 50 == 0:
-            print(f"  Processed {i + 1}/{len(all_indicators)} indicators", flush=True)
+            print(f"  Processed {i + 1}/{len(all_signals)} signals", flush=True)
 
     # Process cohorts
     cohort_physics_rows = []
@@ -772,17 +772,17 @@ def run_physics(
     # Run conservation tests
     conservation_rows = []
 
-    if run_conservation_tests and len(indicator_physics_rows) > 0:
+    if run_conservation_tests and len(signal_physics_rows) > 0:
         if verbose:
             print("\nRunning conservation tests...", flush=True)
 
         # Convert to DataFrame for easier analysis
-        ind_phys_df = pl.DataFrame(indicator_physics_rows)
+        ind_phys_df = pl.DataFrame(signal_physics_rows)
 
-        for indicator_id in all_indicators[:50]:  # Test subset for speed
+        for signal_id in all_signals[:50]:  # Test subset for speed
             for target_obs in target_obs_list:
                 subset = ind_phys_df.filter(
-                    (pl.col('indicator_id') == indicator_id) &
+                    (pl.col('signal_id') == signal_id) &
                     (pl.col('target_obs') == target_obs)
                 ).sort('obs_date')
 
@@ -797,8 +797,8 @@ def run_physics(
                 # Energy conservation
                 energy_test = test_energy_conservation(energies)
                 energy_test.update({
-                    'level': 'indicator',
-                    'entity_id': indicator_id,
+                    'level': 'signal',
+                    'entity_id': signal_id,
                     'target_obs': target_obs,
                     'computed_at': datetime.now(),
                 })
@@ -807,20 +807,20 @@ def run_physics(
                 # Least action
                 action_test = test_least_action(lagrangians, positions, velocities)
                 action_test.update({
-                    'level': 'indicator',
-                    'entity_id': indicator_id,
+                    'level': 'signal',
+                    'entity_id': signal_id,
                     'target_obs': target_obs,
                     'computed_at': datetime.now(),
                 })
                 conservation_rows.append(action_test)
 
     # Store results
-    if indicator_physics_rows:
-        df = pl.DataFrame(indicator_physics_rows, infer_schema_length=None)
-        path = get_parquet_path('physics', 'indicator')
+    if signal_physics_rows:
+        df = pl.DataFrame(signal_physics_rows, infer_schema_length=None)
+        path = get_parquet_path('physics', 'signal')
         upsert_parquet(df, path, INDICATOR_PHYSICS_KEY_COLS)
         if verbose:
-            print(f"\nWrote {len(indicator_physics_rows):,} indicator physics rows", flush=True)
+            print(f"\nWrote {len(signal_physics_rows):,} signal physics rows", flush=True)
 
     if cohort_physics_rows:
         df = pl.DataFrame(cohort_physics_rows, infer_schema_length=None)
@@ -846,9 +846,9 @@ def run_physics(
                     print(f"    {row['result']}: {row['count']}")
 
     return {
-        'indicators': len(all_indicators),
+        'signals': len(all_signals),
         'cohorts': len(all_cohorts),
-        'indicator_physics_rows': len(indicator_physics_rows),
+        'signal_physics_rows': len(signal_physics_rows),
         'cohort_physics_rows': len(cohort_physics_rows),
         'conservation_tests': len(conservation_rows),
     }
@@ -915,7 +915,7 @@ def main():
     print("  - Entropy increase (second law)")
     print()
     print("Output:")
-    print("  - physics/indicator.parquet (KE, PE, momentum per indicator)")
+    print("  - physics/signal.parquet (KE, PE, momentum per signal)")
     print("  - physics/cohort.parquet (KE, PE, momentum per cohort)")
     print("  - physics/conservation.parquet (test results)")
     print()
@@ -932,9 +932,9 @@ def main():
     print("=" * 80)
     print("COMPLETE")
     print("=" * 80)
-    print(f"Indicators: {result['indicators']}")
+    print(f"Signals: {result['signals']}")
     print(f"Cohorts: {result['cohorts']}")
-    print(f"Indicator physics rows: {result['indicator_physics_rows']}")
+    print(f"Signal physics rows: {result['signal_physics_rows']}")
     print(f"Cohort physics rows: {result['cohort_physics_rows']}")
     print(f"Conservation tests: {result['conservation_tests']}")
 

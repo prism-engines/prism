@@ -249,17 +249,17 @@ def create_prism_observations(
     """
     Create PRISM-format observations from MIMIC vitals.
 
-    Each ICU stay becomes multiple indicators (one per vital sign).
+    Each ICU stay becomes multiple signals (one per vital sign).
     Signal are segmented into windows for regime analysis.
 
     Args:
         vitals: DataFrame with vital measurements
         sepsis_labels: DataFrame with sepsis labels
         window_hours: Total window to analyze (hours)
-        segment_hours: Segment length for PRISM indicators
+        segment_hours: Segment length for PRISM signals
 
     Returns:
-        Tuple of (observations, indicators) DataFrames
+        Tuple of (observations, signals) DataFrames
     """
     obs_rows = []
     ind_rows = []
@@ -322,8 +322,8 @@ def create_prism_observations(
             if len(vital_data) < 10:
                 continue
 
-            # Create indicator
-            indicator_id = f"mimic_{stay_id}_{vital_name}"
+            # Create signal
+            signal_id = f"mimic_{stay_id}_{vital_name}"
 
             # Determine regime
             if has_sepsis:
@@ -334,14 +334,14 @@ def create_prism_observations(
             # Create observations
             for j, obs_row in enumerate(vital_data.iter_rows(named=True)):
                 obs_rows.append({
-                    "indicator_id": indicator_id,
+                    "signal_id": signal_id,
                     "obs_date": obs_row["charttime"],
                     "value": float(obs_row["valuenum"]),
                 })
 
-            # Create indicator metadata
+            # Create signal metadata
             ind_rows.append({
-                "indicator_id": indicator_id,
+                "signal_id": signal_id,
                 "subject_id": subject_id,
                 "stay_id": stay_id,
                 "vital_name": vital_name,
@@ -351,9 +351,9 @@ def create_prism_observations(
             })
 
     observations = pl.DataFrame(obs_rows)
-    indicators = pl.DataFrame(ind_rows)
+    signals = pl.DataFrame(ind_rows)
 
-    return observations, indicators
+    return observations, signals
 
 
 def fetch_mimic_demo(output_dir: Path):
@@ -387,11 +387,11 @@ def fetch_mimic_demo(output_dir: Path):
 
     print()
     print("Creating PRISM observations...")
-    observations, indicators = create_prism_observations(vitals, sepsis)
+    observations, signals = create_prism_observations(vitals, sepsis)
 
     # Save
     observations.write_parquet(output_dir / "raw" / "observations.parquet")
-    indicators.write_parquet(output_dir / "raw" / "indicators.parquet")
+    signals.write_parquet(output_dir / "raw" / "signals.parquet")
 
     # Create cohorts
     cohorts = pl.DataFrame([{
@@ -402,8 +402,8 @@ def fetch_mimic_demo(output_dir: Path):
     cohorts.write_parquet(output_dir / "config" / "cohorts.parquet")
 
     cohort_members = pl.DataFrame([
-        {"cohort_id": "mimic_demo", "indicator_id": ind_id}
-        for ind_id in indicators["indicator_id"].to_list()
+        {"cohort_id": "mimic_demo", "signal_id": ind_id}
+        for ind_id in signals["signal_id"].to_list()
     ])
     cohort_members.write_parquet(output_dir / "config" / "cohort_members.parquet")
 
@@ -413,15 +413,15 @@ def fetch_mimic_demo(output_dir: Path):
     print("MIMIC-IV Demo Processing Complete")
     print("=" * 60)
     print(f"Observations: {len(observations)}")
-    print(f"Indicators: {len(indicators)}")
+    print(f"Signals: {len(signals)}")
     print()
 
     print("Regime summary:")
-    print(indicators.group_by("regime").len())
+    print(signals.group_by("regime").len())
     print()
 
     print("Vital signs:")
-    print(indicators.group_by("vital_name").len())
+    print(signals.group_by("vital_name").len())
     print()
 
     print(f"Saved to {output_dir}")

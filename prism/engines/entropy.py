@@ -29,7 +29,7 @@ except ImportError:
 
 def compute_sample_entropy_with_derivation(
     values: np.ndarray,
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -47,7 +47,7 @@ def compute_sample_entropy_with_derivation(
     deriv = Derivation(
         engine_name="sample_entropy",
         method_name="Sample Entropy (SampEn)",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -188,7 +188,7 @@ def compute_sample_entropy_with_derivation(
 
 def compute_permutation_entropy_with_derivation(
     values: np.ndarray,
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -208,7 +208,7 @@ def compute_permutation_entropy_with_derivation(
     deriv = Derivation(
         engine_name="permutation_entropy",
         method_name="Permutation Entropy (PE)",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -318,7 +318,7 @@ def compute_permutation_entropy_with_derivation(
 
 def compute_entropy(values: np.ndarray) -> dict:
     """
-    Measure entropy of a single indicator.
+    Measure entropy of a single signal.
 
     Args:
         values: Array of observed values (native sampling)

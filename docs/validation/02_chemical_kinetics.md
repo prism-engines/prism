@@ -266,13 +266,13 @@ Generated data location: `data/chemical_kinetics/`
 data/chemical_kinetics/
 ├── raw/
 │   ├── observations.parquet      # Concentration signal topology
-│   ├── indicators.parquet        # Indicator metadata
+│   ├── signals.parquet        # Signal metadata
 │   └── trajectory_summary.parquet # Ground truth parameters
 ├── config/
 │   ├── cohorts.parquet
 │   └── cohort_members.parquet
 └── vector/
-    └── indicator.parquet         # PRISM metrics
+    └── signal.parquet         # PRISM metrics
 ```
 
 ### Generated Trajectories

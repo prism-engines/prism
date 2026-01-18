@@ -39,11 +39,11 @@ def load_trajectory_summary():
     return pl.read_parquet(summary_path)
 
 
-def get_indicator_values(obs: pl.DataFrame, indicator_id: str) -> np.ndarray:
-    """Extract values for a specific indicator."""
+def get_signal_values(obs: pl.DataFrame, signal_id: str) -> np.ndarray:
+    """Extract values for a specific signal."""
     values = (
         obs
-        .filter(pl.col('indicator_id') == indicator_id)
+        .filter(pl.col('signal_id') == signal_id)
         .sort('obs_date')
         .select('value')
         .to_numpy()
@@ -163,8 +163,8 @@ def run_validation():
         print(f"\n  {traj} ({angle}°, {regime}):")
 
         for var in variables:
-            indicator_id = f"{traj}_{var}"
-            values = get_indicator_values(obs, indicator_id)
+            signal_id = f"{traj}_{var}"
+            values = get_signal_values(obs, signal_id)
 
             if len(values) == 0:
                 continue
@@ -177,7 +177,7 @@ def run_validation():
             results.append({
                 'trajectory': traj,
                 'variable': var,
-                'indicator_id': indicator_id,
+                'signal_id': signal_id,
                 'initial_angle': angle,
                 'regime': regime,
                 'true_energy': energy,
@@ -192,7 +192,7 @@ def run_validation():
     print("[4] CHAOS TRANSITION ANALYSIS")
     print("=" * 70)
 
-    # Focus on theta1 (primary chaos indicator)
+    # Focus on theta1 (primary chaos signal)
     theta1_results = results_df.filter(pl.col('variable') == 'theta1').sort('initial_angle')
 
     print("\nAngle vs Lyapunov Exponent (theta1):")
@@ -284,10 +284,10 @@ def run_validation():
             print(f"  [?] Unexpected entropy behavior: {se_10:.4f} → {se_150:.4f}")
 
     # Save results
-    results_df.write_parquet(DATA_DIR / 'vector' / 'indicator.parquet')
+    results_df.write_parquet(DATA_DIR / 'vector' / 'signal.parquet')
     traj_avg.write_parquet(DATA_DIR / 'vector' / 'trajectory_summary.parquet')
 
-    print(f"\n  Saved: {DATA_DIR / 'vector' / 'indicator.parquet'}")
+    print(f"\n  Saved: {DATA_DIR / 'vector' / 'signal.parquet'}")
     print(f"  Saved: {DATA_DIR / 'vector' / 'trajectory_summary.parquet'}")
 
     print()

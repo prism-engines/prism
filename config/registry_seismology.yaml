@@ -1,11 +1,11 @@
 # =============================================================================
-# PRISM Seismology Indicator Registry
+# PRISM Seismology Signal Registry
 # =============================================================================
 #
 # DOMAIN TRANSLATION:
 #     General Term    →  Seismology
 #     ─────────────────────────────────────────
-#     Indicator       →  Fault zone / Region
+#     Signal       →  Fault zone / Region
 #     Daily change    →  Daily earthquake count or energy release
 #     Volatility      →  Magnitude variance
 #     Correlation     →  Cross-fault triggering
@@ -195,7 +195,7 @@ regions:
 # INDICATOR DEFINITIONS
 # =============================================================================
 
-indicators:
+signals:
   COUNT:
     description: "Daily earthquake count"
     unit: "count"

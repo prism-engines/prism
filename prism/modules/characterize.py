@@ -2,17 +2,17 @@
 PRISM Characterize Module
 =========================
 
-Inline characterization for indicators. Called by indicator_vector
+Inline characterization for signals. Called by signal_vector
 to determine which engines to run.
 
 This module wraps the Characterizer engine for inline use.
 
 Usage:
 ------
-    from prism.modules.characterize import characterize_indicator
+    from prism.modules.characterize import characterize_signal
 
-    # In indicator_vector processing loop:
-    char_result = characterize_indicator(indicator_id, values, dates)
+    # In signal_vector processing loop:
+    char_result = characterize_signal(signal_id, values, dates)
     engines_to_run = char_result.valid_engines
     has_discontinuities = char_result.has_steps or char_result.has_impulses
 """
@@ -36,21 +36,21 @@ def _get_characterizer() -> Characterizer:
     return _characterizer
 
 
-def characterize_indicator(
-    indicator_id: str,
+def characterize_signal(
+    signal_id: str,
     values: np.ndarray,
     dates: Optional[np.ndarray] = None,
     window_end: Optional[date] = None,
 ) -> CharacterizationResult:
     """
-    Characterize a single indicator inline.
+    Characterize a single signal inline.
 
-    This is the primary interface for indicator_vector to characterize
-    indicators as they are processed, rather than reading from a
+    This is the primary interface for signal_vector to characterize
+    signals as they are processed, rather than reading from a
     pre-computed characterization parquet.
 
     Args:
-        indicator_id: The indicator identifier
+        signal_id: The signal identifier
         values: Signal values (1D array, will be cleaned of NaN)
         dates: Optional observation dates (for frequency detection)
         window_end: Optional window end date (defaults to today)
@@ -66,7 +66,7 @@ def characterize_indicator(
     char = _get_characterizer()
     return char.compute(
         values=values,
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_end=window_end,
         dates=dates,
     )
@@ -82,7 +82,7 @@ def get_engines_from_characterization(
     Determine which engines to run based on characterization result.
 
     Args:
-        char_result: Result from characterize_indicator()
+        char_result: Result from characterize_signal()
         core_engines: Set of engines that always run
         conditional_engines: Set of engines that run conditionally
         discontinuity_engines: Set of engines for discontinuity analysis
@@ -116,13 +116,13 @@ def get_characterization_summary(char_result: CharacterizationResult) -> Dict[st
     Get a summary dict from characterization result for logging/storage.
 
     Args:
-        char_result: Result from characterize_indicator()
+        char_result: Result from characterize_signal()
 
     Returns:
         Dict with key characterization fields
     """
     return {
-        'indicator_id': char_result.indicator_id,
+        'signal_id': char_result.signal_id,
         'dynamical_class': char_result.dynamical_class,
         'ax_stationarity': char_result.ax_stationarity,
         'ax_memory': char_result.ax_memory,

@@ -103,12 +103,12 @@ Check that normalized outputs have:
 
 ### Long Format (Current)
 ```
-indicator_id | obs_date | engine | metric_name | metric_value | metric_value_norm
+signal_id | obs_date | engine | metric_name | metric_value | metric_value_norm
 ```
 
 ### Wide Format (Alternative)
 ```
-indicator_id | obs_date | hurst_raw | hurst_norm | entropy_raw | entropy_norm | ...
+signal_id | obs_date | hurst_raw | hurst_norm | entropy_raw | entropy_norm | ...
 ```
 
 ## File Outputs
@@ -153,7 +153,7 @@ Now all engines are on comparable scales, and geometry/delta computations are fa
 
 ## Integration Points
 
-### Indicator Vector (indicator_vector.py)
+### Signal Vector (signal_vector.py)
 After raw engine computation, apply normalization before saving.
 
 ### Domain Geometry (domain_geometry_alt.py)

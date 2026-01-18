@@ -297,9 +297,9 @@ python -m prism.runners.characterize --domain bearing --cohort cwru
 ```
 
 ### Phase 2: Vector Layer (Week 1-2)
-Run indicator vector computation for each dataset:
+Run signal vector computation for each dataset:
 ```bash
-python -m prism.runners.indicator_vector --domain <domain> --cohort <cohort>
+python -m prism.runners.signal_vector --domain <domain> --cohort <cohort>
 ```
 
 ### Phase 3: Geometry Layer (Week 2)
@@ -398,7 +398,7 @@ Observation → Vector (behavioral fingerprints)
 python -m prism.runners.characterize --domain bearing --cohort cwru
 
 # 2. Vector
-python -m prism.runners.indicator_vector --domain bearing --cohort cwru
+python -m prism.runners.signal_vector --domain bearing --cohort cwru
 
 # 3. Geometry
 python -m prism.runners.cohort --domain bearing --cohort cwru

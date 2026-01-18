@@ -8,7 +8,7 @@ Persists the window computation schedule so we can:
 - Detect missing windows
 
 Schema:
-    indicator_id: str
+    signal_id: str
     tier: str (anchor, bridge, scout, micro)
     window_end: date
     lookback_start: date
@@ -31,7 +31,7 @@ Usage:
     pending = get_pending_windows(tier='anchor')
 
     # Mark windows as computed
-    mark_computed(indicator_id='SENSOR_01', tier='anchor', window_end=date(2024,1,15))
+    mark_computed(signal_id='SENSOR_01', tier='anchor', window_end=date(2024,1,15))
 """
 
 import logging
@@ -51,14 +51,14 @@ logger = logging.getLogger(__name__)
 SCHEDULE_PATH = Path("data/config/window_schedule.parquet")
 
 
-def _compute_windows_for_indicator(
+def _compute_windows_for_signal(
     obs_dates: np.ndarray,
     target_obs: int,
     stride: int,
     min_obs: int,
 ) -> List[Tuple[date, date, int]]:
     """
-    Compute window endpoints for a single indicator.
+    Compute window endpoints for a single signal.
 
     Returns list of (window_end, lookback_start, actual_obs) tuples.
     """
@@ -92,15 +92,15 @@ def _compute_windows_for_indicator(
 
 def generate_schedule(
     tiers: Optional[List[str]] = None,
-    indicators: Optional[List[str]] = None,
+    signals: Optional[List[str]] = None,
     force: bool = False,
 ) -> Dict[str, int]:
     """
-    Generate the full window schedule for all indicators and tiers.
+    Generate the full window schedule for all signals and tiers.
 
     Args:
         tiers: Specific tiers to generate (default: all)
-        indicators: Specific indicators (default: all)
+        signals: Specific signals (default: all)
         force: Overwrite existing schedule (default: False, only add new)
 
     Returns:
@@ -121,11 +121,11 @@ def generate_schedule(
 
     obs = pl.read_parquet(obs_path)
 
-    if indicators:
-        obs = obs.filter(pl.col("indicator_id").is_in(indicators))
+    if signals:
+        obs = obs.filter(pl.col("signal_id").is_in(signals))
 
-    # Group by indicator
-    indicator_groups = obs.group_by("indicator_id").agg([
+    # Group by signal
+    signal_groups = obs.group_by("signal_id").agg([
         pl.col("obs_date").sort().alias("dates")
     ])
 
@@ -134,7 +134,7 @@ def generate_schedule(
     if not force and SCHEDULE_PATH.exists():
         try:
             existing_df = pl.read_parquet(SCHEDULE_PATH)
-            for row in existing_df.select(["indicator_id", "tier", "window_end"]).iter_rows():
+            for row in existing_df.select(["signal_id", "tier", "window_end"]).iter_rows():
                 existing.add((row[0], row[1], row[2]))
         except Exception:
             pass
@@ -143,8 +143,8 @@ def generate_schedule(
     rows = []
     counts = {tier: 0 for tier in tiers}
 
-    for row in indicator_groups.iter_rows(named=True):
-        indicator_id = row["indicator_id"]
+    for row in signal_groups.iter_rows(named=True):
+        signal_id = row["signal_id"]
         dates = np.array(row["dates"])
 
         for tier in tiers:
@@ -153,16 +153,16 @@ def generate_schedule(
             stride = window_config.stride_days
             min_obs = window_config.min_observations
 
-            windows = _compute_windows_for_indicator(dates, target_obs, stride, min_obs)
+            windows = _compute_windows_for_signal(dates, target_obs, stride, min_obs)
 
             for window_end, lookback_start, actual_obs in windows:
                 # Skip if already exists
-                key = (indicator_id, tier, window_end)
+                key = (signal_id, tier, window_end)
                 if key in existing:
                     continue
 
                 rows.append({
-                    "indicator_id": indicator_id,
+                    "signal_id": signal_id,
                     "tier": tier,
                     "window_end": window_end,
                     "lookback_start": lookback_start,
@@ -216,7 +216,7 @@ def get_schedule_stats() -> pl.DataFrame:
 
 def get_pending_windows(
     tier: Optional[str] = None,
-    indicator_id: Optional[str] = None,
+    signal_id: Optional[str] = None,
     limit: Optional[int] = None,
 ) -> pl.DataFrame:
     """
@@ -224,7 +224,7 @@ def get_pending_windows(
 
     Args:
         tier: Filter by tier
-        indicator_id: Filter by indicator
+        signal_id: Filter by signal
         limit: Max number of windows to return
 
     Returns:
@@ -239,10 +239,10 @@ def get_pending_windows(
     if tier:
         df = df.filter(pl.col("tier") == tier)
 
-    if indicator_id:
-        df = df.filter(pl.col("indicator_id") == indicator_id)
+    if signal_id:
+        df = df.filter(pl.col("signal_id") == signal_id)
 
-    df = df.sort(["tier", "indicator_id", "window_end"])
+    df = df.sort(["tier", "signal_id", "window_end"])
 
     if limit:
         df = df.head(limit)
@@ -251,7 +251,7 @@ def get_pending_windows(
 
 
 def mark_computed(
-    indicator_id: str,
+    signal_id: str,
     tier: str,
     window_end: date,
     status: str = "computed",
@@ -260,7 +260,7 @@ def mark_computed(
     Mark a window as computed (or failed/skipped).
 
     Args:
-        indicator_id: Indicator ID
+        signal_id: Signal ID
         tier: Window tier
         window_end: Window end date
         status: New status (computed, failed, skipped)
@@ -275,7 +275,7 @@ def mark_computed(
 
     # Find matching row
     mask = (
-        (pl.col("indicator_id") == indicator_id) &
+        (pl.col("signal_id") == signal_id) &
         (pl.col("tier") == tier) &
         (pl.col("window_end") == window_end)
     )
@@ -298,7 +298,7 @@ def mark_batch_computed(
     Mark multiple windows as computed in a single operation.
 
     Args:
-        records: List of (indicator_id, tier, window_end) tuples
+        records: List of (signal_id, tier, window_end) tuples
         status: New status
 
     Returns:
@@ -315,11 +315,11 @@ def mark_batch_computed(
 
     # Build update expressions
     def should_update(row):
-        return (row["indicator_id"], row["tier"], row["window_end"]) in to_update
+        return (row["signal_id"], row["tier"], row["window_end"]) in to_update
 
     # More efficient: create a DataFrame of updates and join
     updates_df = pl.DataFrame({
-        "indicator_id": [r[0] for r in records],
+        "signal_id": [r[0] for r in records],
         "tier": [r[1] for r in records],
         "window_end": [r[2] for r in records],
         "_new_status": [status] * len(records),
@@ -329,7 +329,7 @@ def mark_batch_computed(
     # Left join and coalesce
     df = df.join(
         updates_df,
-        on=["indicator_id", "tier", "window_end"],
+        on=["signal_id", "tier", "window_end"],
         how="left",
     ).with_columns([
         pl.coalesce(["_new_status", "status"]).alias("status"),
@@ -341,7 +341,7 @@ def mark_batch_computed(
 
 
 def mark_in_progress(
-    indicator_id: str,
+    signal_id: str,
     tier: str,
     window_end: date,
 ) -> bool:
@@ -351,7 +351,7 @@ def mark_in_progress(
     Call this BEFORE starting computation. If process crashes,
     we can detect orphaned in-progress windows.
     """
-    return mark_computed(indicator_id, tier, window_end, status="in_progress")
+    return mark_computed(signal_id, tier, window_end, status="in_progress")
 
 
 def mark_batch_in_progress(
@@ -430,7 +430,7 @@ def reconcile_with_results() -> Dict[str, int]:
     """
     Reconcile schedule with actual computed results.
 
-    Marks windows as 'computed' if they exist in vector/indicators.parquet
+    Marks windows as 'computed' if they exist in vector/signals.parquet
     but are still marked 'pending' in the schedule.
 
     Returns:
@@ -439,7 +439,7 @@ def reconcile_with_results() -> Dict[str, int]:
     if not SCHEDULE_PATH.exists():
         return {}
 
-    vector_path = get_parquet_path("vector", "indicators")
+    vector_path = get_parquet_path("vector", "signals")
     if not vector_path.exists():
         return {}
 
@@ -448,7 +448,7 @@ def reconcile_with_results() -> Dict[str, int]:
 
     # Get unique computed windows from results
     computed = results.select([
-        "indicator_id",
+        "signal_id",
         pl.col("obs_date").alias("window_end"),
         "target_obs",
     ]).unique()
@@ -469,8 +469,8 @@ def reconcile_with_results() -> Dict[str, int]:
     pending = schedule.filter(pl.col("status") == "pending")
 
     to_update = pending.join(
-        computed.select(["indicator_id", "window_end", "tier"]),
-        on=["indicator_id", "window_end", "tier"],
+        computed.select(["signal_id", "window_end", "tier"]),
+        on=["signal_id", "window_end", "tier"],
         how="inner",
     )
 
@@ -479,21 +479,21 @@ def reconcile_with_results() -> Dict[str, int]:
 
     # Update schedule
     update_keys = set(
-        (r["indicator_id"], r["tier"], r["window_end"])
+        (r["signal_id"], r["tier"], r["window_end"])
         for r in to_update.iter_rows(named=True)
     )
 
     now = datetime.now()
     schedule = schedule.with_columns([
         pl.when(
-            pl.struct(["indicator_id", "tier", "window_end"]).map_elements(
-                lambda x: (x["indicator_id"], x["tier"], x["window_end"]) in update_keys,
+            pl.struct(["signal_id", "tier", "window_end"]).map_elements(
+                lambda x: (x["signal_id"], x["tier"], x["window_end"]) in update_keys,
                 return_dtype=pl.Boolean
             )
         ).then(pl.lit("computed")).otherwise(pl.col("status")).alias("status"),
         pl.when(
-            pl.struct(["indicator_id", "tier", "window_end"]).map_elements(
-                lambda x: (x["indicator_id"], x["tier"], x["window_end"]) in update_keys,
+            pl.struct(["signal_id", "tier", "window_end"]).map_elements(
+                lambda x: (x["signal_id"], x["tier"], x["window_end"]) in update_keys,
                 return_dtype=pl.Boolean
             )
         ).then(pl.lit(now)).otherwise(pl.col("computed_at")).alias("computed_at"),
@@ -510,7 +510,7 @@ def get_missing_windows(tier: Optional[str] = None) -> pl.DataFrame:
     """
     Compare schedule against actual computed results to find missing windows.
 
-    Returns windows that are marked 'computed' but have no data in vector/indicators.parquet.
+    Returns windows that are marked 'computed' but have no data in vector/signals.parquet.
     """
     if not SCHEDULE_PATH.exists():
         return pl.DataFrame()
@@ -522,15 +522,15 @@ def get_missing_windows(tier: Optional[str] = None) -> pl.DataFrame:
         schedule = schedule.filter(pl.col("tier") == tier)
 
     # Load actual results
-    vector_path = get_parquet_path("vector", "indicators")
+    vector_path = get_parquet_path("vector", "signals")
     if not vector_path.exists():
         return schedule  # All are missing
 
     results = pl.read_parquet(vector_path)
 
-    # Get unique (indicator, window_end, target_obs) from results
+    # Get unique (signal, window_end, target_obs) from results
     computed = results.select([
-        "indicator_id",
+        "signal_id",
         "obs_date",  # This is window_end in results
         "target_obs",
     ]).unique()
@@ -550,8 +550,8 @@ def get_missing_windows(tier: Optional[str] = None) -> pl.DataFrame:
     # Find missing by anti-join
     missing = schedule.join(
         computed,
-        left_on=["indicator_id", "window_end", "target_obs_check"],
-        right_on=["indicator_id", "obs_date", "target_obs"],
+        left_on=["signal_id", "window_end", "target_obs_check"],
+        right_on=["signal_id", "obs_date", "target_obs"],
         how="anti",
     )
 
@@ -563,7 +563,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="PRISM Window Schedule Management")
-    parser.add_argument("--generate", action="store_true", help="Generate schedule for all indicators")
+    parser.add_argument("--generate", action="store_true", help="Generate schedule for all signals")
     parser.add_argument("--force", action="store_true", help="Force regenerate (overwrite existing)")
     parser.add_argument("--stats", action="store_true", help="Show schedule statistics")
     parser.add_argument("--pending", action="store_true", help="Show pending windows")

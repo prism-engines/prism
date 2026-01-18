@@ -40,16 +40,16 @@ Output Schema:
 
 Usage:
     # Full production run (all cohorts, all tiers)
-    python -m prism.entry_points.indicator_geometry
+    python -m prism.entry_points.signal_geometry
 
     # Force clear progress tracker
-    python -m prism.entry_points.indicator_geometry --force
+    python -m prism.entry_points.signal_geometry --force
 
     # Testing mode - filter to specific cohort
-    python -m prism.entry_points.indicator_geometry --filter-cohort macro --testing
+    python -m prism.entry_points.signal_geometry --filter-cohort macro --testing
 
     # Testing mode - specific date range
-    python -m prism.entry_points.indicator_geometry --dates 2023-01-01:2023-12-31 --testing
+    python -m prism.entry_points.signal_geometry --dates 2023-01-01:2023-12-31 --testing
 """
 
 import argparse
@@ -130,12 +130,12 @@ logger = logging.getLogger(__name__)
 # DATA FETCHING (orchestration)
 # =============================================================================
 
-def get_curated_indicators() -> Optional[set]:
+def get_curated_signals() -> Optional[set]:
     """
-    Get set of curated (non-redundant) indicators from filter_deep output.
+    Get set of curated (non-redundant) signals from filter_deep output.
 
-    Returns None if no filter output exists (run all indicators).
-    Returns set of indicator IDs if filter output exists.
+    Returns None if no filter output exists (run all signals).
+    Returns set of signal IDs if filter output exists.
     """
     curated_path = Path('data/filter/deep_curated.parquet')
     if not curated_path.exists():
@@ -143,23 +143,23 @@ def get_curated_indicators() -> Optional[set]:
 
     try:
         df = pl.read_parquet(curated_path)
-        return set(df['indicator_id'].to_list())
+        return set(df['signal_id'].to_list())
     except Exception as e:
-        logger.warning(f"Could not read curated indicators: {e}")
+        logger.warning(f"Could not read curated signals: {e}")
         return None
 
 
-def get_redundant_indicators() -> set:
-    """Get set of redundant indicators to exclude."""
+def get_redundant_signals() -> set:
+    """Get set of redundant signals to exclude."""
     redundant_path = Path('data/filter/deep_redundant.parquet')
     if not redundant_path.exists():
         return set()
 
     try:
         df = pl.read_parquet(redundant_path)
-        return set(df['indicator_id'].to_list())
+        return set(df['signal_id'].to_list())
     except Exception as e:
-        logger.warning(f"Could not read redundant indicators: {e}")
+        logger.warning(f"Could not read redundant signals: {e}")
         return set()
 
 
@@ -181,36 +181,36 @@ def get_date_range() -> Tuple[date, date]:
     return min_date, max_date
 
 
-# Cache redundant indicators at module load
+# Cache redundant signals at module load
 _REDUNDANT_INDICATORS: Optional[set] = None
 
 
-def get_cohort_indicators(cohort: str) -> List[str]:
+def get_cohort_signals(cohort: str) -> List[str]:
     """
-    Fetch all indicators in a cohort, excluding redundant ones.
+    Fetch all signals in a cohort, excluding redundant ones.
 
-    Uses filter_deep output if available to exclude redundant indicators.
+    Uses filter_deep output if available to exclude redundant signals.
     """
     global _REDUNDANT_INDICATORS
 
-    # Load redundant indicators once
+    # Load redundant signals once
     if _REDUNDANT_INDICATORS is None:
-        _REDUNDANT_INDICATORS = get_redundant_indicators()
+        _REDUNDANT_INDICATORS = get_redundant_signals()
         if _REDUNDANT_INDICATORS:
-            logger.info(f"Excluding {len(_REDUNDANT_INDICATORS)} redundant indicators from filter_deep")
+            logger.info(f"Excluding {len(_REDUNDANT_INDICATORS)} redundant signals from filter_deep")
 
     cohort_members = pl.read_parquet(get_parquet_path('config', 'cohort_members'))
     # Handle both 'cohort_id' and 'cohort' column names
     cohort_col = 'cohort_id' if 'cohort_id' in cohort_members.columns else 'cohort'
-    indicators = cohort_members.filter(
+    signals = cohort_members.filter(
         pl.col(cohort_col) == cohort
-    ).select('indicator_id').sort('indicator_id').to_series().to_list()
+    ).select('signal_id').sort('signal_id').to_series().to_list()
 
-    # Filter out redundant indicators
+    # Filter out redundant signals
     if _REDUNDANT_INDICATORS:
-        indicators = [ind for ind in indicators if ind not in _REDUNDANT_INDICATORS]
+        signals = [ind for ind in signals if ind not in _REDUNDANT_INDICATORS]
 
-    return indicators
+    return signals
 
 
 def get_all_cohorts() -> List[str]:
@@ -227,38 +227,38 @@ def get_cohort_data_matrix(
     window_days: int
 ) -> pd.DataFrame:
     """
-    Fetch cohort data as a matrix (rows=time, cols=indicators).
+    Fetch cohort data as a matrix (rows=time, cols=signals).
 
-    Returns DataFrame with DateTimeIndex and indicator columns.
+    Returns DataFrame with DateTimeIndex and signal columns.
     """
     window_start = window_end - timedelta(days=window_days)
 
-    # Get cohort indicators
-    indicators = get_cohort_indicators(cohort)
+    # Get cohort signals
+    signals = get_cohort_signals(cohort)
 
     # Lazy scan with filter pushdown (memory efficient)
     filtered = (
         pl.scan_parquet(get_parquet_path('raw', 'observations'))
         .filter(
-            (pl.col('indicator_id').is_in(indicators)) &
+            (pl.col('signal_id').is_in(signals)) &
             (pl.col('obs_date') >= window_start) &
             (pl.col('obs_date') <= window_end)
         )
-        .select(['obs_date', 'indicator_id', 'value'])
+        .select(['obs_date', 'signal_id', 'value'])
         .collect()
     )
 
     if filtered.is_empty():
         return pd.DataFrame()
 
-    # Deduplicate: take last value for each (indicator_id, obs_date) pair
-    filtered = filtered.group_by(['indicator_id', 'obs_date']).agg(
+    # Deduplicate: take last value for each (signal_id, obs_date) pair
+    filtered = filtered.group_by(['signal_id', 'obs_date']).agg(
         pl.col('value').last()
     )
 
     # Pivot to matrix format using Polars
     pivoted = filtered.pivot(
-        on='indicator_id',
+        on='signal_id',
         index='obs_date',
         values='value'
     ).sort('obs_date')
@@ -286,7 +286,7 @@ def get_pairwise_data(
     window_days: int
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Fetch aligned signal topology for two indicators.
+    Fetch aligned signal topology for two signals.
 
     Returns (series_a, series_b) as numpy arrays.
     """
@@ -295,11 +295,11 @@ def get_pairwise_data(
     # Lazy scan with filter pushdown (memory efficient)
     obs_path = get_parquet_path('raw', 'observations')
 
-    # Get data for both indicators
+    # Get data for both signals
     data_a = (
         pl.scan_parquet(obs_path)
         .filter(
-            (pl.col('indicator_id') == ind_a) &
+            (pl.col('signal_id') == ind_a) &
             (pl.col('obs_date') >= window_start) &
             (pl.col('obs_date') <= window_end)
         )
@@ -311,7 +311,7 @@ def get_pairwise_data(
     data_b = (
         pl.scan_parquet(obs_path)
         .filter(
-            (pl.col('indicator_id') == ind_b) &
+            (pl.col('signal_id') == ind_b) &
             (pl.col('obs_date') >= window_start) &
             (pl.col('obs_date') <= window_end)
         )
@@ -330,7 +330,7 @@ def get_pairwise_data(
     return aligned['value_a'].to_numpy(), aligned['value_b'].to_numpy()
 
 
-def get_indicator_window_vectors(
+def get_signal_window_vectors(
     cohort: str,
     window_end: date,
     window_sizes: List[int]
@@ -338,30 +338,30 @@ def get_indicator_window_vectors(
     """
     Build window_vectors dict for barycenter computation.
 
-    For each indicator, fetch signal topology for each window size and create
+    For each signal, fetch signal topology for each window size and create
     feature vectors (simple stats as representation).
 
     Returns:
-        Dict mapping indicator_id -> {window_days: feature_vector}
+        Dict mapping signal_id -> {window_days: feature_vector}
     """
-    indicators = get_cohort_indicators(cohort)
+    signals = get_cohort_signals(cohort)
     window_vectors = {}
 
     # Lazy scan with cohort filter pushdown (memory efficient)
     obs_cohort = (
         pl.scan_parquet(get_parquet_path('raw', 'observations'))
-        .filter(pl.col('indicator_id').is_in(indicators))
+        .filter(pl.col('signal_id').is_in(signals))
         .collect()
     )
 
-    for indicator_id in indicators:
+    for signal_id in signals:
         vectors = {}
 
         for window_days in window_sizes:
             window_start = window_end - timedelta(days=window_days)
 
             df = obs_cohort.filter(
-                (pl.col('indicator_id') == indicator_id) &
+                (pl.col('signal_id') == signal_id) &
                 (pl.col('obs_date') >= window_start) &
                 (pl.col('obs_date') <= window_end)
             ).sort('obs_date')
@@ -378,7 +378,7 @@ def get_indicator_window_vectors(
                 ])
 
         if vectors:
-            window_vectors[indicator_id] = vectors
+            window_vectors[signal_id] = vectors
 
     return window_vectors
 
@@ -394,7 +394,7 @@ def compute_cohort_geometry(matrix: pd.DataFrame, cohort: str, window_end: date)
     Calls all 9 canonical GEOMETRY engines and extracts metrics.
 
     Args:
-        matrix: DataFrame (rows=time, cols=indicators)
+        matrix: DataFrame (rows=time, cols=signals)
         cohort: Cohort identifier
         window_end: Window end date
 
@@ -504,7 +504,7 @@ def compute_cohort_geometry(matrix: pd.DataFrame, cohort: str, window_end: date)
     # 9. BARYCENTER ENGINE - handled separately with window_vectors
 
     # Add metadata
-    results['n_indicators'] = matrix.shape[1]
+    results['n_signals'] = matrix.shape[1]
     results['n_observations'] = matrix.shape[0]
 
     return results
@@ -529,8 +529,8 @@ def compute_barycenter_metrics(
     # Get window sizes from weights
     window_sizes = sorted(weights.keys())
 
-    # Build window_vectors for each indicator
-    window_vectors = get_indicator_window_vectors(cohort, window_end, window_sizes)
+    # Build window_vectors for each signal
+    window_vectors = get_signal_window_vectors(cohort, window_end, window_sizes)
 
     if not window_vectors:
         return {
@@ -562,7 +562,7 @@ def compute_pairwise_geometry(
 
     Args:
         series_a, series_b: Aligned signal topology
-        ind_a, ind_b: Indicator names
+        ind_a, ind_b: Signal names
 
     Returns:
         Dict of pairwise metrics
@@ -661,7 +661,7 @@ def compute_mode_metrics(
     # Try to load Laplace field data if not provided
     if field_df is None:
         try:
-            field_path = get_parquet_path('vector', 'indicator_field')
+            field_path = get_parquet_path('vector', 'signal_field')
             if Path(field_path).exists():
                 field_df = pl.read_parquet(field_path)
             else:
@@ -671,14 +671,14 @@ def compute_mode_metrics(
             logger.debug(f"Could not load Laplace field: {e}")
             return results
 
-    # Get cohort indicators
-    indicators = get_cohort_indicators(cohort)
-    if len(indicators) < 3:
+    # Get cohort signals
+    signals = get_cohort_signals(cohort)
+    if len(signals) < 3:
         return results
 
     try:
         # Discover modes using the module
-        modes_df = discover_modes(field_df, domain_id, cohort, indicators)
+        modes_df = discover_modes(field_df, domain_id, cohort, signals)
 
         if modes_df is not None and len(modes_df) > 0:
             results['mode_n_discovered'] = int(modes_df['mode_id'].nunique())
@@ -752,7 +752,7 @@ def ensure_schema():
 
 # Key columns for upsert operations
 GEOMETRY_COHORT_KEY_COLS = ['cohort_id', 'window_end', 'window_days']
-GEOMETRY_PAIRS_KEY_COLS = ['indicator_a', 'indicator_b', 'window_end', 'window_days']
+GEOMETRY_PAIRS_KEY_COLS = ['signal_a', 'signal_b', 'window_end', 'window_days']
 
 
 def store_cohort_geometry_batch(rows: List[Dict[str, Any]], weighted: bool = False):
@@ -786,7 +786,7 @@ def make_cohort_row(
     if include_weight:
         row['window_weight'] = get_window_weight(window_days)
     row.update({
-        'n_indicators': metrics.get('n_indicators', 0),
+        'n_signals': metrics.get('n_signals', 0),
         'n_observations': metrics.get('n_observations', 0),
         'distance_mean': metrics.get('distance_mean'),
         'distance_std': metrics.get('distance_std'),
@@ -834,8 +834,8 @@ def store_pairwise_geometry_batch(rows: List[Dict[str, Any]], weighted: bool = F
 
     # Always write both versions
     df_unweighted = df.drop('window_weight') if 'window_weight' in df.columns else df
-    upsert_parquet(df_unweighted, get_parquet_path('geometry', 'indicator_pair'), GEOMETRY_PAIRS_KEY_COLS)
-    upsert_parquet(df, get_parquet_path('geometry', 'indicator_pair_weighted'), GEOMETRY_PAIRS_KEY_COLS)
+    upsert_parquet(df_unweighted, get_parquet_path('geometry', 'signal_pair'), GEOMETRY_PAIRS_KEY_COLS)
+    upsert_parquet(df, get_parquet_path('geometry', 'signal_pair_weighted'), GEOMETRY_PAIRS_KEY_COLS)
 
     logger.info(f"Wrote {len(rows)} pairwise geometry rows")
 
@@ -850,8 +850,8 @@ def make_pairwise_row(
 ) -> Dict[str, Any]:
     """Create a row dict for pairwise geometry."""
     row = {
-        'indicator_a': ind_a,
-        'indicator_b': ind_b,
+        'signal_a': ind_a,
+        'signal_b': ind_b,
         'window_end': window_end,
         'window_days': window_days,
     }
@@ -912,13 +912,13 @@ def run_cohort_geometry(
     # Create row for batch storage
     row = make_cohort_row(cohort, window_end, window_days, metrics, include_weight=include_weight)
 
-    logger.info(f"  {cohort} @ {window_end} ({window_days}d): {matrix.shape[1]} indicators, "
+    logger.info(f"  {cohort} @ {window_end} ({window_days}d): {matrix.shape[1]} signals, "
                 f"PCA_1={(metrics.get('pca_variance_pc1') or 0):.3f}, "
                 f"barycenter_disp={(metrics.get('barycenter_mean_dispersion') or 0):.3f}")
 
     return {
         'status': 'success',
-        'n_indicators': metrics.get('n_indicators', 0),
+        'n_signals': metrics.get('n_signals', 0),
         'n_observations': metrics.get('n_observations', 0),
     }, row
 
@@ -929,16 +929,16 @@ def run_pairwise_geometry(
     window_days: int,
     include_weight: bool = False
 ) -> List[Dict[str, Any]]:
-    """Run pairwise geometry for all indicator pairs in a cohort."""
-    indicators = get_cohort_indicators(cohort)
+    """Run pairwise geometry for all signal pairs in a cohort."""
+    signals = get_cohort_signals(cohort)
     rows = []
 
-    if len(indicators) < 2:
-        logger.warning(f"Cohort {cohort} has fewer than 2 indicators")
+    if len(signals) < 2:
+        logger.warning(f"Cohort {cohort} has fewer than 2 signals")
         return rows
 
-    for i, ind_a in enumerate(indicators):
-        for ind_b in indicators[i+1:]:
+    for i, ind_a in enumerate(signals):
+        for ind_b in signals[i+1:]:
             series_a, series_b = get_pairwise_data(ind_a, ind_b, window_end, window_days)
 
             if len(series_a) < 5:
@@ -1069,8 +1069,8 @@ def main():
 
     # Mode selection (mutually exclusive, required)
     mode_group = parser.add_mutually_exclusive_group(required=True)
-    mode_group.add_argument('--indicator', action='store_true',
-                            help='Process within-cohort indicator geometry (pairwise + cohort-level)')
+    mode_group.add_argument('--signal', action='store_true',
+                            help='Process within-cohort signal geometry (pairwise + cohort-level)')
     mode_group.add_argument('--cohort', action='store_true',
                             help='Process cross-cohort geometry (cohort comparisons)')
 
@@ -1169,7 +1169,7 @@ def main():
     window_tiers = get_default_tiers()
 
     # Determine mode
-    mode = "indicator" if args.indicator else "cohort"
+    mode = "signal" if args.signal else "cohort"
 
     # Memory tracking
     start_memory = get_memory_usage_mb()

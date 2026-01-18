@@ -2,18 +2,18 @@
 PRISM Dynamic State Runner
 ==========================
 
-Computes system-level energy state from indicator and geometry field vectors.
+Computes system-level energy state from signal and geometry field vectors.
 
 Pipeline:
 ---------
-indicator_field.parquet + geometry_field.parquet → dynamic_state.py → state/system.parquet
+signal_field.parquet + geometry_field.parquet → dynamic_state.py → state/system.parquet
 
 Energy Decomposition:
 --------------------
-system_energy = indicator_energy_sum + coupling_energy
+system_energy = signal_energy_sum + coupling_energy
 
 Where:
-- indicator_energy_sum: Sum of individual indicator energies (from gradient magnitudes)
+- signal_energy_sum: Sum of individual signal energies (from gradient magnitudes)
 - coupling_energy: Energy stored in pairwise relationships (from geometry field)
 
 The coupling energy represents "hidden" energy stored in the relational structure.
@@ -45,32 +45,32 @@ logger = logging.getLogger(__name__)
 # ENERGY COMPUTATION
 # =============================================================================
 
-def compute_indicator_energy(
-    indicator_field: pl.DataFrame,
+def compute_signal_energy(
+    signal_field: pl.DataFrame,
     window_end: datetime,
 ) -> Dict[str, float]:
     """
-    Compute aggregate indicator energy for a window.
+    Compute aggregate signal energy for a window.
 
     Energy proxy = sum of squared gradient magnitudes.
     High gradients = high activity = high energy.
 
     Args:
-        indicator_field: DataFrame with indicator field vectors
+        signal_field: DataFrame with signal field vectors
         window_end: The window timestamp
 
     Returns:
-        Dict with indicator energy metrics
+        Dict with signal energy metrics
     """
     # Filter to window
-    window_data = indicator_field.filter(pl.col('window_end') == window_end)
+    window_data = signal_field.filter(pl.col('window_end') == window_end)
 
     if len(window_data) == 0:
         return {
-            'indicator_energy_sum': 0.0,
-            'indicator_energy_mean': 0.0,
-            'indicator_energy_std': 0.0,
-            'n_indicators': 0,
+            'signal_energy_sum': 0.0,
+            'signal_energy_mean': 0.0,
+            'signal_energy_std': 0.0,
+            'n_signals': 0,
         }
 
     # Get gradient magnitudes
@@ -80,18 +80,18 @@ def compute_indicator_energy(
         grads = np.abs(window_data['gradient'].drop_nulls().to_numpy())
     else:
         return {
-            'indicator_energy_sum': 0.0,
-            'indicator_energy_mean': 0.0,
-            'indicator_energy_std': 0.0,
-            'n_indicators': 0,
+            'signal_energy_sum': 0.0,
+            'signal_energy_mean': 0.0,
+            'signal_energy_std': 0.0,
+            'n_signals': 0,
         }
 
     if len(grads) == 0:
         return {
-            'indicator_energy_sum': 0.0,
-            'indicator_energy_mean': 0.0,
-            'indicator_energy_std': 0.0,
-            'n_indicators': 0,
+            'signal_energy_sum': 0.0,
+            'signal_energy_mean': 0.0,
+            'signal_energy_std': 0.0,
+            'n_signals': 0,
         }
 
     # Energy = sum of squared gradients (kinetic energy analogy)
@@ -100,10 +100,10 @@ def compute_indicator_energy(
     energy_std = float(np.std(grads ** 2)) if len(grads) > 1 else 0.0
 
     return {
-        'indicator_energy_sum': energy_sum,
-        'indicator_energy_mean': energy_mean,
-        'indicator_energy_std': energy_std,
-        'n_indicators': len(grads),
+        'signal_energy_sum': energy_sum,
+        'signal_energy_mean': energy_mean,
+        'signal_energy_std': energy_std,
+        'n_signals': len(grads),
     }
 
 
@@ -193,40 +193,40 @@ def compute_coupling_energy(
 
 
 def compute_system_energy(
-    indicator_energy: Dict[str, float],
+    signal_energy: Dict[str, float],
     coupling_energy: Dict[str, float],
 ) -> Dict[str, float]:
     """
     Compute total system energy.
 
-    system_energy = indicator_energy + coupling_energy
+    system_energy = signal_energy + coupling_energy
 
     The coupling energy is "hidden" in the relational structure.
     Total energy should be approximately conserved (physics test).
 
     Args:
-        indicator_energy: From compute_indicator_energy
+        signal_energy: From compute_signal_energy
         coupling_energy: From compute_coupling_energy
 
     Returns:
         Dict with system energy metrics
     """
-    ind_sum = indicator_energy.get('indicator_energy_sum', 0.0)
+    ind_sum = signal_energy.get('signal_energy_sum', 0.0)
     coup_sum = coupling_energy.get('coupling_energy_sum', 0.0)
 
     system_total = ind_sum + coup_sum
 
     # Energy partition
     if system_total > 0:
-        indicator_fraction = ind_sum / system_total
+        signal_fraction = ind_sum / system_total
         coupling_fraction = coup_sum / system_total
     else:
-        indicator_fraction = 0.5
+        signal_fraction = 0.5
         coupling_fraction = 0.5
 
     return {
         'system_energy': system_total,
-        'indicator_fraction': indicator_fraction,
+        'signal_fraction': signal_fraction,
         'coupling_fraction': coupling_fraction,
     }
 
@@ -236,7 +236,7 @@ def compute_system_energy(
 # =============================================================================
 
 def run_dynamic_state(
-    indicator_field_path: Optional[Path] = None,
+    signal_field_path: Optional[Path] = None,
     geometry_field_path: Optional[Path] = None,
     output_path: Optional[Path] = None,
     verbose: bool = True,
@@ -245,7 +245,7 @@ def run_dynamic_state(
     Compute system-level dynamic state from field vectors.
 
     Args:
-        indicator_field_path: Path to indicator_field.parquet
+        signal_field_path: Path to signal_field.parquet
         geometry_field_path: Path to geometry_field.parquet
         output_path: Path for output system.parquet
         verbose: Print progress
@@ -256,8 +256,8 @@ def run_dynamic_state(
     ensure_directories()
 
     # Default paths
-    if indicator_field_path is None:
-        indicator_field_path = get_parquet_path('vector', 'indicator_field')
+    if signal_field_path is None:
+        signal_field_path = get_parquet_path('vector', 'signal_field')
     if geometry_field_path is None:
         geometry_field_path = get_parquet_path('geometry', 'geometry_field')
     if output_path is None:
@@ -267,23 +267,23 @@ def run_dynamic_state(
         print("=" * 70)
         print("DYNAMIC STATE COMPUTATION")
         print("=" * 70)
-        print(f"Indicator field: {indicator_field_path}")
+        print(f"Signal field: {signal_field_path}")
         print(f"Geometry field: {geometry_field_path}")
 
     # Check inputs exist
-    if not indicator_field_path.exists():
-        raise FileNotFoundError(f"Indicator field not found: {indicator_field_path}")
+    if not signal_field_path.exists():
+        raise FileNotFoundError(f"Signal field not found: {signal_field_path}")
 
     has_geometry = geometry_field_path.exists()
     if not has_geometry:
         if verbose:
             print(f"[WARN] Geometry field not found: {geometry_field_path}")
-            print("       Running without coupling energy (indicator energy only)")
+            print("       Running without coupling energy (signal energy only)")
 
-    # Load indicator field (lazy for memory)
-    indicator_lazy = pl.scan_parquet(indicator_field_path)
+    # Load signal field (lazy for memory)
+    signal_lazy = pl.scan_parquet(signal_field_path)
     windows = (
-        indicator_lazy
+        signal_lazy
         .select('window_end')
         .unique()
         .sort('window_end')
@@ -306,15 +306,15 @@ def run_dynamic_state(
     start_mem = get_memory_usage_mb()
 
     for i, window_end in enumerate(windows):
-        # Load indicator data for this window
+        # Load signal data for this window
         ind_window = (
-            pl.scan_parquet(indicator_field_path)
+            pl.scan_parquet(signal_field_path)
             .filter(pl.col('window_end') == window_end)
             .collect()
         )
 
-        # Compute indicator energy
-        ind_energy = compute_indicator_energy(ind_window, window_end)
+        # Compute signal energy
+        ind_energy = compute_signal_energy(ind_window, window_end)
 
         # Compute coupling energy if geometry available
         if geometry_df is not None:
@@ -365,9 +365,9 @@ def run_dynamic_state(
             std_sys = state_df['system_energy'].std()
             print(f"System energy: mean={mean_sys:.2f}, std={std_sys:.2f}" if mean_sys else "System energy: N/A")
 
-        if 'indicator_fraction' in state_df.columns:
-            mean_frac = state_df['indicator_fraction'].mean()
-            print(f"Mean indicator fraction: {mean_frac:.2%}" if mean_frac else "Mean indicator fraction: N/A")
+        if 'signal_fraction' in state_df.columns:
+            mean_frac = state_df['signal_fraction'].mean()
+            print(f"Mean signal fraction: {mean_frac:.2%}" if mean_frac else "Mean signal fraction: N/A")
 
         if 'mean_correlation' in state_df.columns:
             mean_corr = state_df['mean_correlation'].mean()
@@ -393,13 +393,13 @@ def main():
         description='PRISM Dynamic State Runner',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Computes system-level energy state from indicator and geometry field vectors.
+Computes system-level energy state from signal and geometry field vectors.
 
 Energy Decomposition:
-    system_energy = indicator_energy_sum + coupling_energy_sum
+    system_energy = signal_energy_sum + coupling_energy_sum
 
 Where:
-    - indicator_energy: Activity of individual indicators (gradient magnitudes)
+    - signal_energy: Activity of individual signals (gradient magnitudes)
     - coupling_energy: Energy stored in pairwise relationships
 
 Examples:
@@ -408,9 +408,9 @@ Examples:
         """
     )
     parser.add_argument(
-        '--indicator-field',
+        '--signal-field',
         type=str,
-        help='Input indicator_field.parquet'
+        help='Input signal_field.parquet'
     )
     parser.add_argument(
         '--geometry-field',
@@ -435,12 +435,12 @@ Examples:
 
     args = parser.parse_args()
 
-    indicator_path = Path(args.indicator_field) if args.indicator_field else None
+    signal_path = Path(args.signal_field) if args.signal_field else None
     geometry_path = Path(args.geometry_field) if args.geometry_field else None
     output_path = Path(args.output) if args.output else None
 
     state_df = run_dynamic_state(
-        indicator_field_path=indicator_path,
+        signal_field_path=signal_path,
         geometry_field_path=geometry_path,
         output_path=output_path,
         verbose=not args.quiet,

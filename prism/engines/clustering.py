@@ -1,7 +1,7 @@
 """
 PRISM Clustering Engine
 
-Groups indicators by behavioral similarity.
+Groups signals by behavioral similarity.
 
 Measures:
 - Cluster assignments
@@ -43,10 +43,10 @@ class ClusteringEngine(BaseEngine):
     """
     Clustering engine for behavioral grouping.
     
-    Groups indicators based on correlation structure or return patterns.
+    Groups signals based on correlation structure or return patterns.
     
     Outputs:
-        - results.clusters: Indicator cluster assignments
+        - results.clusters: Signal cluster assignments
         - results.centroids: Cluster centroids
     """
     
@@ -72,7 +72,7 @@ class ClusteringEngine(BaseEngine):
         Run clustering analysis.
         
         Args:
-            df: Normalized indicator data
+            df: Normalized signal data
             run_id: Unique run identifier
             n_clusters: Number of clusters (None = auto-detect)
             method: 'kmeans' or 'hierarchical'
@@ -83,11 +83,11 @@ class ClusteringEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = list(df_clean.columns)
-        n_indicators = len(indicators)
+        signals = list(df_clean.columns)
+        n_signals = len(signals)
         
-        if n_indicators < 2:
-            raise ValueError(f"Need at least 3 indicators for clustering, got {n_indicators}")
+        if n_signals < 2:
+            raise ValueError(f"Need at least 3 signals for clustering, got {n_signals}")
         
         window_start, window_end = get_window_dates(df_clean)
         
@@ -103,7 +103,7 @@ class ClusteringEngine(BaseEngine):
             corr_matrix = corr_matrix.fillna(0)
             X = corr_matrix.values
         else:
-            # Use transposed data (indicators as samples)
+            # Use transposed data (signals as samples)
             # Drop constant columns first
             df_var = df_clean.loc[:, df_clean.std() > 0]
             X = df_var.T.values
@@ -112,7 +112,7 @@ class ClusteringEngine(BaseEngine):
         if n_clusters is None:
             n_clusters = self._find_optimal_clusters(X, max_clusters, method)
         
-        n_clusters = min(n_clusters, n_indicators - 1)
+        n_clusters = min(n_clusters, n_signals - 1)
         
         # Fit clustering
         if method == "kmeans":
@@ -128,7 +128,7 @@ class ClusteringEngine(BaseEngine):
             ])
         
         # Compute quality metrics
-        if n_clusters > 1 and n_clusters < n_indicators:
+        if n_clusters > 1 and n_clusters < n_signals:
             silhouette = silhouette_score(X, labels)
             calinski = calinski_harabasz_score(X, labels)
         else:
@@ -137,7 +137,7 @@ class ClusteringEngine(BaseEngine):
         
         # Store results
         self._store_clusters(
-            indicators, labels, window_start, window_end, run_id
+            signals, labels, window_start, window_end, run_id
         )
         self._store_centroids(
             centroids, window_start, window_end, run_id
@@ -147,7 +147,7 @@ class ClusteringEngine(BaseEngine):
         cluster_sizes = pd.Series(labels).value_counts().sort_index().to_dict()
         
         metrics = {
-            "n_indicators": n_indicators,
+            "n_signals": n_signals,
             "n_clusters": int(n_clusters),
             "method": method,
             "silhouette_score": float(silhouette),
@@ -193,7 +193,7 @@ class ClusteringEngine(BaseEngine):
     
     def _store_clusters(
         self,
-        indicators: list,
+        signals: list,
         labels: np.ndarray,
         window_start: date,
         window_end: date,
@@ -201,12 +201,12 @@ class ClusteringEngine(BaseEngine):
     ):
         """Store cluster assignments to results.clusters."""
         records = []
-        for indicator, label in zip(indicators, labels):
+        for signal, label in zip(signals, labels):
             records.append({
                 "cluster_id": f"cluster_{label}",
                 "window_start": window_start,
                 "window_end": window_end,
-                "indicator_id": indicator,
+                "signal_id": signal,
                 "membership": 1.0,  # Hard clustering
                 "run_id": run_id,
             })

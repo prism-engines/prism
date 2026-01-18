@@ -80,7 +80,7 @@ def read_parquet_smart(
         Polars DataFrame (empty if file doesn't exist)
 
     Example:
-        >>> df = read_parquet_smart('data/vector/indicator_field.parquet')
+        >>> df = read_parquet_smart('data/vector/signal_field.parquet')
         # Automatically uses lazy mode if file is > 500 MB
     """
     path = Path(path)
@@ -124,7 +124,7 @@ def iter_parquet_windows(
 
     Example:
         >>> for window_end, df in iter_parquet_windows(
-        ...     'data/vector/indicator_field.parquet',
+        ...     'data/vector/signal_field.parquet',
         ...     window_col='window_end'
         ... ):
         ...     process(df)
@@ -239,7 +239,7 @@ def scan_parquet(
     Example:
         >>> lf = scan_parquet('data/raw/observations.parquet')
         >>> if lf is not None:
-        ...     result = lf.filter(pl.col('indicator_id') == 'SENSOR_01').collect()
+        ...     result = lf.filter(pl.col('signal_id') == 'SENSOR_01').collect()
     """
     path = Path(path)
     if not path.exists():
@@ -343,8 +343,8 @@ def upsert_parquet(
     Example:
         >>> upsert_parquet(
         ...     metrics_df,
-        ...     'data/vector/indicators.parquet',
-        ...     key_cols=['indicator_id', 'obs_date', 'engine', 'metric_name']
+        ...     'data/vector/signals.parquet',
+        ...     key_cols=['signal_id', 'obs_date', 'engine', 'metric_name']
         ... )
     """
     path = Path(path)
@@ -386,7 +386,7 @@ def delete_rows(
     Example:
         >>> delete_rows(
         ...     'data/raw/observations.parquet',
-        ...     pl.col('indicator_id') == 'OLD_INDICATOR'
+        ...     pl.col('signal_id') == 'OLD_INDICATOR'
         ... )
     """
     path = Path(path)
@@ -425,8 +425,8 @@ def merge_parquet_files(
     Example:
         >>> merge_parquet_files(
         ...     [Path('/tmp/worker_0.parquet'), Path('/tmp/worker_1.parquet')],
-        ...     Path('data/vector/indicators.parquet'),
-        ...     key_cols=['indicator_id', 'obs_date', 'engine', 'metric_name']
+        ...     Path('data/vector/signals.parquet'),
+        ...     key_cols=['signal_id', 'obs_date', 'engine', 'metric_name']
         ... )
     """
     dfs = []
@@ -466,7 +466,7 @@ def get_parquet_schema(path: Union[str, Path]) -> Optional[dict]:
     Example:
         >>> schema = get_parquet_schema('data/raw/observations.parquet')
         >>> print(schema)
-        {'indicator_id': String, 'obs_date': Date, 'value': Float64}
+        {'signal_id': String, 'obs_date': Date, 'value': Float64}
     """
     path = Path(path)
     if not path.exists():
@@ -504,7 +504,7 @@ def read_table(schema: str, table: str, columns: Optional[List[str]] = None) -> 
 
     Args:
         schema: Schema name (raw, vector, geometry, state)
-        table: Table name (observations, indicators, etc.)
+        table: Table name (observations, signals, etc.)
         columns: Optional list of columns to read
 
     Returns:
@@ -512,7 +512,7 @@ def read_table(schema: str, table: str, columns: Optional[List[str]] = None) -> 
 
     Example:
         >>> obs = read_table('raw', 'observations')
-        >>> vectors = read_table('vector', 'indicators', columns=['indicator_id', 'metric_value'])
+        >>> vectors = read_table('vector', 'signals', columns=['signal_id', 'metric_value'])
     """
     path = get_parquet_path(schema, table)
     return read_parquet(path, columns=columns)
@@ -531,7 +531,7 @@ def write_table(
     Args:
         df: Polars DataFrame to write
         schema: Schema name (raw, vector, geometry, state)
-        table: Table name (observations, indicators, etc.)
+        table: Table name (observations, signals, etc.)
         mode: 'replace' (overwrite), 'append', or 'upsert'
         key_cols: Required for 'upsert' mode
 
@@ -540,7 +540,7 @@ def write_table(
 
     Example:
         >>> write_table(observations, 'raw', 'observations', mode='upsert',
-        ...             key_cols=['indicator_id', 'obs_date'])
+        ...             key_cols=['signal_id', 'obs_date'])
     """
     path = get_parquet_path(schema, table)
 

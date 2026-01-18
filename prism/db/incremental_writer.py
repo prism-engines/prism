@@ -13,14 +13,14 @@ Features:
 Usage:
     writer = IncrementalWriter(
         schema="vector",
-        table="indicators",
-        key_cols=["indicator_id", "obs_date", "target_obs", "engine", "metric_name"],
+        table="signals",
+        key_cols=["signal_id", "obs_date", "target_obs", "engine", "metric_name"],
         batch_size=10,  # Write every 10 items
     )
 
-    for indicator_id in indicators:
-        rows = process_indicator(indicator_id)
-        writer.add_rows(rows, item_id=indicator_id, tier="anchor")
+    for signal_id in signals:
+        rows = process_signal(signal_id)
+        writer.add_rows(rows, item_id=signal_id, tier="anchor")
 
     writer.flush()  # Final write
     stats = writer.get_stats()
@@ -80,7 +80,7 @@ class IncrementalWriter:
 
         Args:
             schema: Parquet schema (e.g., "vector", "geometry", "state")
-            table: Table name (e.g., "indicators", "cohorts", "pairs")
+            table: Table name (e.g., "signals", "cohorts", "pairs")
             key_cols: Columns that form unique key for upsert
             batch_size: Number of items to accumulate before writing
             use_schedule: Whether to use window_schedule for tracking
@@ -111,7 +111,7 @@ class IncrementalWriter:
                 schedule = pl.read_parquet(schedule_path)
                 computed = schedule.filter(pl.col("status") == "computed")
                 for row in computed.iter_rows(named=True):
-                    key = (row["indicator_id"], row["tier"], row["window_end"])
+                    key = (row["signal_id"], row["tier"], row["window_end"])
                     self.computed_keys.add(key)
                 if self.verbose and len(self.computed_keys) > 0:
                     logger.info(f"Loaded {len(self.computed_keys):,} already-computed windows from schedule")
@@ -139,7 +139,7 @@ class IncrementalWriter:
 
         Args:
             rows: List of row dicts to add
-            item_id: Identifier for this item (e.g., indicator_id)
+            item_id: Identifier for this item (e.g., signal_id)
             tier: Window tier name
             window_end: Optional specific window end date
         """
@@ -228,7 +228,7 @@ class TierRunner:
     Base class for running computations across a tier.
 
     Handles:
-    - Loading indicators/items to process
+    - Loading signals/items to process
     - Checking what's already computed
     - Running computation with incremental writes
     - Progress tracking and resume

@@ -75,8 +75,8 @@ FLAG_THRESHOLDS = {
 # =============================================================================
 
 EVENT_TYPES = {
-    'decoupling': 'Indicators that were coupled became independent',
-    'coupling_emergence': 'Indicators that were independent became coupled',
+    'decoupling': 'Signals that were coupled became independent',
+    'coupling_emergence': 'Signals that were independent became coupled',
     'phase_shift': 'Phase coherence changed sign or broke',
     'volatility_cluster': 'Structural variance spiked significantly',
     'regime_change': 'Multiple metrics shifted simultaneously',

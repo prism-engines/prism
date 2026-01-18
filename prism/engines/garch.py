@@ -53,7 +53,7 @@ except ImportError:
 
 def compute_garch(values: np.ndarray) -> dict:
     """
-    Compute GARCH volatility metrics for a single indicator.
+    Compute GARCH volatility metrics for a single signal.
 
     Args:
         values: Array of observed values (levels, not returns)
@@ -116,7 +116,7 @@ def compute_garch(values: np.ndarray) -> dict:
 
 def compute_garch_with_derivation(
     values: np.ndarray,
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "unknown",
     window_start: str = "",
     window_end: str = "",
@@ -139,7 +139,7 @@ def compute_garch_with_derivation(
     derivation = Derivation(
         engine_name="garch",
         method_name="GARCH(1,1) via Moment Matching",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -328,15 +328,15 @@ class GARCHEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = list(df_clean.columns)
+        signals = list(df_clean.columns)
         
         window_start = df_clean.index.min().date()
         window_end = df_clean.index.max().date()
         
         results = []
         
-        for indicator in indicators:
-            returns = df_clean[indicator].values * 100  # Scale for numerical stability
+        for signal in signals:
+            returns = df_clean[signal].values * 100  # Scale for numerical stability
             
             try:
                 if HAS_ARCH:
@@ -345,14 +345,14 @@ class GARCHEngine(BaseEngine):
                     garch_result = self._fit_simple_garch(returns, p, q)
                 
                 results.append({
-                    "indicator_id": indicator,
+                    "signal_id": signal,
                     **garch_result,
                 })
                 
             except Exception as e:
-                logger.warning(f"GARCH failed for {indicator}: {e}")
+                logger.warning(f"GARCH failed for {signal}: {e}")
                 results.append({
-                    "indicator_id": indicator,
+                    "signal_id": signal,
                     "omega": np.nan,
                     "alpha": np.nan,
                     "beta": np.nan,
@@ -368,7 +368,7 @@ class GARCHEngine(BaseEngine):
         valid = df_results.dropna(subset=["persistence"])
         
         metrics = {
-            "n_indicators": len(indicators),
+            "n_signals": len(signals),
             "n_successful": len(valid),
             "p": p,
             "q": q,
@@ -378,7 +378,7 @@ class GARCHEngine(BaseEngine):
         }
         
         logger.info(
-            f"GARCH complete: {metrics['n_successful']}/{len(indicators)} successful, "
+            f"GARCH complete: {metrics['n_successful']}/{len(signals)} successful, "
             f"avg persistence={metrics['avg_persistence']:.3f}" if metrics['avg_persistence'] else ""
         )
         
@@ -473,7 +473,7 @@ class GARCHEngine(BaseEngine):
                 value = r.get(dim)
                 if value is not None and not np.isnan(value):
                     records.append({
-                        "indicator_id": r["indicator_id"],
+                        "signal_id": r["signal_id"],
                         "window_start": window_start,
                         "window_end": window_end,
                         "dimension": f"garch_{dim}",

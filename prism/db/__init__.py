@@ -14,12 +14,12 @@ Usage:
 
     # Read/write tables
     observations = read_table('raw', 'observations')
-    write_table(results, 'vector', 'indicators', mode='upsert', key_cols=[...])
+    write_table(results, 'vector', 'signals', mode='upsert', key_cols=[...])
 
     # Query with Polars
     import polars as pl
     obs = pl.read_parquet(get_parquet_path('raw', 'observations'))
-    spy_data = obs.filter(pl.col('indicator_id') == 'SENSOR_01')
+    spy_data = obs.filter(pl.col('signal_id') == 'SENSOR_01')
 """
 
 # Path management

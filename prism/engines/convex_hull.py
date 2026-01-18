@@ -1,14 +1,14 @@
 """
 PRISM Convex Hull Engine
 
-Measures the geometric extent of indicators in behavioral space.
+Measures the geometric extent of signals in behavioral space.
 
 Measures:
 - Convex hull volume (overall dispersion)
 - Surface area
-- Number of vertices (boundary indicators)
+- Number of vertices (boundary signals)
 - Centroid location
-- Distance from centroid (per indicator)
+- Distance from centroid (per signal)
 - Inradius / circumradius ratio (shape regularity)
 
 Phase: Structure
@@ -17,8 +17,8 @@ Normalization: Z-score required
 Interpretation:
 - Contracting volume over time = behavioral convergence (crisis?)
 - Expanding volume = behavioral divergence
-- Boundary indicators = extreme behavioral signatures
-- Centroid distance = how "mainstream" vs "unusual" each indicator is
+- Boundary signals = extreme behavioral signatures
+- Centroid distance = how "mainstream" vs "unusual" each signal is
 
 Note: Full convex hull only computable in low dimensions.
 For high-D behavioral space, we use PCA reduction or approximate methods.
@@ -92,16 +92,16 @@ class ConvexHullEngine(BaseEngine):
     """
     Convex Hull engine for behavioral space geometry.
     
-    Measures the geometric extent and shape of the indicator cloud
+    Measures the geometric extent and shape of the signal cloud
     in behavioral space. Useful for tracking convergence/divergence
-    and identifying boundary indicators.
+    and identifying boundary signals.
     
     For high-dimensional spaces, uses PCA projection to compute
     hull metrics in reduced dimensions.
     
     Outputs:
         - results.hull_metrics: Overall hull statistics
-        - results.indicator_centrality: Per-indicator distance from centroid
+        - results.signal_centrality: Per-signal distance from centroid
     """
     
     name = "convex_hull"
@@ -123,23 +123,23 @@ class ConvexHullEngine(BaseEngine):
         Run convex hull analysis on behavioral space.
         
         Args:
-            df: Behavioral vectors (rows=dimensions, cols=indicators)
+            df: Behavioral vectors (rows=dimensions, cols=signals)
             run_id: Unique run identifier
             max_hull_dims: Maximum dimensions for hull computation (default 6)
         
         Returns:
             Dict with summary metrics
         """
-        indicators = list(df.columns)
-        n_indicators = len(indicators)
+        signals = list(df.columns)
+        n_signals = len(signals)
         n_dims = len(df)
         
-        if n_indicators < 4:
-            raise ValueError(f"Need at least 4 indicators for hull, got {n_indicators}")
+        if n_signals < 4:
+            raise ValueError(f"Need at least 4 signals for hull, got {n_signals}")
         
         window_start, window_end = get_window_dates(df)
         
-        # Prepare data: (n_indicators, n_dimensions)
+        # Prepare data: (n_signals, n_dimensions)
         X = df.T.values
         
         # Compute centroid and distances (works in any dimension)
@@ -148,35 +148,35 @@ class ConvexHullEngine(BaseEngine):
         # Pairwise extent metrics (work in any dimension)
         extent_metrics = _compute_pairwise_extent(X)
         
-        # Store indicator centrality
+        # Store signal centrality
         self._store_centrality(
-            indicators, centroid_distances, window_start, window_end, run_id
+            signals, centroid_distances, window_start, window_end, run_id
         )
         
         # For hull computation, reduce dimensionality if needed
         hull_metrics = {}
         
-        if n_dims <= max_hull_dims and n_indicators > n_dims:
+        if n_dims <= max_hull_dims and n_signals > n_dims:
             # Can compute hull directly
-            hull_metrics = self._compute_hull_metrics(X, indicators)
+            hull_metrics = self._compute_hull_metrics(X, signals)
             hull_metrics["hull_dimensionality"] = n_dims
             hull_metrics["used_pca_projection"] = False
         else:
             # Project to lower dimensions for hull
-            n_components = min(max_hull_dims, n_dims, n_indicators - 1)
+            n_components = min(max_hull_dims, n_dims, n_signals - 1)
             
             if n_components >= 2:
                 pca = PCA(n_components=n_components)
                 X_projected = pca.fit_transform(X)
                 
-                hull_metrics = self._compute_hull_metrics(X_projected, indicators)
+                hull_metrics = self._compute_hull_metrics(X_projected, signals)
                 hull_metrics["hull_dimensionality"] = n_components
                 hull_metrics["used_pca_projection"] = True
                 hull_metrics["pca_variance_captured"] = float(sum(pca.explained_variance_ratio_))
         
         # Combine all metrics
         metrics = {
-            "n_indicators": n_indicators,
+            "n_signals": n_signals,
             "n_dimensions": n_dims,
             "centroid_avg_distance": float(np.mean(centroid_distances)),
             "centroid_max_distance": float(np.max(centroid_distances)),
@@ -186,13 +186,13 @@ class ConvexHullEngine(BaseEngine):
             **hull_metrics,
         }
         
-        # Identify boundary vs interior indicators
+        # Identify boundary vs interior signals
         if "hull_vertices" in hull_metrics:
-            metrics["n_boundary_indicators"] = hull_metrics.get("n_vertices", 0)
-            metrics["boundary_ratio"] = hull_metrics.get("n_vertices", 0) / n_indicators
+            metrics["n_boundary_signals"] = hull_metrics.get("n_vertices", 0)
+            metrics["boundary_ratio"] = hull_metrics.get("n_vertices", 0) / n_signals
         
         logger.info(
-            f"Convex hull complete: {n_indicators} indicators in {n_dims}D, "
+            f"Convex hull complete: {n_signals} signals in {n_dims}D, "
             f"avg centroid dist={metrics['centroid_avg_distance']:.4f}, "
             f"max pairwise={metrics['max_pairwise_distance']:.4f}"
         )
@@ -202,14 +202,14 @@ class ConvexHullEngine(BaseEngine):
     def _compute_hull_metrics(
         self,
         X: np.ndarray,
-        indicators: List[str],
+        signals: List[str],
     ) -> Dict[str, Any]:
         """
         Compute convex hull metrics for point cloud.
         
         Args:
             X: (n_points, n_dims) array
-            indicators: List of indicator names
+            signals: List of signal names
         
         Returns:
             Dict with hull metrics
@@ -223,16 +223,16 @@ class ConvexHullEngine(BaseEngine):
         try:
             hull = ConvexHull(X)
             
-            # Vertices are the boundary indicators
+            # Vertices are the boundary signals
             vertex_indices = hull.vertices
-            vertex_indicators = [indicators[i] for i in vertex_indices]
+            vertex_signals = [signals[i] for i in vertex_indices]
             
             metrics = {
                 "hull_volume": float(hull.volume) if n_dims >= 2 else 0.0,
                 "hull_area": float(hull.area) if n_dims >= 2 else 0.0,
                 "n_vertices": len(vertex_indices),
                 "n_facets": len(hull.simplices),
-                "hull_vertices": vertex_indicators,
+                "hull_vertices": vertex_signals,
             }
             
             # Compute approximate "sphericity" - how round is the hull?
@@ -261,21 +261,21 @@ class ConvexHullEngine(BaseEngine):
     
     def _store_centrality(
         self,
-        indicators: List[str],
+        signals: List[str],
         distances: np.ndarray,
         window_start: date,
         window_end: date,
         run_id: str,
     ):
-        """Store per-indicator centrality (distance from centroid)."""
+        """Store per-signal centrality (distance from centroid)."""
         # Normalize distances to [0, 1] range
         max_dist = distances.max() if distances.max() > 0 else 1.0
         normalized = distances / max_dist
         
         records = []
-        for indicator, dist, norm_dist in zip(indicators, distances, normalized):
+        for signal, dist, norm_dist in zip(signals, distances, normalized):
             records.append({
-                "indicator_id": indicator,
+                "signal_id": signal,
                 "window_start": window_start,
                 "window_end": window_end,
                 "centroid_distance": float(dist),
@@ -291,4 +291,4 @@ class ConvexHullEngine(BaseEngine):
         
         if records:
             df = pd.DataFrame(records)
-            self.store_results("indicator_centrality", df, run_id)
+            self.store_results("signal_centrality", df, run_id)

@@ -1,6 +1,6 @@
 # PRISM Behavioral Space Analysis Methods
 
-A comprehensive catalog of mathematical methods for analyzing indicators in **behavioral space** - the geometric representation where each indicator is a point defined by its behavioral characteristics (Hurst exponent, entropy, volatility, etc.).
+A comprehensive catalog of mathematical methods for analyzing signals in **behavioral space** - the geometric representation where each signal is a point defined by its behavioral characteristics (Hurst exponent, entropy, volatility, etc.).
 
 > **Key Distinction**: These methods operate on **static vectors** - positions in behavioral space at a given time. They do NOT require temporal sequences like signal topology methods (DTW, Granger, etc.).
 
@@ -13,7 +13,7 @@ A comprehensive catalog of mathematical methods for analyzing indicators in **be
 | Engine | What It Measures | PRISM Output |
 |--------|------------------|--------------|
 | **PCA** | Principal axes of variation in behavioral space | Dimensionality, variance explained, loadings |
-| **Distance** | Euclidean, Mahalanobis, Cosine separation between indicators | Pairwise distance matrices |
+| **Distance** | Euclidean, Mahalanobis, Cosine separation between signals | Pairwise distance matrices |
 | **Clustering** | K-means, hierarchical groupings of similar behaviors | Cluster assignments, silhouette scores |
 | **Mutual Information** | Non-linear dependence between behavioral dimensions | Pairwise MI, dependency strength |
 
@@ -21,33 +21,33 @@ A comprehensive catalog of mathematical methods for analyzing indicators in **be
 
 | Engine | What It Measures | PRISM Output |
 |--------|------------------|--------------|
-| **MST (Minimum Spanning Tree)** | Skeleton of relationships connecting all indicators | Edge weights, hub nodes, diameter |
-| **LOF (Local Outlier Factor)** | Density-based anomaly detection | Per-indicator LOF scores, outlier classification |
-| **Convex Hull** | Geometric extent of indicator cloud | Volume, boundary indicators, centroid distances |
+| **MST (Minimum Spanning Tree)** | Skeleton of relationships connecting all signals | Edge weights, hub nodes, diameter |
+| **LOF (Local Outlier Factor)** | Density-based anomaly detection | Per-signal LOF scores, outlier classification |
+| **Convex Hull** | Geometric extent of signal cloud | Volume, boundary signals, centroid distances |
 
 ---
 
 ## Network / Graph Methods
 
-Methods that treat indicators as nodes in a network, with edges defined by behavioral similarity.
+Methods that treat signals as nodes in a network, with edges defined by behavioral similarity.
 
 ### Minimum Spanning Tree ✅ (Implemented)
-**Concept**: Connect all indicators with minimum total distance. Reveals the "backbone" of relationships.
+**Concept**: Connect all signals with minimum total distance. Reveals the "backbone" of relationships.
 
 **Metrics**:
 - Total MST weight (sum of edge lengths)
 - Average/max/min edge lengths
 - Hub nodes (high-degree vertices)
-- Leaf nodes (peripheral indicators)
+- Leaf nodes (peripheral signals)
 - MST diameter (longest path)
 
 **Interpretation**:
 - Contracting MST → behavioral convergence (crisis?)
-- High-degree hubs → "bridge" indicators connecting clusters
-- Long edges → weakly connected indicator pairs
+- High-degree hubs → "bridge" signals connecting clusters
+- Long edges → weakly connected signal pairs
 
 ### k-Nearest Neighbors Graph
-**Concept**: Connect each indicator to its k closest behavioral neighbors.
+**Concept**: Connect each signal to its k closest behavioral neighbors.
 
 **Potential Metrics**:
 - Average neighbor distance
@@ -78,20 +78,20 @@ Methods that treat indicators as nodes in a network, with edges defined by behav
 
 ## Manifold / Topology Methods
 
-Methods that analyze the shape and structure of the indicator cloud in behavioral space.
+Methods that analyze the shape and structure of the signal cloud in behavioral space.
 
 ### Local Outlier Factor ✅ (Implemented)
-**Concept**: Compare local density around each indicator to its neighbors' density.
+**Concept**: Compare local density around each signal to its neighbors' density.
 
 **Metrics**:
-- LOF score per indicator (>1 = outlier)
+- LOF score per signal (>1 = outlier)
 - Outlier counts at thresholds (1.5, 2.0, 3.0)
-- Most/least anomalous indicators
+- Most/least anomalous signals
 
 **Interpretation**:
 - LOF > 2.0 → strongly unusual behavioral signature
 - Sudden LOF increase → behavioral regime change
-- Persistent outliers → structurally different indicators
+- Persistent outliers → structurally different signals
 
 ### UMAP / t-SNE
 **Concept**: Non-linear dimensionality reduction for visualization.
@@ -104,7 +104,7 @@ Methods that analyze the shape and structure of the indicator cloud in behaviora
 **Interpretation**:
 - Tight clusters → distinct behavioral regimes
 - Gradients → continuous behavioral transitions
-- Isolated points → anomalous indicators
+- Isolated points → anomalous signals
 
 ### Persistent Homology (TDA)
 **Concept**: Track topological features (connected components, holes, voids) across scales.
@@ -123,7 +123,7 @@ Methods that analyze the shape and structure of the indicator cloud in behaviora
 **Concept**: Tree-based anomaly detection. Anomalies are "easier to isolate."
 
 **Potential Metrics**:
-- Anomaly score per indicator
+- Anomaly score per signal
 - Average path length
 - Feature importance for isolation
 
@@ -136,22 +136,22 @@ Methods that analyze the shape and structure of the indicator cloud in behaviora
 
 ## Distribution / Density Methods
 
-Methods that analyze the statistical distribution of indicators in behavioral space.
+Methods that analyze the statistical distribution of signals in behavioral space.
 
 ### Convex Hull ✅ (Implemented)
-**Concept**: Smallest convex set containing all indicators.
+**Concept**: Smallest convex set containing all signals.
 
 **Metrics**:
 - Hull volume (overall dispersion)
 - Surface area
-- Number of vertices (boundary indicators)
+- Number of vertices (boundary signals)
 - Centroid and centroid distances
 - Sphericity (shape regularity)
 
 **Interpretation**:
 - Contracting volume → convergence (risk?)
 - Expanding volume → divergence
-- Boundary indicators → extreme behavioral signatures
+- Boundary signals → extreme behavioral signatures
 - Centroid distance → mainstream vs unusual
 
 ### Kernel Density Estimation
@@ -161,7 +161,7 @@ Methods that analyze the statistical distribution of indicators in behavioral sp
 - Peak locations (behavioral modes)
 - Number of modes (multimodality)
 - Entropy of density distribution
-- Per-indicator density values
+- Per-signal density values
 
 **Interpretation**:
 - Multiple peaks → distinct behavioral regimes
@@ -169,18 +169,18 @@ Methods that analyze the statistical distribution of indicators in behavioral sp
 - Low-density regions → unusual behavioral combinations
 
 ### Centroid Analysis
-**Concept**: Track the center of mass of the indicator cloud.
+**Concept**: Track the center of mass of the signal cloud.
 
 **Potential Metrics**:
 - Centroid coordinates (in behavioral dimensions)
 - Centroid velocity (change over time)
-- Distance from centroid per indicator
+- Distance from centroid per signal
 - Centroid stability (variance over windows)
 
 **Interpretation**:
 - Moving centroid → systematic behavioral shift
 - Stable centroid → consistent regime
-- Far from centroid → contrarian indicators
+- Far from centroid → contrarian signals
 
 ### Covariance Structure
 **Concept**: Analyze the covariance/correlation between behavioral dimensions.
@@ -205,7 +205,7 @@ Methods that analyze the statistical distribution of indicators in behavioral sp
 
 **Potential Metrics**:
 - Optimal number of components (BIC/AIC)
-- Per-indicator cluster probabilities
+- Per-signal cluster probabilities
 - Cluster means and covariances
 - Overlap between clusters
 
@@ -308,7 +308,7 @@ Methods that analyze the statistical distribution of indicators in behavioral sp
 
 All behavioral space methods:
 1. **Input**: Results from `results.vector` (behavioral descriptors)
-2. **Operation**: Compare indicator positions in N-dimensional behavioral space
+2. **Operation**: Compare signal positions in N-dimensional behavioral space
 3. **Output**: Write to `results.geometry` (structural metrics)
 
 **Data Flow**:
@@ -316,7 +316,7 @@ All behavioral space methods:
 raw.observations → Vector Engines → results.vector
                                          ↓
                               Behavioral Space Matrix
-                              (indicators × dimensions)
+                              (signals × dimensions)
                                          ↓
                               Geometry Engines (this catalog)
                                          ↓
@@ -327,7 +327,7 @@ raw.observations → Vector Engines → results.vector
 | Behavioral Space Engines | Signal Topology Engines |
 |--------------------------|---------------------|
 | Compare static positions | Compare temporal evolution |
-| Input: indicator × dimension matrix | Input: time × indicator matrix |
+| Input: signal × dimension matrix | Input: time × signal matrix |
 | Question: "How similar are behaviors?" | Question: "Who leads/lags whom?" |
 | Works on single snapshot | Requires sequence of observations |
 

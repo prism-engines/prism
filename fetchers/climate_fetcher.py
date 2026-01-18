@@ -33,43 +33,43 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     Main fetch function called by prism.entry_points.fetch.
 
     Args:
-        config: YAML configuration with 'indicators' list
+        config: YAML configuration with 'signals' list
 
     Returns:
         List of observation dicts with keys:
-        - indicator_id: str
+        - signal_id: str
         - observed_at: date
         - value: float
         - source: str
         - domain: str
     """
-    indicators = config.get("indicators", [])
+    signals = config.get("signals", [])
     start_date = config.get("start_date", "1950-01-01")
     end_date = config.get("end_date", datetime.now().strftime("%Y-%m-%d"))
 
     all_observations = []
 
-    # Group indicators by data source for efficient fetching
-    indicator_groups = _group_indicators(indicators)
+    # Group signals by data source for efficient fetching
+    signal_groups = _group_signals(signals)
 
-    for source_name, source_indicators in indicator_groups.items():
-        logger.info(f"Fetching {len(source_indicators)} indicators from {source_name}")
+    for source_name, source_signals in signal_groups.items():
+        logger.info(f"Fetching {len(source_signals)} signals from {source_name}")
 
         try:
             if source_name == "noaa_gml":
-                obs = _fetch_noaa_gml(source_indicators, start_date, end_date)
+                obs = _fetch_noaa_gml(source_signals, start_date, end_date)
             elif source_name == "nasa_giss":
-                obs = _fetch_nasa_giss(source_indicators, start_date, end_date)
+                obs = _fetch_nasa_giss(source_signals, start_date, end_date)
             elif source_name == "noaa_ncei":
-                obs = _fetch_noaa_ncei(source_indicators, start_date, end_date)
+                obs = _fetch_noaa_ncei(source_signals, start_date, end_date)
             elif source_name == "noaa_cpc":
-                obs = _fetch_noaa_cpc(source_indicators, start_date, end_date)
+                obs = _fetch_noaa_cpc(source_signals, start_date, end_date)
             elif source_name == "nsidc":
-                obs = _fetch_nsidc(source_indicators, start_date, end_date)
+                obs = _fetch_nsidc(source_signals, start_date, end_date)
             elif source_name == "noaa_sea_level":
-                obs = _fetch_sea_level(source_indicators, start_date, end_date)
+                obs = _fetch_sea_level(source_signals, start_date, end_date)
             elif source_name == "esrl":
-                obs = _fetch_esrl(source_indicators, start_date, end_date)
+                obs = _fetch_esrl(source_signals, start_date, end_date)
             else:
                 logger.warning(f"Unknown source: {source_name}")
                 obs = []
@@ -85,8 +85,8 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     return all_observations
 
 
-def _group_indicators(indicators: List[str]) -> Dict[str, List[str]]:
-    """Group indicators by their data source."""
+def _group_signals(signals: List[str]) -> Dict[str, List[str]]:
+    """Group signals by their data source."""
     groups = {
         "noaa_gml": [],      # Greenhouse gases
         "nasa_giss": [],     # Temperature anomalies
@@ -165,7 +165,7 @@ def _group_indicators(indicators: List[str]) -> Dict[str, List[str]]:
         "STRATOSPHERIC_": "noaa_gml",
     }
 
-    for ind in indicators:
+    for ind in signals:
         assigned = False
         for prefix, source in source_mapping.items():
             if ind.startswith(prefix):
@@ -184,12 +184,12 @@ def _group_indicators(indicators: List[str]) -> Dict[str, List[str]]:
 # NOAA Global Monitoring Laboratory - CO2, CH4, N2O, SF6
 # =============================================================================
 
-def _fetch_noaa_gml(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_noaa_gml(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch greenhouse gas data from NOAA GML."""
     observations = []
 
     # Mauna Loa CO2 - monthly
-    if any(ind.startswith("CO2_") for ind in indicators):
+    if any(ind.startswith("CO2_") for ind in signals):
         try:
             url = "https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_mm_mlo.csv"
             df = pd.read_csv(url, comment='#', names=[
@@ -211,9 +211,9 @@ def _fetch_noaa_gml(indicators: List[str], start_date: str, end_date: str) -> Li
                 if obs_date < _parse_date(start_date) or obs_date > _parse_date(end_date):
                     continue
 
-                if "CO2_MONTHLY" in indicators:
+                if "CO2_MONTHLY" in signals:
                     observations.append({
-                        "indicator_id": "CO2_MONTHLY",
+                        "signal_id": "CO2_MONTHLY",
                         "observed_at": obs_date,
                         "value": float(row['monthly_avg']),
                         "source": "noaa_gml",
@@ -221,7 +221,7 @@ def _fetch_noaa_gml(indicators: List[str], start_date: str, end_date: str) -> Li
                     })
 
             # Calculate annual and growth rate
-            if "CO2_ANNUAL" in indicators or "CO2_GROWTH_RATE" in indicators:
+            if "CO2_ANNUAL" in signals or "CO2_GROWTH_RATE" in signals:
                 df_valid = df[df['monthly_avg'] > 0].copy()
                 annual = df_valid.groupby('year')['monthly_avg'].mean()
 
@@ -230,9 +230,9 @@ def _fetch_noaa_gml(indicators: List[str], start_date: str, end_date: str) -> Li
                     if obs_date < _parse_date(start_date) or obs_date > _parse_date(end_date):
                         continue
 
-                    if "CO2_ANNUAL" in indicators:
+                    if "CO2_ANNUAL" in signals:
                         observations.append({
-                            "indicator_id": "CO2_ANNUAL",
+                            "signal_id": "CO2_ANNUAL",
                             "observed_at": obs_date,
                             "value": float(value),
                             "source": "noaa_gml",
@@ -240,27 +240,27 @@ def _fetch_noaa_gml(indicators: List[str], start_date: str, end_date: str) -> Li
                         })
 
                 # Growth rate
-                if "CO2_GROWTH_RATE" in indicators:
+                if "CO2_GROWTH_RATE" in signals:
                     for i in range(1, len(annual)):
                         year = annual.index[i]
                         growth = annual.iloc[i] - annual.iloc[i-1]
                         obs_date = date(int(year), 7, 1)
                         if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                             observations.append({
-                                "indicator_id": "CO2_GROWTH_RATE",
+                                "signal_id": "CO2_GROWTH_RATE",
                                 "observed_at": obs_date,
                                 "value": float(growth),
                                 "source": "noaa_gml",
                                 "domain": "climate",
                             })
 
-            logger.info(f"  Fetched CO2 data: {len([o for o in observations if 'CO2' in o['indicator_id']])} obs")
+            logger.info(f"  Fetched CO2 data: {len([o for o in observations if 'CO2' in o['signal_id']])} obs")
 
         except Exception as e:
             logger.error(f"  Error fetching CO2: {e}")
 
     # Methane CH4
-    if "CH4_MONTHLY" in indicators:
+    if "CH4_MONTHLY" in signals:
         try:
             url = "https://gml.noaa.gov/webdata/ccgg/trends/ch4/ch4_mm_gl.csv"
             df = pd.read_csv(url, comment='#', names=[
@@ -282,20 +282,20 @@ def _fetch_noaa_gml(indicators: List[str], start_date: str, end_date: str) -> Li
                     continue
 
                 observations.append({
-                    "indicator_id": "CH4_MONTHLY",
+                    "signal_id": "CH4_MONTHLY",
                     "observed_at": obs_date,
                     "value": float(row['monthly_avg']),
                     "source": "noaa_gml",
                     "domain": "climate",
                 })
 
-            logger.info(f"  Fetched CH4 data: {len([o for o in observations if 'CH4' in o['indicator_id']])} obs")
+            logger.info(f"  Fetched CH4 data: {len([o for o in observations if 'CH4' in o['signal_id']])} obs")
 
         except Exception as e:
             logger.error(f"  Error fetching CH4: {e}")
 
     # Nitrous Oxide N2O
-    if "N2O_MONTHLY" in indicators:
+    if "N2O_MONTHLY" in signals:
         try:
             url = "https://gml.noaa.gov/webdata/ccgg/trends/n2o/n2o_mm_gl.csv"
             df = pd.read_csv(url, comment='#', names=[
@@ -317,20 +317,20 @@ def _fetch_noaa_gml(indicators: List[str], start_date: str, end_date: str) -> Li
                     continue
 
                 observations.append({
-                    "indicator_id": "N2O_MONTHLY",
+                    "signal_id": "N2O_MONTHLY",
                     "observed_at": obs_date,
                     "value": float(row['monthly_avg']),
                     "source": "noaa_gml",
                     "domain": "climate",
                 })
 
-            logger.info(f"  Fetched N2O data: {len([o for o in observations if 'N2O' in o['indicator_id']])} obs")
+            logger.info(f"  Fetched N2O data: {len([o for o in observations if 'N2O' in o['signal_id']])} obs")
 
         except Exception as e:
             logger.error(f"  Error fetching N2O: {e}")
 
     # SF6
-    if "SF6_MONTHLY" in indicators:
+    if "SF6_MONTHLY" in signals:
         try:
             url = "https://gml.noaa.gov/webdata/ccgg/trends/sf6/sf6_mm_gl.csv"
             df = pd.read_csv(url, comment='#', names=[
@@ -352,14 +352,14 @@ def _fetch_noaa_gml(indicators: List[str], start_date: str, end_date: str) -> Li
                     continue
 
                 observations.append({
-                    "indicator_id": "SF6_MONTHLY",
+                    "signal_id": "SF6_MONTHLY",
                     "observed_at": obs_date,
                     "value": float(row['monthly_avg']),
                     "source": "noaa_gml",
                     "domain": "climate",
                 })
 
-            logger.info(f"  Fetched SF6 data: {len([o for o in observations if 'SF6' in o['indicator_id']])} obs")
+            logger.info(f"  Fetched SF6 data: {len([o for o in observations if 'SF6' in o['signal_id']])} obs")
 
         except Exception as e:
             logger.error(f"  Error fetching SF6: {e}")
@@ -371,7 +371,7 @@ def _fetch_noaa_gml(indicators: List[str], start_date: str, end_date: str) -> Li
 # NASA GISS - Global Temperature Anomalies
 # =============================================================================
 
-def _fetch_nasa_giss(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_nasa_giss(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch temperature anomaly data from NASA GISS."""
     observations = []
 
@@ -402,9 +402,9 @@ def _fetch_nasa_giss(indicators: List[str], start_date: str, end_date: str) -> L
                 if obs_date < _parse_date(start_date) or obs_date > _parse_date(end_date):
                     continue
 
-                if "GISS_TEMP_GLOBAL" in indicators:
+                if "GISS_TEMP_GLOBAL" in signals:
                     observations.append({
-                        "indicator_id": "GISS_TEMP_GLOBAL",
+                        "signal_id": "GISS_TEMP_GLOBAL",
                         "observed_at": obs_date,
                         "value": value,
                         "source": "nasa_giss",
@@ -417,7 +417,7 @@ def _fetch_nasa_giss(indicators: List[str], start_date: str, end_date: str) -> L
         logger.error(f"  Error fetching NASA GISS: {e}")
 
     # Northern Hemisphere
-    if "GISS_TEMP_NH" in indicators:
+    if "GISS_TEMP_NH" in signals:
         try:
             url = "https://data.giss.nasa.gov/gistemp/tabledata_v4/NH.Ts+dSST.csv"
             df = pd.read_csv(url, skiprows=1)
@@ -435,7 +435,7 @@ def _fetch_nasa_giss(indicators: List[str], start_date: str, end_date: str) -> L
                     obs_date = date(year, month_idx, 15)
                     if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                         observations.append({
-                            "indicator_id": "GISS_TEMP_NH",
+                            "signal_id": "GISS_TEMP_NH",
                             "observed_at": obs_date,
                             "value": value,
                             "source": "nasa_giss",
@@ -448,7 +448,7 @@ def _fetch_nasa_giss(indicators: List[str], start_date: str, end_date: str) -> L
             logger.error(f"  Error fetching GISS NH: {e}")
 
     # Southern Hemisphere
-    if "GISS_TEMP_SH" in indicators:
+    if "GISS_TEMP_SH" in signals:
         try:
             url = "https://data.giss.nasa.gov/gistemp/tabledata_v4/SH.Ts+dSST.csv"
             df = pd.read_csv(url, skiprows=1)
@@ -466,7 +466,7 @@ def _fetch_nasa_giss(indicators: List[str], start_date: str, end_date: str) -> L
                     obs_date = date(year, month_idx, 15)
                     if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                         observations.append({
-                            "indicator_id": "GISS_TEMP_SH",
+                            "signal_id": "GISS_TEMP_SH",
                             "observed_at": obs_date,
                             "value": value,
                             "source": "nasa_giss",
@@ -485,11 +485,11 @@ def _fetch_nasa_giss(indicators: List[str], start_date: str, end_date: str) -> L
 # NOAA CPC - Teleconnection Indices
 # =============================================================================
 
-def _fetch_noaa_cpc(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_noaa_cpc(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch teleconnection indices from NOAA CPC."""
     observations = []
 
-    # Index definitions: (indicator_id, url_path, column_name)
+    # Index definitions: (signal_id, url_path, column_name)
     indices = [
         ("NAO_INDEX", "https://www.cpc.ncep.noaa.gov/products/precip/CWlink/pna/norm.nao.monthly.b5001.current.ascii.table", "NAO"),
         ("AO_INDEX", "https://www.cpc.ncep.noaa.gov/products/precip/CWlink/daily_ao_index/monthly.ao.index.b50.current.ascii.table", "AO"),
@@ -498,7 +498,7 @@ def _fetch_noaa_cpc(indicators: List[str], start_date: str, end_date: str) -> Li
     ]
 
     for ind_id, url, name in indices:
-        if ind_id not in indicators:
+        if ind_id not in signals:
             continue
 
         try:
@@ -531,21 +531,21 @@ def _fetch_noaa_cpc(indicators: List[str], start_date: str, end_date: str) -> Li
                         continue
 
                     observations.append({
-                        "indicator_id": ind_id,
+                        "signal_id": ind_id,
                         "observed_at": obs_date,
                         "value": value,
                         "source": "noaa_cpc",
                         "domain": "climate",
                     })
 
-            logger.info(f"  Fetched {ind_id}: {len([o for o in observations if o['indicator_id'] == ind_id])} obs")
+            logger.info(f"  Fetched {ind_id}: {len([o for o in observations if o['signal_id'] == ind_id])} obs")
             time.sleep(REQUEST_DELAY)
 
         except Exception as e:
             logger.error(f"  Error fetching {ind_id}: {e}")
 
     # SOI - Southern Oscillation Index
-    if "SOI_INDEX" in indicators:
+    if "SOI_INDEX" in signals:
         try:
             url = "https://www.cpc.ncep.noaa.gov/data/indices/soi"
             response = requests.get(url, timeout=30)
@@ -575,7 +575,7 @@ def _fetch_noaa_cpc(indicators: List[str], start_date: str, end_date: str) -> Li
                     obs_date = date(year, month_idx, 15)
                     if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                         observations.append({
-                            "indicator_id": "SOI_INDEX",
+                            "signal_id": "SOI_INDEX",
                             "observed_at": obs_date,
                             "value": value,
                             "source": "noaa_cpc",
@@ -588,7 +588,7 @@ def _fetch_noaa_cpc(indicators: List[str], start_date: str, end_date: str) -> Li
             logger.error(f"  Error fetching SOI: {e}")
 
     # Nino 3.4 SST
-    if "SST_NINO34" in indicators:
+    if "SST_NINO34" in signals:
         try:
             url = "https://www.cpc.ncep.noaa.gov/data/indices/ersst5.nino.mth.91-20.ascii"
             response = requests.get(url, timeout=30)
@@ -611,7 +611,7 @@ def _fetch_noaa_cpc(indicators: List[str], start_date: str, end_date: str) -> Li
                 obs_date = date(year, month, 15)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": "SST_NINO34",
+                        "signal_id": "SST_NINO34",
                         "observed_at": obs_date,
                         "value": nino34,
                         "source": "noaa_cpc",
@@ -630,12 +630,12 @@ def _fetch_noaa_cpc(indicators: List[str], start_date: str, end_date: str) -> Li
 # NSIDC - Sea Ice Data (Updated for v4.0 format)
 # =============================================================================
 
-def _fetch_nsidc(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_nsidc(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch sea ice data from NSIDC Sea Ice Index v4.0."""
     observations = []
 
     # Arctic Sea Ice Extent (monthly) - now split by month in v4.0
-    if any(ind.startswith("ARCTIC_SEA_ICE") for ind in indicators):
+    if any(ind.startswith("ARCTIC_SEA_ICE") for ind in signals):
         try:
             base_url = "https://noaadata.apps.nsidc.org/NOAA/G02135/north/monthly/data"
             all_data = []
@@ -669,31 +669,31 @@ def _fetch_nsidc(indicators: List[str], start_date: str, end_date: str) -> List[
                     if obs_date < _parse_date(start_date) or obs_date > _parse_date(end_date):
                         continue
 
-                    if "ARCTIC_SEA_ICE_EXTENT" in indicators:
+                    if "ARCTIC_SEA_ICE_EXTENT" in signals:
                         observations.append({
-                            "indicator_id": "ARCTIC_SEA_ICE_EXTENT",
+                            "signal_id": "ARCTIC_SEA_ICE_EXTENT",
                             "observed_at": obs_date,
                             "value": extent,
                             "source": "nsidc",
                             "domain": "climate",
                         })
 
-                    if "ARCTIC_SEA_ICE_AREA" in indicators and area is not None and area > 0:
+                    if "ARCTIC_SEA_ICE_AREA" in signals and area is not None and area > 0:
                         observations.append({
-                            "indicator_id": "ARCTIC_SEA_ICE_AREA",
+                            "signal_id": "ARCTIC_SEA_ICE_AREA",
                             "observed_at": obs_date,
                             "value": area,
                             "source": "nsidc",
                             "domain": "climate",
                         })
 
-                logger.info(f"  Fetched Arctic sea ice: {len([o for o in observations if 'ARCTIC' in o['indicator_id']])} obs")
+                logger.info(f"  Fetched Arctic sea ice: {len([o for o in observations if 'ARCTIC' in o['signal_id']])} obs")
 
         except Exception as e:
             logger.error(f"  Error fetching Arctic ice: {e}")
 
     # Antarctic Sea Ice Extent
-    if any(ind.startswith("ANTARCTIC_SEA_ICE") for ind in indicators):
+    if any(ind.startswith("ANTARCTIC_SEA_ICE") for ind in signals):
         try:
             base_url = "https://noaadata.apps.nsidc.org/NOAA/G02135/south/monthly/data"
             all_data = []
@@ -726,25 +726,25 @@ def _fetch_nsidc(indicators: List[str], start_date: str, end_date: str) -> List[
                     if obs_date < _parse_date(start_date) or obs_date > _parse_date(end_date):
                         continue
 
-                    if "ANTARCTIC_SEA_ICE_EXTENT" in indicators:
+                    if "ANTARCTIC_SEA_ICE_EXTENT" in signals:
                         observations.append({
-                            "indicator_id": "ANTARCTIC_SEA_ICE_EXTENT",
+                            "signal_id": "ANTARCTIC_SEA_ICE_EXTENT",
                             "observed_at": obs_date,
                             "value": extent,
                             "source": "nsidc",
                             "domain": "climate",
                         })
 
-                    if "ANTARCTIC_SEA_ICE_AREA" in indicators and area is not None and area > 0:
+                    if "ANTARCTIC_SEA_ICE_AREA" in signals and area is not None and area > 0:
                         observations.append({
-                            "indicator_id": "ANTARCTIC_SEA_ICE_AREA",
+                            "signal_id": "ANTARCTIC_SEA_ICE_AREA",
                             "observed_at": obs_date,
                             "value": area,
                             "source": "nsidc",
                             "domain": "climate",
                         })
 
-                logger.info(f"  Fetched Antarctic sea ice: {len([o for o in observations if 'ANTARCTIC' in o['indicator_id']])} obs")
+                logger.info(f"  Fetched Antarctic sea ice: {len([o for o in observations if 'ANTARCTIC' in o['signal_id']])} obs")
 
         except Exception as e:
             logger.error(f"  Error fetching Antarctic ice: {e}")
@@ -756,11 +756,11 @@ def _fetch_nsidc(indicators: List[str], start_date: str, end_date: str) -> List[
 # NOAA - Sea Level (Updated URL)
 # =============================================================================
 
-def _fetch_sea_level(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_sea_level(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch global mean sea level data from NOAA STAR."""
     observations = []
 
-    if "SEA_LEVEL_GLOBAL" in indicators:
+    if "SEA_LEVEL_GLOBAL" in signals:
         try:
             # NOAA Laboratory for Satellite Altimetry - updated URL
             url = "https://www.star.nesdis.noaa.gov/socd/lsa/SeaLevelRise/slr/slr_sla_gbl_free_ref_90.csv"
@@ -792,7 +792,7 @@ def _fetch_sea_level(indicators: List[str], start_date: str, end_date: str) -> L
                 obs_date = date(year, month, 15)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": "SEA_LEVEL_GLOBAL",
+                        "signal_id": "SEA_LEVEL_GLOBAL",
                         "observed_at": obs_date,
                         "value": value,
                         "source": "noaa_star",
@@ -811,12 +811,12 @@ def _fetch_sea_level(indicators: List[str], start_date: str, end_date: str) -> L
 # NOAA NCEI - Temperature, Precipitation, Drought
 # =============================================================================
 
-def _fetch_noaa_ncei(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_noaa_ncei(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch climate data from NOAA NCEI."""
     observations = []
 
     # Global temperature anomaly
-    if "NOAA_TEMP_GLOBAL" in indicators:
+    if "NOAA_TEMP_GLOBAL" in signals:
         try:
             url = "https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/signal topology/globe/land_ocean/1/0/1880-2024.csv"
 
@@ -834,20 +834,20 @@ def _fetch_noaa_ncei(indicators: List[str], start_date: str, end_date: str) -> L
                 obs_date = date(year, month, 15)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": "NOAA_TEMP_GLOBAL",
+                        "signal_id": "NOAA_TEMP_GLOBAL",
                         "observed_at": obs_date,
                         "value": value,
                         "source": "noaa_ncei",
                         "domain": "climate",
                     })
 
-            logger.info(f"  Fetched NOAA global temp: {len([o for o in observations if o['indicator_id'] == 'NOAA_TEMP_GLOBAL'])} obs")
+            logger.info(f"  Fetched NOAA global temp: {len([o for o in observations if o['signal_id'] == 'NOAA_TEMP_GLOBAL'])} obs")
 
         except Exception as e:
             logger.error(f"  Error fetching NOAA temp: {e}")
 
     # Land temperature
-    if "NOAA_TEMP_LAND" in indicators:
+    if "NOAA_TEMP_LAND" in signals:
         try:
             url = "https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/signal topology/globe/land/1/0/1880-2024.csv"
 
@@ -865,7 +865,7 @@ def _fetch_noaa_ncei(indicators: List[str], start_date: str, end_date: str) -> L
                 obs_date = date(year, month, 15)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": "NOAA_TEMP_LAND",
+                        "signal_id": "NOAA_TEMP_LAND",
                         "observed_at": obs_date,
                         "value": value,
                         "source": "noaa_ncei",
@@ -878,7 +878,7 @@ def _fetch_noaa_ncei(indicators: List[str], start_date: str, end_date: str) -> L
             logger.error(f"  Error fetching NOAA land temp: {e}")
 
     # Ocean temperature
-    if "NOAA_TEMP_OCEAN" in indicators:
+    if "NOAA_TEMP_OCEAN" in signals:
         try:
             url = "https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/signal topology/globe/ocean/1/0/1880-2024.csv"
 
@@ -896,7 +896,7 @@ def _fetch_noaa_ncei(indicators: List[str], start_date: str, end_date: str) -> L
                 obs_date = date(year, month, 15)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": "NOAA_TEMP_OCEAN",
+                        "signal_id": "NOAA_TEMP_OCEAN",
                         "observed_at": obs_date,
                         "value": value,
                         "source": "noaa_ncei",
@@ -915,12 +915,12 @@ def _fetch_noaa_ncei(indicators: List[str], start_date: str, end_date: str) -> L
 # ESRL - Solar and Volcanic
 # =============================================================================
 
-def _fetch_esrl(indicators: List[str], start_date: str, end_date: str) -> List[Dict]:
+def _fetch_esrl(signals: List[str], start_date: str, end_date: str) -> List[Dict]:
     """Fetch solar and volcanic data from NOAA ESRL."""
     observations = []
 
     # Sunspot numbers (SILSO)
-    if "SUNSPOT_NUMBER" in indicators:
+    if "SUNSPOT_NUMBER" in signals:
         try:
             url = "https://www.sidc.be/SILSO/DATA/SN_m_tot_V2.0.csv"
 
@@ -942,14 +942,14 @@ def _fetch_esrl(indicators: List[str], start_date: str, end_date: str) -> List[D
                 obs_date = date(year, month, 15)
                 if obs_date >= _parse_date(start_date) and obs_date <= _parse_date(end_date):
                     observations.append({
-                        "indicator_id": "SUNSPOT_NUMBER",
+                        "signal_id": "SUNSPOT_NUMBER",
                         "observed_at": obs_date,
                         "value": value,
                         "source": "silso",
                         "domain": "climate",
                     })
 
-            logger.info(f"  Fetched sunspot numbers: {len([o for o in observations if o['indicator_id'] == 'SUNSPOT_NUMBER'])} obs")
+            logger.info(f"  Fetched sunspot numbers: {len([o for o in observations if o['signal_id'] == 'SUNSPOT_NUMBER'])} obs")
 
         except Exception as e:
             logger.error(f"  Error fetching sunspots: {e}")
@@ -971,7 +971,7 @@ def _parse_date(date_str: str) -> date:
 if __name__ == "__main__":
     # Test fetch
     config = {
-        "indicators": [
+        "signals": [
             "CO2_MONTHLY",
             "CO2_ANNUAL",
             "GISS_TEMP_GLOBAL",
@@ -987,8 +987,8 @@ if __name__ == "__main__":
 
     print(f"\nFetched {len(observations)} observations")
 
-    # Summary by indicator
+    # Summary by signal
     from collections import Counter
-    counts = Counter(o['indicator_id'] for o in observations)
+    counts = Counter(o['signal_id'] for o in observations)
     for ind, count in sorted(counts.items()):
         print(f"  {ind}: {count}")

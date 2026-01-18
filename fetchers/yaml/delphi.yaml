@@ -4,7 +4,7 @@
 source: delphi
 domain: epidemiological
 
-indicators:
+signals:
   # National ILI (Influenza-like Illness)
   - ILI_NATIONAL
 

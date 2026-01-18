@@ -157,9 +157,9 @@ def compute_rolling_features(df: pd.DataFrame, window: int = 30) -> pd.DataFrame
     return pd.DataFrame(features)
 
 
-def compute_health_indicators(df: pd.DataFrame) -> pd.DataFrame:
+def compute_health_signals(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute aggregate health indicators (HI) from sensors.
+    Compute aggregate health signals (HI) from sensors.
     Based on literature: weighted combination of informative sensors.
     """
     # Sensors known to be most informative for HPC degradation
@@ -179,12 +179,12 @@ def compute_health_indicators(df: pd.DataFrame) -> pd.DataFrame:
                 else:
                     df.loc[mask, f'{sensor}_norm'] = 0
 
-    # Aggregate health indicator (simple mean of normalized informative sensors)
+    # Aggregate health signal (simple mean of normalized informative sensors)
     norm_cols = [f'{s}_norm' for s in informative if f'{s}_norm' in df.columns]
     if norm_cols:
-        df['health_indicator'] = df[norm_cols].mean(axis=1)
+        df['health_signal'] = df[norm_cols].mean(axis=1)
     else:
-        df['health_indicator'] = 0
+        df['health_signal'] = 0
 
     return df
 
@@ -263,9 +263,9 @@ def extract_features(train_df: pd.DataFrame, window: int = 30) -> pd.DataFrame:
     print("  Computing rolling features...")
     features_df = compute_rolling_features(train_df, window=window)
 
-    print("  Computing health indicators...")
-    train_hi = compute_health_indicators(train_df)
-    hi_cols = ['unit', 'cycle', 'health_indicator']
+    print("  Computing health signals...")
+    train_hi = compute_health_signals(train_df)
+    hi_cols = ['unit', 'cycle', 'health_signal']
     features_df = features_df.merge(train_hi[hi_cols], on=['unit', 'cycle'], how='left')
 
     print("  Computing trend features...")

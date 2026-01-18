@@ -213,7 +213,7 @@ class RealizedVolEngine(BaseEngine):
 
 def compute_realized_vol_with_derivation(
     values: np.ndarray,
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -225,7 +225,7 @@ def compute_realized_vol_with_derivation(
 
     Args:
         values: Array of observed values (levels, measurements)
-        indicator_id: Indicator identifier
+        signal_id: Signal identifier
         window_id: Window identifier
         window_start, window_end: Date range
         min_obs: Minimum observations required
@@ -248,7 +248,7 @@ def compute_realized_vol_with_derivation(
     deriv = Derivation(
         engine_name="realized_vol",
         method_name="Realized Volatility & Distribution Metrics",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -260,7 +260,7 @@ def compute_realized_vol_with_derivation(
     deriv.add_step(
         title="Input Value Series",
         equation="V = {V₁, V₂, ..., Vₙ}",
-        calculation=f"Series: {indicator_id}\n"
+        calculation=f"Series: {signal_id}\n"
                     f"n = {n} observations\n\n"
                     f"Value statistics:\n"
                     f"  First: {values[0]:.4f}\n"

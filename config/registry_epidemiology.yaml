@@ -1,11 +1,11 @@
 # =============================================================================
-# PRISM Epidemiology Indicator Registry
+# PRISM Epidemiology Signal Registry
 # =============================================================================
 #
 # DOMAIN TRANSLATION:
 #     General Term        ->  Epidemiology
 #     ─────────────────────────────────────────
-#     Indicator           ->  Disease signal / Region
+#     Signal           ->  Disease signal / Region
 #     Daily change        ->  Weekly ILI rate change
 #     Volatility          ->  Epidemic intensity variance
 #     Correlation         ->  Disease co-occurrence / Geographic spread
@@ -122,7 +122,7 @@ signals:
     unit: "percent"
     definition: "Percentage of outpatient visits for ILI symptoms"
     expected_distribution: "Seasonal with winter peaks (Dec-Feb)"
-    prism_relevance: "Primary activity indicator, cluster detection"
+    prism_relevance: "Primary activity signal, cluster detection"
 
   WILI:
     description: "Weighted ILI Rate"
@@ -135,8 +135,8 @@ signals:
     description: "Hospitalization Rate"
     unit: "per 100,000"
     definition: "Flu hospitalizations per 100,000 population"
-    expected_distribution: "Lagged indicator, follows ILI by 1-2 weeks"
-    prism_relevance: "Severity indicator, distinguishes mild vs severe seasons"
+    expected_distribution: "Lagged signal, follows ILI by 1-2 weeks"
+    prism_relevance: "Severity signal, distinguishes mild vs severe seasons"
 
 
 # =============================================================================

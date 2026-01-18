@@ -5,10 +5,10 @@ PRISM State Runner - Temporal Dynamics from Geometry
 Orchestrates temporal state dynamics by analyzing geometry evolution over time.
 
 This runner is a PURE ORCHESTRATOR:
-- Reads from geometry.structure, geometry.displacement, geometry.indicators
+- Reads from geometry.structure, geometry.displacement, geometry.signals
 - Computes temporal dynamics (energy, tension, phases)
 - Detects regime shifts and cross-cohort transmission
-- Stores to state.system, state.indicator_dynamics, state.transfers
+- Stores to state.system, state.signal_dynamics, state.transfers
 
 NO COMPUTATION LOGIC - all delegated to canonical engines.
 
@@ -19,12 +19,12 @@ STATE DYNAMICS ENGINES (5):
     - energy_dynamics:    Energy trends, acceleration, z-scores
     - tension_dynamics:   Dispersion velocity, alignment evolution
     - phase_detector:     Regime shifts, phase classification
-    - cohort_aggregator:  Indicator-level to cohort-level metrics
+    - cohort_aggregator:  Signal-level to cohort-level metrics
     - transfer_detector:  Cross-cohort transmission patterns
 
 Output Schema:
     state.system             - System-level temporal dynamics
-    state.indicator_dynamics - Per-indicator temporal evolution
+    state.signal_dynamics - Per-signal temporal evolution
     state.transfers          - Cross-cohort transmission
 
 Storage: Parquet files (no database locks)
@@ -84,7 +84,7 @@ MIN_HISTORY = 20  # Minimum snapshots needed for dynamics
 
 # Key columns for upsert deduplication
 SYSTEM_KEY_COLS = ['state_time']
-INDICATOR_DYNAMICS_KEY_COLS = ['indicator_id', 'state_time']
+INDICATOR_DYNAMICS_KEY_COLS = ['signal_id', 'state_time']
 TRANSFERS_KEY_COLS = ['state_time', 'cohort_from', 'cohort_to']
 
 
@@ -128,7 +128,7 @@ def get_geometry_history(
         (pl.col('window_end') <= end_date)
     ).select([
         'window_end',
-        'n_indicators',
+        'n_signals',
         'pca_variance_1',
         'pca_variance_2',
         'pca_variance_3',
@@ -177,17 +177,17 @@ def get_displacement_history(
     return df
 
 
-def get_indicator_geometry(window_end: date) -> pl.DataFrame:
+def get_signal_geometry(window_end: date) -> pl.DataFrame:
     """
-    Fetch geometry.indicators for a specific date.
+    Fetch geometry.signals for a specific date.
     """
-    indicators_path = get_parquet_path('geometry', 'indicators')
-    if not indicators_path.exists():
+    signals_path = get_parquet_path('geometry', 'signals')
+    if not signals_path.exists():
         return pl.DataFrame()
 
-    df = pl.read_parquet(indicators_path)
+    df = pl.read_parquet(signals_path)
     df = df.filter(pl.col('window_end') == window_end).select([
-        'indicator_id',
+        'signal_id',
         'barycenter',
         'timescale_dispersion',
         'timescale_alignment',
@@ -203,14 +203,14 @@ def get_cohort_membership() -> Dict[str, List[str]]:
         return {}
 
     df = pl.read_parquet(members_path)
-    df = df.filter(pl.col('cohort_id').is_not_null()).sort(['cohort_id', 'indicator_id'])
+    df = df.filter(pl.col('cohort_id').is_not_null()).sort(['cohort_id', 'signal_id'])
 
     membership = {}
     for row in df.iter_rows(named=True):
         cohort_id = row['cohort_id']
         if cohort_id not in membership:
             membership[cohort_id] = []
-        membership[cohort_id].append(row['indicator_id'])
+        membership[cohort_id].append(row['signal_id'])
 
     return membership
 
@@ -312,14 +312,14 @@ def compute_system_state(
     }
 
 
-def compute_indicator_dynamics(
+def compute_signal_dynamics(
     state_date: date,
     prev_date: Optional[date]
 ) -> List[Dict[str, Any]]:
     """
-    Compute indicator-level dynamics for a single date.
+    Compute signal-level dynamics for a single date.
     """
-    current = get_indicator_geometry(state_date)
+    current = get_signal_geometry(state_date)
 
     if len(current) == 0:
         return []
@@ -327,8 +327,8 @@ def compute_indicator_dynamics(
     results = []
 
     if prev_date:
-        previous = get_indicator_geometry(prev_date)
-        prev_dict = {row['indicator_id']: row for row in previous.iter_rows(named=True)}
+        previous = get_signal_geometry(prev_date)
+        prev_dict = {row['signal_id']: row for row in previous.iter_rows(named=True)}
     else:
         prev_dict = {}
 
@@ -345,13 +345,13 @@ def compute_indicator_dynamics(
         system_centroid = None
 
     for row in current.iter_rows(named=True):
-        ind_id = row['indicator_id']
+        ind_id = row['signal_id']
         bc = row['barycenter']
         disp = row['timescale_dispersion']
         align = row['timescale_alignment']
 
         result = {
-            'indicator_id': ind_id,
+            'signal_id': ind_id,
             'state_time': state_date,
             'dispersion': disp,
             'alignment': align,
@@ -437,7 +437,7 @@ def compute_cross_cohort_transfers(
     for i, cohort_a in enumerate(cohorts):
         for cohort_b in cohorts[i+1:]:
             # Simplified: use same series for demo
-            # Real implementation: aggregate indicator-level metrics per cohort
+            # Real implementation: aggregate signal-level metrics per cohort
             result = transfer_engine.run(
                 energy_series,
                 energy_series,  # Would be cohort_b's series
@@ -478,7 +478,7 @@ def run_state_snapshot(
 
     Returns dict with results to store.
     """
-    results = {'system': None, 'indicators': [], 'transfers': []}
+    results = {'system': None, 'signals': [], 'transfers': []}
 
     # Get history
     structure_history = get_geometry_history(state_date)
@@ -494,10 +494,10 @@ def run_state_snapshot(
     if system_state:
         results['system'] = system_state
 
-    # 2. Indicator dynamics
-    indicator_dynamics = compute_indicator_dynamics(state_date, prev_date)
-    if indicator_dynamics:
-        results['indicators'] = indicator_dynamics
+    # 2. Signal dynamics
+    signal_dynamics = compute_signal_dynamics(state_date, prev_date)
+    if signal_dynamics:
+        results['signals'] = signal_dynamics
 
     # 3. Cross-cohort transfers
     transfers = compute_cross_cohort_transfers(state_date)
@@ -507,7 +507,7 @@ def run_state_snapshot(
     if verbose and system_state:
         phase = system_state.get('phase_label', 'unknown')
         shift = system_state.get('is_regime_shift', False)
-        logger.info(f"  {state_date}: phase={phase}, shift={shift}, indicators={len(indicator_dynamics)}")
+        logger.info(f"  {state_date}: phase={phase}, shift={shift}, signals={len(signal_dynamics)}")
 
     return results
 
@@ -528,7 +528,7 @@ def run_state_range(
 
     if not available_dates:
         logger.error("No geometry data found. Run geometry runner first.")
-        return {'system': 0, 'indicators': 0, 'transfers': 0}
+        return {'system': 0, 'signals': 0, 'transfers': 0}
 
     # Filter to range
     if start_date:
@@ -538,7 +538,7 @@ def run_state_range(
 
     if not available_dates:
         logger.error(f"No data in range {start_date} to {end_date}")
-        return {'system': 0, 'indicators': 0, 'transfers': 0}
+        return {'system': 0, 'signals': 0, 'transfers': 0}
 
     # Apply stride
     if stride > 1:
@@ -555,13 +555,13 @@ def run_state_range(
         logger.info(f"Snapshots: {len(strided_dates)} (stride={stride})")
         logger.info("")
 
-    totals = {'system': 0, 'indicators': 0, 'transfers': 0}
+    totals = {'system': 0, 'signals': 0, 'transfers': 0}
     prev_date = None
     computed_at = datetime.now()
 
     # Collect all results
     system_rows = []
-    indicator_rows = []
+    signal_rows = []
     transfer_rows = []
 
     for i, state_date in enumerate(strided_dates):
@@ -572,10 +572,10 @@ def run_state_range(
             system_rows.append(results['system'])
             totals['system'] += 1
 
-        for ind in results['indicators']:
+        for ind in results['signals']:
             ind['computed_at'] = computed_at
-            indicator_rows.append(ind)
-        totals['indicators'] += len(results['indicators'])
+            signal_rows.append(ind)
+        totals['signals'] += len(results['signals'])
 
         for tr in results['transfers']:
             tr['computed_at'] = computed_at
@@ -590,10 +590,10 @@ def run_state_range(
                 df = pl.DataFrame(system_rows)
                 upsert_parquet(df, get_parquet_path('state', 'system'), SYSTEM_KEY_COLS)
                 system_rows = []
-            if indicator_rows:
-                df = pl.DataFrame(indicator_rows)
-                upsert_parquet(df, get_parquet_path('state', 'indicator_dynamics'), INDICATOR_DYNAMICS_KEY_COLS)
-                indicator_rows = []
+            if signal_rows:
+                df = pl.DataFrame(signal_rows)
+                upsert_parquet(df, get_parquet_path('state', 'signal_dynamics'), INDICATOR_DYNAMICS_KEY_COLS)
+                signal_rows = []
             if transfer_rows:
                 df = pl.DataFrame(transfer_rows)
                 upsert_parquet(df, get_parquet_path('state', 'transfers'), TRANSFERS_KEY_COLS)
@@ -603,9 +603,9 @@ def run_state_range(
     if system_rows:
         df = pl.DataFrame(system_rows)
         upsert_parquet(df, get_parquet_path('state', 'system'), SYSTEM_KEY_COLS)
-    if indicator_rows:
-        df = pl.DataFrame(indicator_rows)
-        upsert_parquet(df, get_parquet_path('state', 'indicator_dynamics'), INDICATOR_DYNAMICS_KEY_COLS)
+    if signal_rows:
+        df = pl.DataFrame(signal_rows)
+        upsert_parquet(df, get_parquet_path('state', 'signal_dynamics'), INDICATOR_DYNAMICS_KEY_COLS)
     if transfer_rows:
         df = pl.DataFrame(transfer_rows)
         upsert_parquet(df, get_parquet_path('state', 'transfers'), TRANSFERS_KEY_COLS)
@@ -614,7 +614,7 @@ def run_state_range(
         logger.info("")
         logger.info("=" * 80)
         logger.info(f"COMPLETE: {totals['system']} system states, "
-                    f"{totals['indicators']} indicator dynamics, "
+                    f"{totals['signals']} signal dynamics, "
                     f"{totals['transfers']} transfers")
         logger.info("=" * 80)
 
@@ -631,13 +631,13 @@ def process_state_parallel(assignment: WorkerAssignment) -> Dict[str, Any]:
     temp_path = assignment.temp_path
     config = assignment.config
 
-    totals = {'system': 0, 'indicators': 0, 'transfers': 0}
+    totals = {'system': 0, 'signals': 0, 'transfers': 0}
     prev_date = None
     computed_at = datetime.now()
 
     # Collect all results
     system_rows = []
-    indicator_rows = []
+    signal_rows = []
     transfer_rows = []
 
     try:
@@ -656,12 +656,12 @@ def process_state_parallel(assignment: WorkerAssignment) -> Dict[str, Any]:
                 system_rows.append(system_state)
                 totals['system'] += 1
 
-            # Compute indicator dynamics
-            indicator_dynamics = compute_indicator_dynamics(state_date, prev_date)
-            for ind in indicator_dynamics:
+            # Compute signal dynamics
+            signal_dynamics = compute_signal_dynamics(state_date, prev_date)
+            for ind in signal_dynamics:
                 ind['computed_at'] = computed_at
-                indicator_rows.append(ind)
-            totals['indicators'] += len(indicator_dynamics)
+                signal_rows.append(ind)
+            totals['signals'] += len(signal_dynamics)
 
             # Cross-cohort transfers (less frequently)
             if totals['system'] % 5 == 0:
@@ -681,8 +681,8 @@ def process_state_parallel(assignment: WorkerAssignment) -> Dict[str, Any]:
             row['_table'] = 'system'
             all_rows.append(row)
 
-        for row in indicator_rows:
-            row['_table'] = 'indicator_dynamics'
+        for row in signal_rows:
+            row['_table'] = 'signal_dynamics'
             all_rows.append(row)
 
         for row in transfer_rows:
@@ -705,7 +705,7 @@ def merge_state_results(temp_paths: List[Path], verbose: bool = True) -> Dict[st
     """
     Merge worker temp files into main state parquet files.
     """
-    totals = {'system': 0, 'indicator_dynamics': 0, 'transfers': 0}
+    totals = {'system': 0, 'signal_dynamics': 0, 'transfers': 0}
 
     # Read all temp files
     all_dfs = []
@@ -726,7 +726,7 @@ def merge_state_results(temp_paths: List[Path], verbose: bool = True) -> Dict[st
     # Split by table type and write to respective parquet files
     for table_name, key_cols in [
         ('system', SYSTEM_KEY_COLS),
-        ('indicator_dynamics', INDICATOR_DYNAMICS_KEY_COLS),
+        ('signal_dynamics', INDICATOR_DYNAMICS_KEY_COLS),
         ('transfers', TRANSFERS_KEY_COLS),
     ]:
         table_df = combined.filter(pl.col('_table') == table_name).drop('_table')
@@ -774,7 +774,7 @@ Examples:
 
 Storage: Parquet files (no database locks)
   data/state/system.parquet             - System-level temporal dynamics
-  data/state/indicator_dynamics.parquet - Per-indicator temporal evolution
+  data/state/signal_dynamics.parquet - Per-signal temporal evolution
   data/state/transfers.parquet          - Cross-cohort transmission patterns
 """
     )
@@ -837,11 +837,11 @@ Storage: Parquet files (no database locks)
             df = pl.DataFrame([results['system']])
             upsert_parquet(df, get_parquet_path('state', 'system'), SYSTEM_KEY_COLS)
 
-        if results['indicators']:
-            for ind in results['indicators']:
+        if results['signals']:
+            for ind in results['signals']:
                 ind['computed_at'] = computed_at
-            df = pl.DataFrame(results['indicators'])
-            upsert_parquet(df, get_parquet_path('state', 'indicator_dynamics'), INDICATOR_DYNAMICS_KEY_COLS)
+            df = pl.DataFrame(results['signals'])
+            upsert_parquet(df, get_parquet_path('state', 'signal_dynamics'), INDICATOR_DYNAMICS_KEY_COLS)
 
         if results['transfers']:
             for tr in results['transfers']:
@@ -909,7 +909,7 @@ Storage: Parquet files (no database locks)
         logger.info("")
         logger.info("=" * 80)
         logger.info(f"COMPLETE: {totals.get('system', 0)} system states, "
-                    f"{totals.get('indicator_dynamics', 0)} indicator dynamics, "
+                    f"{totals.get('signal_dynamics', 0)} signal dynamics, "
                     f"{totals.get('transfers', 0)} transfers")
         logger.info("=" * 80)
 

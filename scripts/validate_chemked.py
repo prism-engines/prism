@@ -40,15 +40,15 @@ DATA_DIR = Path('/Users/jasonrudder/prism-mac/data/chemked_prism')
 def load_data():
     """Load ChemKED data in PRISM format."""
     obs = pl.read_parquet(DATA_DIR / 'raw' / 'observations.parquet')
-    indicators = pl.read_parquet(DATA_DIR / 'raw' / 'indicators.parquet')
-    return obs, indicators
+    signals = pl.read_parquet(DATA_DIR / 'raw' / 'signals.parquet')
+    return obs, signals
 
 
-def get_values(obs: pl.DataFrame, indicator_id: str) -> np.ndarray:
-    """Extract ignition delay values for indicator (sorted by obs_date = sorted by 1/T)."""
+def get_values(obs: pl.DataFrame, signal_id: str) -> np.ndarray:
+    """Extract ignition delay values for signal (sorted by obs_date = sorted by 1/T)."""
     return (
         obs
-        .filter(pl.col('indicator_id') == indicator_id)
+        .filter(pl.col('signal_id') == signal_id)
         .sort('obs_date')
         .select('value')
         .to_numpy()
@@ -99,35 +99,35 @@ def run_validation():
 
     # Load data
     print("[1] Loading data...")
-    obs, indicators = load_data()
+    obs, signals = load_data()
     print(f"    Observations: {len(obs):,}")
-    print(f"    Indicators: {len(indicators)}")
+    print(f"    Signals: {len(signals)}")
     print()
 
-    # === Compute PRISM metrics for each indicator ===
+    # === Compute PRISM metrics for each signal ===
     print("=" * 80)
     print("[2] Computing PRISM metrics...")
     print("=" * 80)
 
     results = []
-    for row in indicators.iter_rows(named=True):
-        indicator_id = row['indicator_id']
-        values = get_values(obs, indicator_id)
+    for row in signals.iter_rows(named=True):
+        signal_id = row['signal_id']
+        values = get_values(obs, signal_id)
 
         if len(values) < 10:
             continue
 
         metrics = compute_metrics(values)
-        metrics['indicator_id'] = indicator_id
+        metrics['signal_id'] = signal_id
         metrics['fuel'] = row['fuel']
         metrics['n_points'] = row['n_points']
         metrics['arrhenius_r2'] = row['arrhenius_r_squared']
         metrics['activation_energy'] = row['activation_energy_kJ_mol']
         results.append(metrics)
-        print(f"  {indicator_id}: n={len(values)}, R²={row['arrhenius_r_squared']:.3f}")
+        print(f"  {signal_id}: n={len(values)}, R²={row['arrhenius_r_squared']:.3f}")
 
     df = pl.DataFrame(results)
-    print(f"\nComputed metrics for {len(df)} indicators")
+    print(f"\nComputed metrics for {len(df)} signals")
 
     # === TEST 1: Correlation with Arrhenius fit quality ===
     print()
@@ -222,8 +222,8 @@ KEY INSIGHT:
 """)
 
     # Save results
-    df.write_parquet(DATA_DIR / 'vector' / 'indicator.parquet')
-    print(f"Saved: {DATA_DIR / 'vector' / 'indicator.parquet'}")
+    df.write_parquet(DATA_DIR / 'vector' / 'signal.parquet')
+    print(f"Saved: {DATA_DIR / 'vector' / 'signal.parquet'}")
 
 
 if __name__ == '__main__':

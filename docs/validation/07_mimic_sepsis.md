@@ -32,7 +32,7 @@ The demo dataset's timing structure (91% of patients had infection at or before 
 **Demo Data Extracted:**
 - ICU stays: 155
 - Observations: 101,528
-- Indicators: 1,419 (vital sign signal topology)
+- Signals: 1,419 (vital sign signal topology)
 - Regimes: 479 septic, 940 stable
 
 ## Reproducibility
@@ -88,7 +88,7 @@ For the demo dataset, sepsis was identified via ICD diagnosis codes:
 
 1. Extract chartevents for vital itemids
 2. Filter outliers (3× IQR)
-3. Create one indicator per (stay × vital) combination
+3. Create one signal per (stay × vital) combination
 4. Label by sepsis diagnosis
 
 ---
@@ -158,8 +158,8 @@ For the demo dataset, sepsis was identified via ICD diagnosis codes:
 Without using domain labels, PRISM metrics identify two distinct populations:
 
 1. **Complexity axis separates regimes**:
-   - High entropy cluster (SampEn > 1.2): 619 indicators → Stable
-   - Low entropy cluster (SampEn < 1.0): 426 indicators → Septic
+   - High entropy cluster (SampEn > 1.2): 619 signals → Stable
+   - Low entropy cluster (SampEn < 1.0): 426 signals → Septic
    - Clusters correspond to ground truth diagnosis
 
 2. **Memory axis does NOT separate**:
@@ -469,19 +469,19 @@ The math is honest: we found a strong **association** (F=65.82) but cannot claim
 data/mimic_demo/
 ├── raw/
 │   ├── observations.parquet   # Vital sign signal topology (101,528 points)
-│   └── indicators.parquet     # ICU stay × vital metadata
+│   └── signals.parquet     # ICU stay × vital metadata
 ├── config/
 │   ├── cohorts.parquet
 │   └── cohort_members.parquet
 └── vector/
-    └── indicator.parquet      # PRISM metrics (1,209 indicators)
+    └── signal.parquet      # PRISM metrics (1,209 signals)
 ```
 
-### Indicator Schema
+### Signal Schema
 
 | Column | Description |
 |--------|-------------|
-| indicator_id | mimic_{stay_id}_{vital_name} |
+| signal_id | mimic_{stay_id}_{vital_name} |
 | subject_id | Patient identifier |
 | stay_id | ICU stay identifier |
 | vital_name | heart_rate, spo2, respiratory_rate, etc. |

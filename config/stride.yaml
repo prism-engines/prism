@@ -142,7 +142,7 @@ domain_windows:
   metro:
     window: 30        # 30 days - fits in 7-month dataset
     stride: 7         # Weekly stride
-    min_obs: 50000    # ~6 samples/min * 60 * 24 * 30 = 259K per indicator
+    min_obs: 50000    # ~6 samples/min * 60 * 24 * 30 = 259K per signal
     description: "MetroPT metro train - air production unit (10s sampling)"
 
   bearing:

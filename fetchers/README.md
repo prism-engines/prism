@@ -74,7 +74,7 @@ python -m prism.entry_points.fetch --hydraulic
 ## Return Format
 
 All fetchers return `list[dict]` with these keys:
-- `indicator_id`: str
+- `signal_id`: str
 - `observed_at`: datetime
 - `value`: float
 - `source`: str

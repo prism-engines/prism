@@ -194,25 +194,25 @@ def fetch_pde_dataset(dataset_key: str, output_dir: Path, n_trajectories: int = 
                 print(f"    Skipping trajectory {traj_idx} - too few timesteps")
                 continue
 
-            # Create indicators for different statistics
+            # Create signals for different statistics
             for stat_name, stat_values in [
                 ("mean", spatial_means),
                 ("std", spatial_stds),
                 ("range", [mx - mn for mx, mn in zip(spatial_maxs, spatial_mins)]),
             ]:
-                indicator_id = f"{dataset_key}_{traj_idx}_{stat_name}"
+                signal_id = f"{dataset_key}_{traj_idx}_{stat_name}"
 
                 # Observations
                 for t, value in enumerate(stat_values):
                     obs_rows.append({
-                        "indicator_id": indicator_id,
+                        "signal_id": signal_id,
                         "obs_date": base_date + timedelta(seconds=t),
                         "value": value,
                     })
 
-                # Indicator metadata
+                # Signal metadata
                 ind_rows.append({
-                    "indicator_id": indicator_id,
+                    "signal_id": signal_id,
                     "dataset": dataset_key,
                     "well_name": well_name,
                     "trajectory": traj_idx,
@@ -229,7 +229,7 @@ def fetch_pde_dataset(dataset_key: str, output_dir: Path, n_trajectories: int = 
         ind_df = pl.DataFrame(ind_rows)
 
         obs_df.write_parquet(output_dir / "raw" / "observations.parquet")
-        ind_df.write_parquet(output_dir / "raw" / "indicators.parquet")
+        ind_df.write_parquet(output_dir / "raw" / "signals.parquet")
 
         # Create cohorts
         cohorts = pl.DataFrame([{
@@ -240,8 +240,8 @@ def fetch_pde_dataset(dataset_key: str, output_dir: Path, n_trajectories: int = 
         cohorts.write_parquet(output_dir / "config" / "cohorts.parquet")
 
         cohort_members = pl.DataFrame([
-            {"cohort_id": f"the_well_{dataset_key}", "indicator_id": ind_id}
-            for ind_id in ind_df["indicator_id"].to_list()
+            {"cohort_id": f"the_well_{dataset_key}", "signal_id": ind_id}
+            for ind_id in ind_df["signal_id"].to_list()
         ])
         cohort_members.write_parquet(output_dir / "config" / "cohort_members.parquet")
 
@@ -250,9 +250,9 @@ def fetch_pde_dataset(dataset_key: str, output_dir: Path, n_trajectories: int = 
         print("Download complete!")
         print("=" * 60)
         print(f"Observations: {len(obs_df)}")
-        print(f"Indicators: {len(ind_df)}")
+        print(f"Signals: {len(ind_df)}")
         print()
-        print("Indicator summary:")
+        print("Signal summary:")
         print(ind_df.group_by("statistic").len())
 
     except ImportError as e:

@@ -100,19 +100,19 @@ def download_gray_scott_via_thewell(output_dir: Path, n_trajectories: int = 30):
                     spatial_means_A.append(float(fields[0, :, :, 0].mean()))
                     spatial_means_B.append(float(fields[0, :, :, 1].mean()))
 
-                # Create indicators
+                # Create signals
                 for species, values in [('A', spatial_means_A), ('B', spatial_means_B)]:
-                    indicator_id = f"gs_{regime}_{traj_offset}_{species}_mean"
+                    signal_id = f"gs_{regime}_{traj_offset}_{species}_mean"
 
                     for t_idx, val in enumerate(values):
                         obs_rows.append({
-                            'indicator_id': indicator_id,
+                            'signal_id': signal_id,
                             'obs_date': base_date + timedelta(seconds=t_idx),
                             'value': val,
                         })
 
                     ind_rows.append({
-                        'indicator_id': indicator_id,
+                        'signal_id': signal_id,
                         'regime': regime,
                         'trajectory': traj_offset,
                         'species': species,
@@ -127,8 +127,8 @@ def download_gray_scott_via_thewell(output_dir: Path, n_trajectories: int = 30):
             print(f"Wrote {len(obs_df)} observations")
 
             ind_df = pl.DataFrame(ind_rows)
-            ind_df.write_parquet(output_dir / 'raw' / 'indicators.parquet')
-            print(f"Wrote {len(ind_df)} indicators")
+            ind_df.write_parquet(output_dir / 'raw' / 'signals.parquet')
+            print(f"Wrote {len(ind_df)} signals")
 
             # Cohort config
             pl.DataFrame([
@@ -136,7 +136,7 @@ def download_gray_scott_via_thewell(output_dir: Path, n_trajectories: int = 30):
             ]).write_parquet(output_dir / 'config' / 'cohorts.parquet')
 
             pl.DataFrame([
-                {'cohort_id': 'gray_scott', 'indicator_id': r['indicator_id']}
+                {'cohort_id': 'gray_scott', 'signal_id': r['signal_id']}
                 for r in ind_rows
             ]).write_parquet(output_dir / 'config' / 'cohort_members.parquet')
 
@@ -236,22 +236,22 @@ def process_gray_scott_hdf5(h5_path: str, output_dir: Path, max_per_regime: int 
                 stats_A = extract_spatial_statistics(species_A)
                 stats_B = extract_spatial_statistics(species_B)
 
-                # Create indicator for each statistic
+                # Create signal for each statistic
                 for species, stats in [('A', stats_A), ('B', stats_B)]:
                     for stat_name, values in stats.items():
-                        indicator_id = f"gs_{regime}_{traj_in_regime}_{species}_{stat_name}"
+                        signal_id = f"gs_{regime}_{traj_in_regime}_{species}_{stat_name}"
 
                         # Subsample if too many timesteps
                         step = max(1, len(values) // 500)
                         for i, val in enumerate(values[::step]):
                             obs_rows.append({
-                                'indicator_id': indicator_id,
+                                'signal_id': signal_id,
                                 'obs_date': base_date + timedelta(seconds=i),
                                 'value': float(val),
                             })
 
                         ind_rows.append({
-                            'indicator_id': indicator_id,
+                            'signal_id': signal_id,
                             'regime': regime,
                             'trajectory': traj_in_regime,
                             'species': species,
@@ -273,8 +273,8 @@ def process_gray_scott_hdf5(h5_path: str, output_dir: Path, max_per_regime: int 
         print(f"Wrote {len(obs_df)} observations")
 
         ind_df = pl.DataFrame(ind_rows)
-        ind_df.write_parquet(output_dir / 'raw' / 'indicators.parquet')
-        print(f"Wrote {len(ind_df)} indicators")
+        ind_df.write_parquet(output_dir / 'raw' / 'signals.parquet')
+        print(f"Wrote {len(ind_df)} signals")
 
         # Cohort config
         pl.DataFrame([
@@ -282,7 +282,7 @@ def process_gray_scott_hdf5(h5_path: str, output_dir: Path, max_per_regime: int 
         ]).write_parquet(output_dir / 'config' / 'cohorts.parquet')
 
         pl.DataFrame([
-            {'cohort_id': 'gray_scott', 'indicator_id': r['indicator_id']}
+            {'cohort_id': 'gray_scott', 'signal_id': r['signal_id']}
             for r in ind_rows
         ]).write_parquet(output_dir / 'config' / 'cohort_members.parquet')
 
@@ -322,7 +322,7 @@ def main():
         print("Download complete!")
         print("="*60)
         print(f"Observations: {len(obs_df)}")
-        print(f"Indicators: {len(ind_df)}")
+        print(f"Signals: {len(ind_df)}")
 
         # Summary by regime
         print("\nRegime summary:")

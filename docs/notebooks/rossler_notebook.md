@@ -92,13 +92,13 @@ sol = solve_ivp(
 ### PRISM Observation Format
 
 The trajectory was converted to PRISM observation format:
-- Each variable (x, y, z) becomes a separate indicator
+- Each variable (x, y, z) becomes a separate signal
 - Time units mapped to synthetic dates (1 time unit = 1 day)
 - Base date: 2020-01-01
 
 ```python
-indicators = ['rossler_x', 'rossler_y', 'rossler_z']
-observations = 30,000  # 3 indicators × 10,000 time points
+signals = ['rossler_x', 'rossler_y', 'rossler_z']
+observations = 30,000  # 3 signals × 10,000 time points
 ```
 
 ---
@@ -121,12 +121,12 @@ observations = 30,000  # 3 indicators × 10,000 time points
 PRISM_DOMAIN=rossler python -m prism.runners.characterize
 ```
 
-**Output:** 3 indicators characterized
+**Output:** 3 signals characterized
 
-### Step 2: Indicator Vector
+### Step 2: Signal Vector
 
 ```bash
-PRISM_DOMAIN=rossler python -m prism.runners.indicator_vector --indicator
+PRISM_DOMAIN=rossler python -m prism.runners.signal_vector --signal
 ```
 
 **Output:**
@@ -136,7 +136,7 @@ PRISM_DOMAIN=rossler python -m prism.runners.indicator_vector --indicator
 
 ### Step 3: Laplace Field
 
-Automatically chained from indicator_vector.
+Automatically chained from signal_vector.
 
 **Output:** 553,010 field rows with gradient, laplacian, divergence
 
@@ -162,7 +162,7 @@ PRISM_DOMAIN=rossler python -m prism.runners.geometry --cohort
 | **rossler_y** | STATIONARY_OSCILLATORY_DETERMINISTIC | 0.624 | **1.0** | 0.997 | 0.0 | rs |
 | **rossler_z** | STATIONARY_APERIODIC_DETERMINISTIC_CLUSTERED_VOL | 0.620 | 0.0 | 0.973 | **1.0** | rs |
 
-### Key Metrics (Indicator Vector)
+### Key Metrics (Signal Vector)
 
 | Metric | rossler_x | rossler_y | rossler_z |
 |--------|-----------|-----------|-----------|
@@ -171,7 +171,7 @@ PRISM_DOMAIN=rossler python -m prism.runners.geometry --cohort
 | **permutation_entropy** | 0.432 | 0.432 | 0.423 |
 | **lyapunov_exponent** | 0.127 | 0.127 | 0.132 |
 
-### Laplace Field Topology (Indicator)
+### Laplace Field Topology (Signal)
 
 | Variable | Sources | Sinks | Source/Sink Ratio |
 |----------|---------|-------|-------------------|
@@ -247,7 +247,7 @@ PRISM_DOMAIN=rossler python -m prism.runners.geometry --cohort
 
 ### ✓ Field Topology
 
-**Indicator-Level:**
+**Signal-Level:**
 
 | Metric | Value | Expected | Result |
 |--------|-------|----------|--------|
@@ -306,8 +306,8 @@ PRISM_DOMAIN=rossler python -m prism.runners.geometry --cohort
 ```
 data/rossler/
 ├── raw/
-│   ├── observations.parquet       # 30,000 rows (3 indicators × 10,000 points)
-│   ├── indicators.parquet         # 3 indicator definitions
+│   ├── observations.parquet       # 30,000 rows (3 signals × 10,000 points)
+│   ├── signals.parquet         # 3 signal definitions
 │   ├── characterization.parquet   # 3 rows (6-axis classification)
 │   └── rossler_trajectory.parquet # 10,000 rows (x, y, z)
 ├── config/
@@ -315,8 +315,8 @@ data/rossler/
 │   ├── cohorts.parquet            # 1 row (rossler_attractor)
 │   └── domain_members.parquet     # 1 row
 ├── vector/
-│   ├── indicator.parquet          # 553,010 rows
-│   ├── indicator_field.parquet    # 553,010 rows (indicator Laplace field)
+│   ├── signal.parquet          # 553,010 rows
+│   ├── signal_field.parquet    # 553,010 rows (signal Laplace field)
 │   └── cohort_field.parquet       # 6,422 rows (cohort Laplace field)
 ├── geometry/
 │   └── cohort.parquet             # 494 rows (cohort-window geometry)
@@ -353,7 +353,7 @@ This validates PRISM's ability to capture structural differences between chaotic
 ```bash
 # Generate data and run full pipeline
 PRISM_DOMAIN=rossler python -m prism.runners.characterize
-PRISM_DOMAIN=rossler python -m prism.runners.indicator_vector --indicator
+PRISM_DOMAIN=rossler python -m prism.runners.signal_vector --signal
 PRISM_DOMAIN=rossler python -m prism.runners.geometry --cohort
 ```
 

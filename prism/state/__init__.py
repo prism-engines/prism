@@ -8,8 +8,8 @@ Completes the PRISM framework with system-level dynamic state detection,
 transition classification, and regime tracking.
 
 The PRISM Trilogy:
-    Layer 1 (Vector):   "How does each indicator behave?"
-    Layer 2 (Geometry): "How do indicators relate?"
+    Layer 1 (Vector):   "How does each signal behave?"
+    Layer 2 (Geometry): "How do signals relate?"
     Layer 3 (State):    "What is the system DOING?"
 
 Key insight: PRISM measures DYNAMICS. Classification asks "which picture?"
@@ -29,8 +29,8 @@ from .transition_detector import (
     Transition,
     compute_system_divergence,
     detect_transitions,
-    find_leading_indicators,
-    summarize_leading_indicators,
+    find_leading_signals,
+    summarize_leading_signals,
 )
 
 from .state_signature import (
@@ -53,8 +53,8 @@ __all__ = [
     'Transition',
     'compute_system_divergence',
     'detect_transitions',
-    'find_leading_indicators',
-    'summarize_leading_indicators',
+    'find_leading_signals',
+    'summarize_leading_signals',
     # State signature
     'StateSignature',
     'extract_signature',

@@ -5,7 +5,7 @@ C-MAPSS: Evaluate RUL with PRISM vectors + geometry + modes + affinity + wavelet
 PR #6 Implementation: Affinity-Weighted Modes and Wavelet Microscope
 
 Combines:
-1. Indicator vector metrics (Hurst, entropy, etc.)
+1. Signal vector metrics (Hurst, entropy, etc.)
 2. Cohort geometry (PCA, distance, clustering)
 3. Pairwise geometry summary (correlation, mutual information)
 4. Mode discovery features (n_modes, affinity, entropy)
@@ -66,11 +66,11 @@ KEY_METRICS = [
 # =============================================================================
 
 def load_prism_vectors() -> pl.DataFrame:
-    """Load PRISM indicator vectors."""
-    vectors = pl.read_parquet(DATA_DIR / 'vector' / 'indicator.parquet')
+    """Load PRISM signal vectors."""
+    vectors = pl.read_parquet(DATA_DIR / 'vector' / 'signal.parquet')
     vectors = vectors.with_columns([
-        pl.col('indicator_id').str.extract(r'u(\d+)_').cast(pl.Int64).alias('unit'),
-        pl.col('indicator_id').str.extract(r'_(s\d+)$').alias('sensor'),
+        pl.col('signal_id').str.extract(r'u(\d+)_').cast(pl.Int64).alias('unit'),
+        pl.col('signal_id').str.extract(r'_(s\d+)$').alias('sensor'),
     ])
     return vectors
 

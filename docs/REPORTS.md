@@ -22,7 +22,7 @@ python scripts/reports.py --db md:prism --report 00_catalog_health
 ### Export to CSV
 ```bash
 python scripts/reports.py --report 20_univariate_signal topology \
-    --indicator BEARING_01 --metric hurst_exponent \
+    --signal BEARING_01 --metric hurst_exponent \
     --start 2020-01-01 --end 2024-12-31 \
     --format csv --out sensor_hurst.csv
 ```
@@ -52,7 +52,7 @@ python scripts/reports.py --report 60_regime_timeline --sql
 |-------|----------|-------------|
 | 00-09 | Health | Catalog health, coverage gaps |
 | 10-19 | Raw | Raw observation summaries |
-| 20-29 | Univariate | Single-indicator signal topology |
+| 20-29 | Univariate | Single-signal signal topology |
 | 30-39 | Geometry | Cohort structure snapshots |
 | 40-49 | State | Temporal dynamics |
 | 50-59 | Coupling | Univariate vs state comparison |
@@ -67,13 +67,13 @@ Copy any SQL file content into a MotherDuck notebook cell. Replace `{{placeholde
 
 ```sql
 -- Example: 20_univariate_signal topology.sql
--- Replace {{indicator_id}} with 'BEARING_01', etc.
+-- Replace {{signal_id}} with 'BEARING_01', etc.
 
 SELECT
     window_end AS date,
     metric_value AS value
 FROM results.univariate
-WHERE indicator_id = 'BEARING_01'  -- was {{indicator_id}}
+WHERE signal_id = 'BEARING_01'  -- was {{signal_id}}
   AND metric_name = 'hurst_exponent'  -- was {{metric_name}}
   AND window_end BETWEEN '2020-01-01' AND '2024-12-31'
 ORDER BY window_end;
@@ -91,7 +91,7 @@ ORDER BY window_end;
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--indicator` | BEARING_01 | Indicator ID |
+| `--signal` | BEARING_01 | Signal ID |
 | `--cohort` | default | Cohort ID |
 | `--metric` | hurst_exponent | Metric name |
 | `--engine` | hurst | Engine name |

@@ -2,16 +2,16 @@
 """
 PRISM Batch Characterization Runner
 
-Characterizes each indicator ONCE using ALL available data.
+Characterizes each signal ONCE using ALL available data.
 Characterization describes WHAT KIND of process this is - structural, not temporal.
-One row per indicator.
+One row per signal.
 
 Pattern: Read Parquet → Compute → Write Parquet (upsert)
 
 Usage:
     python -m prism.entry_points.characterize
     python -m prism.entry_points.characterize --cohort climate
-    python -m prism.entry_points.characterize --indicators sensor_1,sensor_2
+    python -m prism.entry_points.characterize --signals sensor_1,sensor_2
     python -m prism.entry_points.characterize --force  # Recompute all
 """
 
@@ -73,48 +73,48 @@ def get_min_observations() -> int:
     return DEFAULT_MIN_OBSERVATIONS
 
 
-def get_available_indicators() -> List[str]:
-    """Get all indicators with data in raw.observations parquet."""
+def get_available_signals() -> List[str]:
+    """Get all signals with data in raw.observations parquet."""
     obs_path = get_parquet_path('raw', 'observations')
     if not obs_path.exists():
         return []
 
-    df = pl.scan_parquet(obs_path).select('indicator_id').unique().collect()
-    return sorted(df['indicator_id'].to_list())
+    df = pl.scan_parquet(obs_path).select('signal_id').unique().collect()
+    return sorted(df['signal_id'].to_list())
 
 
 def get_existing_characterizations() -> set:
-    """Get set of indicator_ids that have already been characterized."""
+    """Get set of signal_ids that have already been characterized."""
     char_path = get_parquet_path('raw', 'characterization')
     if not char_path.exists():
         return set()
 
-    df = read_parquet(char_path, columns=['indicator_id'])
-    return set(df['indicator_id'].to_list())
+    df = read_parquet(char_path, columns=['signal_id'])
+    return set(df['signal_id'].to_list())
 
 
-def get_all_indicator_data(
-    indicator_id: str,
+def get_all_signal_data(
+    signal_id: str,
     observations_df: pl.DataFrame,
     min_observations: int = 100,
 ) -> Optional[Dict[str, Any]]:
     """
-    Fetch ALL data for an indicator from the observations DataFrame.
+    Fetch ALL data for an signal from the observations DataFrame.
 
     Returns dict with values, dates, start_date, end_date, n_obs
     or None if insufficient data.
     """
-    # Filter for this indicator
-    indicator_df = observations_df.filter(pl.col('indicator_id') == indicator_id)
+    # Filter for this signal
+    signal_df = observations_df.filter(pl.col('signal_id') == signal_id)
 
-    if len(indicator_df) < min_observations:
+    if len(signal_df) < min_observations:
         return None
 
     # Sort by date and extract data
-    indicator_df = indicator_df.sort('obs_date')
+    signal_df = signal_df.sort('obs_date')
 
-    dates = indicator_df['obs_date'].to_numpy()
-    values = indicator_df['value'].to_numpy().astype(float)
+    dates = signal_df['obs_date'].to_numpy()
+    values = signal_df['value'].to_numpy().astype(float)
 
     # Remove NaN values
     valid_mask = ~np.isnan(values)
@@ -134,23 +134,23 @@ def get_all_indicator_data(
 
 
 # =============================================================================
-# MAIN RUNNER (Indicator Characterization)
+# MAIN RUNNER (Signal Characterization)
 # =============================================================================
 
 def run_characterization(
-    indicators: Optional[List[str]] = None,
+    signals: Optional[List[str]] = None,
     cohort: Optional[str] = None,
     domain: Optional[str] = None,
     force: bool = False,
     verbose: bool = True,
 ) -> Dict[str, Any]:
     """
-    Characterize indicators using ALL available data.
+    Characterize signals using ALL available data.
 
     Pattern: Read Parquet → Compute → Write Parquet (upsert)
 
     Args:
-        indicators: List of indicator IDs (None = all available)
+        signals: List of signal IDs (None = all available)
         cohort: Named cohort from COHORTS dict
         domain: Domain for cohort classification (e.g., 'climate', 'industrial')
         force: Recompute even if already characterized
@@ -172,7 +172,7 @@ def run_characterization(
         'skipped': 0,
         'errors': [],
         'by_class': {},
-        'indicators': [],
+        'signals': [],
     }
 
     # Validate observations parquet exists
@@ -188,47 +188,47 @@ def run_characterization(
     if verbose:
         print(f"Starting memory: {start_memory:.1f} MB")
 
-    # Load all observations once (more efficient for multiple indicators)
+    # Load all observations once (more efficient for multiple signals)
     if verbose:
         print("Loading observations...")
     observations_df = read_parquet(obs_path)
     if verbose:
         print(f"  Loaded {len(observations_df):,} observations")
 
-    # Determine which indicators to process
+    # Determine which signals to process
     if cohort and cohort in COHORTS:
-        target_indicators = COHORTS[cohort]
+        target_signals = COHORTS[cohort]
         if verbose:
-            print(f"Using cohort '{cohort}': {len(target_indicators)} indicators")
-    elif indicators:
-        target_indicators = indicators
+            print(f"Using cohort '{cohort}': {len(target_signals)} signals")
+    elif signals:
+        target_signals = signals
         if verbose:
-            print(f"Characterizing {len(target_indicators)} specified indicators")
+            print(f"Characterizing {len(target_signals)} specified signals")
     else:
-        target_indicators = get_available_indicators()
+        target_signals = get_available_signals()
         if verbose:
-            print(f"Processing all available indicators: {len(target_indicators)}")
+            print(f"Processing all available signals: {len(target_signals)}")
 
     # Check what's already characterized (unless force)
     if not force:
         existing_ids = get_existing_characterizations()
         if existing_ids:
-            before_count = len(target_indicators)
-            target_indicators = [i for i in target_indicators if i not in existing_ids]
+            before_count = len(target_signals)
+            target_signals = [i for i in target_signals if i not in existing_ids]
 
-            if verbose and before_count != len(target_indicators):
-                print(f"Skipping {before_count - len(target_indicators)} already characterized")
+            if verbose and before_count != len(target_signals):
+                print(f"Skipping {before_count - len(target_signals)} already characterized")
 
-    if not target_indicators:
+    if not target_signals:
         if verbose:
-            print("\nNo indicators to characterize")
+            print("\nNo signals to characterize")
         return results
 
     # Get min_observations from config
     min_obs = get_min_observations()
 
     if verbose:
-        print(f"\nCharacterizing {len(target_indicators)} indicators (using ALL data)")
+        print(f"\nCharacterizing {len(target_signals)} signals (using ALL data)")
         print(f"Min observations: {min_obs}")
         print("=" * 70)
 
@@ -236,31 +236,31 @@ def run_characterization(
     effective_domain = domain or 'industrial'
 
     # Collect results for batch write - COMPUTE → WRITE → RELEASE pattern
-    BATCH_SIZE = 50  # Write every 50 indicators
+    BATCH_SIZE = 50  # Write every 50 signals
     batch_rows = []
     char_path = get_parquet_path('raw', 'characterization')
 
-    for i, indicator_id in enumerate(target_indicators):
+    for i, signal_id in enumerate(target_signals):
         try:
-            # Get ALL data for this indicator
-            data_info = get_all_indicator_data(indicator_id, observations_df, min_obs)
+            # Get ALL data for this signal
+            data_info = get_all_signal_data(signal_id, observations_df, min_obs)
 
             if data_info is None:
                 if verbose:
-                    print(f"  {indicator_id}: SKIP (insufficient data, need {min_obs}+)")
+                    print(f"  {signal_id}: SKIP (insufficient data, need {min_obs}+)")
                 results['skipped'] += 1
                 continue
 
             # Characterize using ALL data
             char_result = char.compute(
                 values=data_info['values'],
-                indicator_id=indicator_id,
+                signal_id=signal_id,
                 window_end=data_info['end_date'],
                 dates=data_info['dates'],
             )
 
             # Get cohort classification
-            sub_cohort = get_cohort(indicator_id, effective_domain)
+            sub_cohort = get_cohort(signal_id, effective_domain)
 
             # Convert dates to proper Python types
             start_date = data_info['start_date']
@@ -281,7 +281,7 @@ def run_characterization(
 
             # Build row dict
             row = {
-                'indicator_id': indicator_id,
+                'signal_id': signal_id,
                 'sub_cohort': sub_cohort,
                 'ax_stationarity': float(char_result.ax_stationarity),
                 'ax_memory': float(char_result.ax_memory),
@@ -324,19 +324,19 @@ def run_characterization(
             results['processed'] += 1
             dyn_class = char_result.dynamical_class
             results['by_class'][dyn_class] = results['by_class'].get(dyn_class, 0) + 1
-            results['indicators'].append({
-                'indicator_id': indicator_id,
+            results['signals'].append({
+                'signal_id': signal_id,
                 'dynamical_class': dyn_class,
                 'n_observations': data_info['n_observations'],
             })
 
             if verbose:
-                print(f"  [{i+1}/{len(target_indicators)}] {indicator_id}: {dyn_class}")
+                print(f"  [{i+1}/{len(target_signals)}] {signal_id}: {dyn_class}")
 
             # Batch write - COMPUTE → WRITE → RELEASE pattern
             if len(batch_rows) >= BATCH_SIZE:
                 df = pl.DataFrame(batch_rows)
-                upsert_parquet(df, char_path, key_cols=['indicator_id'])
+                upsert_parquet(df, char_path, key_cols=['signal_id'])
                 row_count = len(batch_rows)
 
                 # RELEASE
@@ -350,14 +350,14 @@ def run_characterization(
                     print(f"    -> Batch written ({row_count} rows) [mem: {current_mem:.0f} MB]")
 
         except Exception as e:
-            results['errors'].append({'indicator': indicator_id, 'error': str(e)})
+            results['errors'].append({'signal': signal_id, 'error': str(e)})
             if verbose:
-                print(f"  {indicator_id}: ERROR - {e}")
+                print(f"  {signal_id}: ERROR - {e}")
 
     # Final batch write - WRITE → RELEASE
     if batch_rows:
         df = pl.DataFrame(batch_rows)
-        row_count = upsert_parquet(df, char_path, key_cols=['indicator_id'])
+        row_count = upsert_parquet(df, char_path, key_cols=['signal_id'])
 
         # RELEASE
         del df
@@ -398,11 +398,11 @@ def run_characterization(
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Characterize indicators (one-time, using ALL data)',
+        description='Characterize signals (one-time, using ALL data)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # All indicators in database
+  # All signals in database
   python -m prism.entry_points.characterize
 
   # By domain (for cohort classification)
@@ -412,8 +412,8 @@ Examples:
   # By cohort
   python -m prism.entry_points.characterize --cohort climate
 
-  # Specific indicators
-  python -m prism.entry_points.characterize --indicators sensor_1,sensor_2
+  # Specific signals
+  python -m prism.entry_points.characterize --signals sensor_1,sensor_2
 
   # Force recompute (if engine logic changed)
   python -m prism.entry_points.characterize --force
@@ -423,8 +423,8 @@ Examples:
         """
     )
 
-    parser.add_argument('--indicators', type=str,
-                        help='Comma-separated indicator IDs')
+    parser.add_argument('--signals', type=str,
+                        help='Comma-separated signal IDs')
     parser.add_argument('--cohort', type=str,
                         help=f'Named cohort: {", ".join(COHORTS.keys())}')
     parser.add_argument('--domain', type=str,
@@ -438,7 +438,7 @@ Examples:
 
     # Testing mode - REQUIRED to use any limiting flags
     parser.add_argument('--testing', action='store_true',
-                        help='Enable testing mode. REQUIRED to use limiting flags (--indicators, --cohort). Without --testing, all limiting flags are ignored and full run executes.')
+                        help='Enable testing mode. REQUIRED to use limiting flags (--signals, --cohort). Without --testing, all limiting flags are ignored and full run executes.')
 
     args = parser.parse_args()
 
@@ -449,8 +449,8 @@ Examples:
     # ==========================================================================
     if not args.testing and not args.list_cohorts:
         limiting_flags_used = []
-        if args.indicators:
-            limiting_flags_used.append('--indicators')
+        if args.signals:
+            limiting_flags_used.append('--signals')
         if args.cohort:
             limiting_flags_used.append('--cohort')
 
@@ -461,15 +461,15 @@ Examples:
             print("Running FULL computation instead. Use --testing to enable limiting flags.")
             print("=" * 80)
 
-        # Override to full defaults - characterize ALL indicators
-        args.indicators = None
+        # Override to full defaults - characterize ALL signals
+        args.signals = None
         args.cohort = None
 
     if args.list_cohorts:
         print("\nAvailable cohorts:")
         print("-" * 50)
         for name, inds in COHORTS.items():
-            print(f"\n  {name}: {len(inds)} indicators")
+            print(f"\n  {name}: {len(inds)} signals")
             for ind in inds[:8]:
                 print(f"    - {ind}")
             if len(inds) > 8:
@@ -478,11 +478,11 @@ Examples:
         return
 
     # Parse arguments
-    indicators = args.indicators.split(',') if args.indicators else None
+    signals = args.signals.split(',') if args.signals else None
 
-    # Run indicator characterization
+    # Run signal characterization
     results = run_characterization(
-        indicators=indicators,
+        signals=signals,
         cohort=args.cohort,
         domain=args.domain,
         force=args.force,

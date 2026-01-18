@@ -16,7 +16,7 @@ Usage:
     from fetchers.delphi_fetcher import fetch
 
     config = {
-        "indicators": ["ILI_NATIONAL", "ILI_HHS1", "FLU_HOSP_NATIONAL"],
+        "signals": ["ILI_NATIONAL", "ILI_HHS1", "FLU_HOSP_NATIONAL"],
     }
     observations = fetch(config)
 """
@@ -80,7 +80,7 @@ def epiweek_to_date(epiweek: int) -> pd.Timestamp:
 # ENDPOINT FETCHERS
 # =============================================================================
 
-def fetch_fluview(indicator_id: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+def fetch_fluview(signal_id: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Fetch from FluView endpoint (ILI rates)."""
     url = f"{BASE_URL}/fluview/"
 
@@ -107,7 +107,7 @@ def fetch_fluview(indicator_id: str, params: Dict[str, Any]) -> List[Dict[str, A
 
         if epiweek and ili is not None:
             observations.append({
-                "indicator_id": indicator_id,
+                "signal_id": signal_id,
                 "observed_at": epiweek_to_date(epiweek),
                 "value": float(ili),
                 "source": SOURCE,
@@ -116,7 +116,7 @@ def fetch_fluview(indicator_id: str, params: Dict[str, Any]) -> List[Dict[str, A
     return observations
 
 
-def fetch_flusurv(indicator_id: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+def fetch_flusurv(signal_id: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Fetch from FluSurv-NET endpoint (hospitalization rates)."""
     url = f"{BASE_URL}/flusurv/"
 
@@ -143,7 +143,7 @@ def fetch_flusurv(indicator_id: str, params: Dict[str, Any]) -> List[Dict[str, A
 
         if epiweek and rate is not None:
             observations.append({
-                "indicator_id": indicator_id,
+                "signal_id": signal_id,
                 "observed_at": epiweek_to_date(epiweek),
                 "value": float(rate),
                 "source": SOURCE,
@@ -152,7 +152,7 @@ def fetch_flusurv(indicator_id: str, params: Dict[str, Any]) -> List[Dict[str, A
     return observations
 
 
-def fetch_wiki(indicator_id: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+def fetch_wiki(signal_id: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Fetch Wikipedia access data."""
     url = f"{BASE_URL}/wiki/"
 
@@ -180,7 +180,7 @@ def fetch_wiki(indicator_id: str, params: Dict[str, Any]) -> List[Dict[str, Any]
             try:
                 date = pd.Timestamp(datetime.strptime(date_str, "%Y%m%d"))
                 observations.append({
-                    "indicator_id": indicator_id,
+                    "signal_id": signal_id,
                     "observed_at": date,
                     "value": float(count),
                     "source": SOURCE,
@@ -197,54 +197,54 @@ def fetch_wiki(indicator_id: str, params: Dict[str, Any]) -> List[Dict[str, Any]
 
 def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
-    Fetch observations for indicators specified in config.
+    Fetch observations for signals specified in config.
 
     Args:
         config: Dict with keys:
-            - indicators: list of indicator IDs (required)
+            - signals: list of signal IDs (required)
 
     Returns:
         List of observation dicts with keys:
-            indicator_id, observed_at, value, source
+            signal_id, observed_at, value, source
     """
-    indicators = config.get("indicators", [])
-    if not indicators:
-        raise ValueError("Config must contain 'indicators' list")
+    signals = config.get("signals", [])
+    if not signals:
+        raise ValueError("Config must contain 'signals' list")
 
     all_observations = []
 
-    for indicator_id in indicators:
-        if indicator_id not in INDICATORS:
-            print(f"  {indicator_id}: FAILED - Unknown indicator")
+    for signal_id in signals:
+        if signal_id not in INDICATORS:
+            print(f"  {signal_id}: FAILED - Unknown signal")
             continue
 
-        ind_config = INDICATORS[indicator_id]
+        ind_config = INDICATORS[signal_id]
         endpoint = ind_config["endpoint"]
         params = ind_config.get("params", {})
 
         try:
             if endpoint == "fluview":
-                obs = fetch_fluview(indicator_id, params)
+                obs = fetch_fluview(signal_id, params)
             elif endpoint == "flusurv":
-                obs = fetch_flusurv(indicator_id, params)
+                obs = fetch_flusurv(signal_id, params)
             elif endpoint == "wiki":
-                obs = fetch_wiki(indicator_id, params)
+                obs = fetch_wiki(signal_id, params)
             else:
-                print(f"  {indicator_id}: FAILED - Unknown endpoint: {endpoint}")
+                print(f"  {signal_id}: FAILED - Unknown endpoint: {endpoint}")
                 continue
 
             all_observations.extend(obs)
-            print(f"  {indicator_id}: {len(obs)} observations")
+            print(f"  {signal_id}: {len(obs)} observations")
 
         except Exception as e:
-            print(f"  {indicator_id}: FAILED - {e}")
+            print(f"  {signal_id}: FAILED - {e}")
 
     return all_observations
 
 
 if __name__ == "__main__":
     config = {
-        "indicators": ["ILI_NATIONAL", "ILI_HHS1"],
+        "signals": ["ILI_NATIONAL", "ILI_HHS1"],
     }
     results = fetch(config)
     print(f"\nTotal: {len(results)} observations")

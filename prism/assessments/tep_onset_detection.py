@@ -32,7 +32,7 @@ def find_fault_onsets(obs_df: pl.DataFrame) -> pl.DataFrame:
     Find exact timestamps where fault_code transitions from 0 to non-zero.
     These are the regime change moments PRISM should detect.
     """
-    fault_df = obs_df.filter(pl.col('indicator_id') == 'TEP_FAULT').select([
+    fault_df = obs_df.filter(pl.col('signal_id') == 'TEP_FAULT').select([
         'obs_date',
         pl.col('value').alias('fault_code')
     ]).group_by('obs_date').agg(
@@ -100,7 +100,7 @@ def compute_onset_metrics(window_df: pl.DataFrame) -> dict:
     Key signals:
     - Divergence spike magnitude
     - Gradient acceleration
-    - Cross-indicator divergence correlation
+    - Cross-signal divergence correlation
     """
     pre = window_df.filter(pl.col('phase') == 'PRE')
     onset = window_df.filter(pl.col('phase') == 'ONSET')
@@ -207,15 +207,15 @@ def detect_early_warning(
 # 5. PER-INDICATOR ONSET ANALYSIS
 # ============================================================================
 
-def analyze_indicator_response(
+def analyze_signal_response(
     field_df: pl.DataFrame,
     onset_date,
     window_days: int = 3,
 ) -> pl.DataFrame:
     """
-    Which indicators respond first/strongest to fault onset?
+    Which signals respond first/strongest to fault onset?
 
-    Returns ranking of indicators by onset response magnitude.
+    Returns ranking of signals by onset response magnitude.
     """
     onset = onset_date
     if isinstance(onset, str):
@@ -226,7 +226,7 @@ def analyze_indicator_response(
     pre = field_df.filter(
         (pl.col('window_end') >= onset - timedelta(days=window_days)) &
         (pl.col('window_end') < onset)
-    ).group_by('indicator_id').agg([
+    ).group_by('signal_id').agg([
         pl.col('divergence').mean().alias('pre_div'),
         pl.col('gradient_magnitude').mean().alias('pre_grad'),
     ])
@@ -235,13 +235,13 @@ def analyze_indicator_response(
     post = field_df.filter(
         (pl.col('window_end') >= onset) &
         (pl.col('window_end') <= onset + timedelta(days=window_days))
-    ).group_by('indicator_id').agg([
+    ).group_by('signal_id').agg([
         pl.col('divergence').mean().alias('onset_div'),
         pl.col('gradient_magnitude').mean().alias('onset_grad'),
     ])
 
     # Join and compute response
-    response = pre.join(post, on='indicator_id', how='inner').with_columns([
+    response = pre.join(post, on='signal_id', how='inner').with_columns([
         (pl.col('onset_div') - pl.col('pre_div')).abs().alias('div_change'),
         (pl.col('onset_grad') / (pl.col('pre_grad') + 1e-10)).alias('grad_ratio'),
     ]).sort('div_change', descending=True)
@@ -262,14 +262,14 @@ def evaluate_fault_onset_detection(domain: str):
     print("=" * 80)
 
     # Load data
-    field_path = get_parquet_path('vector', 'indicator_field', domain)
+    field_path = get_parquet_path('vector', 'signal_field', domain)
     obs_path = get_parquet_path('raw', 'observations', domain)
 
     print(f"\nLoading field data from {field_path}...")
     field_df = pl.read_parquet(field_path)
 
     # Filter to TEP
-    field_df = field_df.filter(pl.col('indicator_id').str.starts_with('TEP_'))
+    field_df = field_df.filter(pl.col('signal_id').str.starts_with('TEP_'))
     print(f"Field data: {len(field_df):,} rows")
 
     print(f"Loading observations from {obs_path}...")
@@ -308,9 +308,9 @@ def evaluate_fault_onset_detection(domain: str):
         # Check for early warning
         early = detect_early_warning(field_df, onset_date)
 
-        # Analyze per-indicator response
-        response = analyze_indicator_response(field_df, onset_date)
-        top_responders = response.head(5)['indicator_id'].to_list() if len(response) > 0 else []
+        # Analyze per-signal response
+        response = analyze_signal_response(field_df, onset_date)
+        top_responders = response.head(5)['signal_id'].to_list() if len(response) > 0 else []
 
         result = {
             'fault_id': fault_id,
@@ -389,7 +389,7 @@ def deep_dive_fault(
 
     Generates:
     - Divergence signal topology plot data
-    - Per-indicator response ranking
+    - Per-signal response ranking
     - Mode transition analysis
     """
     print(f"\n{'='*80}")
@@ -411,11 +411,11 @@ def deep_dive_fault(
         print("No data in window")
         return None
 
-    # Aggregate divergence (all indicators)
+    # Aggregate divergence (all signals)
     total_div = window.group_by('window_end').agg([
         pl.col('divergence').sum().alias('total_divergence'),
         pl.col('gradient_magnitude').mean().alias('avg_grad_mag'),
-        pl.col('indicator_id').n_unique().alias('n_indicators'),
+        pl.col('signal_id').n_unique().alias('n_signals'),
     ]).sort('window_end')
 
     print("\nTotal Divergence Timeline:")
@@ -428,20 +428,20 @@ def deep_dive_fault(
         bar = "█" * bar_len
         print(f"  {date}: {div:+12.2f} {bar}{marker}")
 
-    # Top responding indicators
-    response = analyze_indicator_response(field_df, onset_date)
+    # Top responding signals
+    response = analyze_signal_response(field_df, onset_date)
 
-    print("\nTop 10 Responding Indicators:")
+    print("\nTop 10 Responding Signals:")
     print("-" * 60)
     for i, row in enumerate(response.head(10).iter_rows(named=True)):
-        ind = row['indicator_id']
+        ind = row['signal_id']
         change = row['div_change']
         ratio = row['grad_ratio']
         print(f"  {i+1:2d}. {ind:20s}: Δdiv={change:+10.2f}, grad_ratio={ratio:.2f}x")
 
     return {
         'total_divergence': total_div,
-        'indicator_response': response,
+        'signal_response': response,
     }
 
 
@@ -463,9 +463,9 @@ def main():
     results = evaluate_fault_onset_detection(domain)
 
     if args.deep_dive and results is not None:
-        field_path = get_parquet_path('vector', 'indicator_field', domain)
+        field_path = get_parquet_path('vector', 'signal_field', domain)
         field_df = pl.read_parquet(field_path)
-        field_df = field_df.filter(pl.col('indicator_id').str.starts_with('TEP_'))
+        field_df = field_df.filter(pl.col('signal_id').str.starts_with('TEP_'))
 
         fault_onset = results.filter(pl.col('fault_id') == args.deep_dive)
         if len(fault_onset) > 0:

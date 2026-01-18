@@ -42,7 +42,7 @@ class Derivation:
     """Complete derivation for one engine run."""
     engine_name: str
     method_name: str
-    indicator_id: str
+    signal_id: str
     window_id: str
     window_start: Optional[str] = None
     window_end: Optional[str] = None
@@ -119,7 +119,7 @@ class Derivation:
         # Input Data
         lines.append("## 3. Input Data")
         lines.append("")
-        lines.append(f"**Indicator:** `{self.indicator_id}`  ")
+        lines.append(f"**Signal:** `{self.signal_id}`  ")
         lines.append(f"**Window:** {self.window_id}  ")
         if self.window_start and self.window_end:
             lines.append(f"**Date Range:** {self.window_start} to {self.window_end}  ")
@@ -217,7 +217,7 @@ class Derivation:
         lines.append("")
         lines.append("**To reproduce:**")
         lines.append("```bash")
-        lines.append(f"python -m prism.derivations.generate --engine {self.engine_name} --indicator {self.indicator_id} --window {self.window_id}")
+        lines.append(f"python -m prism.derivations.generate --engine {self.engine_name} --signal {self.signal_id} --window {self.window_id}")
         lines.append("```")
         lines.append("")
         lines.append("---")
@@ -236,7 +236,7 @@ class Derivation:
             'spectral_entropy': "Spectral entropy measures the flatness of the power spectrum. High values indicate broadband noise; low values indicate concentrated periodic components.",
             'dfa': "Detrended Fluctuation Analysis (DFA) measures self-similarity and long-range correlations, robust to non-stationarity.",
             'garch': "GARCH models conditional heteroskedasticity (volatility clustering) - periods of high volatility tend to cluster together.",
-            'cohesion': "Cohesion measures the average pairwise similarity of indicator vectors within a cohort.",
+            'cohesion': "Cohesion measures the average pairwise similarity of signal vectors within a cohort.",
             'effective_dimension': "Effective dimension (participation ratio) measures the number of independent behavioral modes in the cohort.",
             'divergence': "Divergence (Laplacian) measures the net flow at each point in behavioral space - sources (expanding) vs sinks (contracting).",
         }
@@ -343,7 +343,7 @@ class DerivableEngine(ABC):
 
     @abstractmethod
     def compute_with_derivation(self, data: np.ndarray,
-                                indicator_id: str,
+                                signal_id: str,
                                 window_id: str,
                                 window_start: str = None,
                                 window_end: str = None) -> tuple[Any, Derivation]:

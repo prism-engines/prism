@@ -70,7 +70,7 @@ def get_min_obs(window_days: int) -> int:
 @dataclass
 class DomainWindowConfig:
     """
-    Domain-specific window configuration for indicator_geometry.
+    Domain-specific window configuration for signal_geometry.
 
     Defines the window sizes to compute for each domain based on
     data frequency (daily vs monthly vs annual).
@@ -86,7 +86,7 @@ class DomainWindowConfig:
     # Data frequency for labeling
     frequency: Literal['daily', 'monthly', 'annual'] = 'daily'
 
-    # Minimum observations per indicator per window
+    # Minimum observations per signal per window
     min_observations_ratio: float = 0.5  # min_obs = window_size * ratio
 
     @classmethod
@@ -174,11 +174,11 @@ class WindowConfig:
     # Window end convention
     end_convention: Literal['end_of_month', 'mid_month', 'exact'] = 'end_of_month'
 
-    # Minimum observations required per indicator
+    # Minimum observations required per signal
     min_observations: int = 100
 
-    # Minimum indicators required per window
-    min_indicators: int = 3
+    # Minimum signals required per window
+    min_signals: int = 3
 
     @classmethod
     def monthly(cls) -> 'WindowConfig':
@@ -218,7 +218,7 @@ class WindowConfig:
             step_size=1,
             end_convention='mid_month',  # Climate data uses 15th
             min_observations=48,
-            min_indicators=3,
+            min_signals=3,
         )
 
     @property
@@ -229,7 +229,7 @@ class WindowConfig:
             'step_size': self.step_size,
             'end_convention': self.end_convention,
             'min_observations': self.min_observations,
-            'min_indicators': self.min_indicators,
+            'min_signals': self.min_signals,
         }
         config_str = json.dumps(config_dict, sort_keys=True)
         return hashlib.md5(config_str.encode()).hexdigest()[:8]

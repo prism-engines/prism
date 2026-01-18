@@ -30,8 +30,8 @@ def get_window_dates(df: pd.DataFrame) -> Tuple[date, date]:
     For behavioral vectors (string index): returns today's date for both
 
     This allows geometry engines to work with both:
-    - Traditional signal topology (rows=dates, cols=indicators)
-    - Behavioral vectors (rows=indicators, cols=dimensions)
+    - Traditional signal topology (rows=dates, cols=signals)
+    - Behavioral vectors (rows=signals, cols=dimensions)
     """
     today = date.today()
 
@@ -114,7 +114,7 @@ class BaseEngine(ABC):
             name = "pca"
             phase = "derived"
 
-            def run(self, indicators, window_start, window_end, **params):
+            def run(self, signals, window_start, window_end, **params):
                 # ... implementation
                 return results_df
     """
@@ -183,16 +183,16 @@ class BaseEngine(ABC):
         return pd.DataFrame()
 
     # Backwards compatibility aliases
-    def load_indicators(
+    def load_signals(
         self,
-        indicator_ids: List[str],
+        signal_ids: List[str],
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> pd.DataFrame:
         """Alias for load_signals (backwards compatibility)."""
-        return self.load_signals(indicator_ids, start_date, end_date)
+        return self.load_signals(signal_ids, start_date, end_date)
 
-    def load_all_indicators(
+    def load_all_signals(
         self,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
@@ -377,7 +377,7 @@ class BaseEngine(ABC):
 
         With Parquet architecture, storage is done via:
             from prism.db import write_table
-            write_table(df, 'vector', 'indicators', mode='upsert', key_cols=[...])
+            write_table(df, 'vector', 'signals', mode='upsert', key_cols=[...])
 
         This method is retained for API compatibility but does nothing.
 

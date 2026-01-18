@@ -109,11 +109,11 @@ Each engine has **21 sensors** measuring different aspects of its operation. Thi
 |--------|--------|------------------|-------|----------------|
 | **s1** | T2 | Total temperature at fan inlet | °R | Incoming air conditions |
 | **s2** | T24 | Total temperature at LPC outlet | °R | Compression heating |
-| **s3** | T30 | Total temperature at HPC outlet | °R | **Key degradation indicator** |
+| **s3** | T30 | Total temperature at HPC outlet | °R | **Key degradation signal** |
 | **s4** | T50 | Total temperature at LPT outlet | °R | Exhaust conditions |
 | **s5** | P2 | Pressure at fan inlet | psia | Incoming air pressure |
 | **s6** | P15 | Total pressure in bypass duct | psia | Bypass flow |
-| **s7** | P30 | Total pressure at HPC outlet | psia | **Key degradation indicator** |
+| **s7** | P30 | Total pressure at HPC outlet | psia | **Key degradation signal** |
 | **s8** | Nf | Physical fan speed | rpm | Fan rotation rate |
 | **s9** | Nc | Physical core speed | rpm | Core rotation rate |
 | **s10** | epr | Engine pressure ratio (P50/P2) | - | Overall efficiency |
@@ -361,28 +361,28 @@ DOMAIN
 Domain: cmapss_fd001 (the entire FD001 dataset)
   │
   ├── Cohort: u001 (Engine 1)
-  │     ├── Indicator: u001_s1 (Engine 1, Sensor 1)
-  │     ├── Indicator: u001_s2 (Engine 1, Sensor 2)
+  │     ├── Signal: u001_s1 (Engine 1, Sensor 1)
+  │     ├── Signal: u001_s2 (Engine 1, Sensor 2)
   │     ├── ...
-  │     └── Indicator: u001_s21 (Engine 1, Sensor 21)
+  │     └── Signal: u001_s21 (Engine 1, Sensor 21)
   │
   ├── Cohort: u002 (Engine 2)
-  │     ├── Indicator: u002_s1
+  │     ├── Signal: u002_s1
   │     ├── ...
-  │     └── Indicator: u002_s21
+  │     └── Signal: u002_s21
   │
   ... (100 cohorts total, one per engine)
   │
   └── Cohort: u100 (Engine 100)
-        ├── Indicator: u100_s1
+        ├── Signal: u100_s1
         ├── ...
-        └── Indicator: u100_s21
+        └── Signal: u100_s21
 ```
 
 **Why this structure?**
 
 - Each **engine** is a cohort (a group of related sensors)
-- Each **sensor** is an indicator (a single signal topology)
+- Each **sensor** is an signal (a single signal topology)
 - **Modes** are discovered behavioral groupings (which sensors behave similarly)
 
 ---
@@ -512,7 +512,7 @@ columns = ['unit', 'cycle', 'setting_1', 'setting_2', 'setting_3'] +
           [f's{i}' for i in range(1, 22)]
 
 # 3. Convert to PRISM structure
-# - Each sensor becomes an indicator (u001_s1, u001_s2, ...)
+# - Each sensor becomes an signal (u001_s1, u001_s2, ...)
 # - Each engine becomes a cohort (u001, u002, ...)
 # - Cycle becomes a date (for PRISM compatibility)
 ```
@@ -522,15 +522,15 @@ columns = ['unit', 'cycle', 'setting_1', 'setting_2', 'setting_3'] +
 | File | Rows | Description |
 |------|------|-------------|
 | `raw/observations.parquet` | 433,251 | All sensor readings (100 engines × 21 sensors × ~206 cycles) |
-| `raw/indicators.parquet` | 2,100 | Indicator definitions (100 × 21) |
+| `raw/signals.parquet` | 2,100 | Signal definitions (100 × 21) |
 | `config/cohorts.parquet` | 100 | Cohort definitions (one per engine) |
-| `config/cohort_members.parquet` | 2,100 | Mapping of indicators to cohorts |
+| `config/cohort_members.parquet` | 2,100 | Mapping of signals to cohorts |
 
 ### Sample: observations.parquet
 
 ```
 ┌─────────────┬────────────┬─────────┬──────────────┐
-│ indicator_id│ obs_date   │ value   │ source       │
+│ signal_id│ obs_date   │ value   │ source       │
 ├─────────────┼────────────┼─────────┼──────────────┤
 │ u001_s1     │ 2000-01-01 │ 518.67  │ cmapss_fd001 │
 │ u001_s1     │ 2000-01-02 │ 518.67  │ cmapss_fd001 │
@@ -594,15 +594,15 @@ Degrading: Rising entropy (becoming erratic)
 ### Processing Time
 
 ```
-2,100 indicators × 51 metrics × multiple windows = ~25 minutes
+2,100 signals × 51 metrics × multiple windows = ~25 minutes
 Output: 3,158,131 vector rows
 ```
 
-### Output: vector/indicator.parquet
+### Output: vector/signal.parquet
 
 ```
 ┌─────────────┬────────────┬────────────────┬──────────────┬─────────────┐
-│ indicator_id│ obs_date   │ engine         │ metric_name  │ metric_value│
+│ signal_id│ obs_date   │ engine         │ metric_name  │ metric_value│
 ├─────────────┼────────────┼────────────────┼──────────────┼─────────────┤
 │ u001_s1     │ 2000-01-01 │ hurst          │ hurst_exp    │ 0.4821      │
 │ u001_s1     │ 2000-01-01 │ entropy        │ sample_entr  │ 0.0023      │
@@ -730,7 +730,7 @@ For example:
 - s3 (HPC outlet temp) and s7 (HPC pressure) should be correlated
 - If correlation drops, it might indicate abnormal HPC behavior
 
-### Output: geometry/indicator_pair.parquet
+### Output: geometry/signal_pair.parquet
 
 ```
 21,000 total pairs (100 engines × 210 pairs each)
@@ -854,7 +854,7 @@ Engine u001 BIC search:
 2,100 rows (100 engines × 21 sensors)
 
 ┌─────────────┬───────────┬─────────┬───────────────┬──────────────┬─────────┐
-│ indicator_id│ cohort_id │ mode_id │ mode_affinity │ mode_entropy │ n_modes │
+│ signal_id│ cohort_id │ mode_id │ mode_affinity │ mode_entropy │ n_modes │
 ├─────────────┼───────────┼─────────┼───────────────┼──────────────┼─────────┤
 │ u001_s1     │ u001      │ 0       │ 0.98          │ 0.05         │ 5       │
 │ u001_s2     │ u001      │ 2       │ 0.91          │ 0.18         │ 5       │
@@ -1209,15 +1209,15 @@ Late lifecycle:
 │   └── cmapss_fd001/                  # PRISM processed data
 │       ├── raw/
 │       │   ├── observations.parquet   # 433,251 rows
-│       │   └── indicators.parquet     # 2,100 rows
+│       │   └── signals.parquet     # 2,100 rows
 │       ├── config/
 │       │   ├── cohorts.parquet        # 100 rows
 │       │   └── cohort_members.parquet # 2,100 rows
 │       ├── vector/
-│       │   └── indicator.parquet      # 3,158,131 rows
+│       │   └── signal.parquet      # 3,158,131 rows
 │       ├── geometry/
 │       │   ├── cohort.parquet         # 100 rows
-│       │   ├── indicator_pair.parquet # 21,000 rows
+│       │   ├── signal_pair.parquet # 21,000 rows
 │       │   ├── cohort_pairwise_summary.parquet # 100 rows
 │       │   └── cohort_modes.parquet   # 2,100 rows
 │       ├── rul_results_v1.parquet     # RMSE 9.47
@@ -1260,7 +1260,7 @@ pip install -e /Users/jasonrudder/prism-mac
 python scripts/cmapss_load.py
 
 # 2. Compute vector metrics (takes ~25 min)
-python -m prism.entry_points.indicator_vector
+python -m prism.entry_points.signal_vector
 
 # 3. Compute cohort geometry
 python scripts/cmapss_cohort_geometry.py
@@ -1283,16 +1283,16 @@ python scripts/cmapss_evaluate_v3.py
 
 | Column | Type | Description |
 |--------|------|-------------|
-| indicator_id | string | e.g., "u001_s3" |
+| signal_id | string | e.g., "u001_s3" |
 | obs_date | date | Cycle as date (2000-01-01 = cycle 1) |
 | value | float64 | Sensor reading |
 | source | string | "cmapss_fd001" |
 
-### vector/indicator.parquet
+### vector/signal.parquet
 
 | Column | Type | Description |
 |--------|------|-------------|
-| indicator_id | string | e.g., "u001_s3" |
+| signal_id | string | e.g., "u001_s3" |
 | obs_date | date | Cycle as date |
 | engine | string | Engine name (hurst, entropy, etc.) |
 | metric_name | string | Metric name (hurst_exponent, etc.) |
@@ -1302,7 +1302,7 @@ python scripts/cmapss_evaluate_v3.py
 
 | Column | Type | Description |
 |--------|------|-------------|
-| indicator_id | string | e.g., "u001_s3" |
+| signal_id | string | e.g., "u001_s3" |
 | cohort_id | string | e.g., "u001" |
 | domain_id | string | "cmapss_fd001" |
 | mode_id | int64 | Discovered mode (0, 1, 2, ...) |
@@ -1339,7 +1339,7 @@ python scripts/cmapss_evaluate_v3.py
 |------|------------|
 | **Domain** | The complete system (all of FD001) |
 | **Cohort** | A grouping (one engine with its 21 sensors) |
-| **Indicator** | A single signal topology (one sensor) |
+| **Signal** | A single signal topology (one sensor) |
 | **Mode** | A discovered behavioral grouping (sensors that act alike) |
 | **Fingerprint** | Summary statistics of a sensor's behavior |
 
@@ -1391,7 +1391,7 @@ python scripts/cmapss_evaluate_v3.py
 
 2. **Relational, not isolated:** We analyze how sensors relate to each other, not just individually
 
-3. **Hierarchical:** Domain → Cohort → Indicator → Mode captures structure at every level
+3. **Hierarchical:** Domain → Cohort → Signal → Mode captures structure at every level
 
 4. **Discovery-based:** Modes are discovered from data, not assumed
 
@@ -1401,7 +1401,7 @@ python scripts/cmapss_evaluate_v3.py
 
 2. **Simple models can win:** Gradient Boosting (relatively simple) beat deep neural networks
 
-3. **Domain structure helps:** Organizing data correctly (engines as cohorts, sensors as indicators) enabled meaningful analysis
+3. **Domain structure helps:** Organizing data correctly (engines as cohorts, sensors as signals) enabled meaningful analysis
 
 4. **Interpretability is valuable:** We can explain WHY an engine is predicted to fail, not just THAT it will
 
@@ -1597,7 +1597,7 @@ $$BIC = -2 \ln(\hat{L}) + k \ln(n)$$
 
 $$\bar{x}_{weighted} = \frac{\sum_i \alpha_i x_i}{\sum_i \alpha_i}$$
 
-where $\alpha_i$ is the mode affinity for indicator $i$.
+where $\alpha_i$ is the mode affinity for signal $i$.
 
 **Affinity-Weighted Variance:**
 
@@ -1607,7 +1607,7 @@ $$\sigma^2_{weighted} = \frac{\sum_i \alpha_i (x_i - \bar{x}_{weighted})^2}{\sum
 
 $$\text{contrast} = \max_{m_1, m_2} |\bar{x}_{m_1} - \bar{x}_{m_2}|$$
 
-**Transitioning Indicator Ratio:**
+**Transitioning Signal Ratio:**
 
 $$\text{trans\_ratio} = \frac{|\{i : \alpha_i < \theta\}|}{N}$$
 
@@ -1645,7 +1645,7 @@ pip install -e .
 ```bash
 # Full pipeline (~30 minutes total)
 python scripts/cmapss_load.py
-python -m prism.entry_points.indicator_vector  # ~25 min
+python -m prism.entry_points.signal_vector  # ~25 min
 python scripts/cmapss_cohort_geometry.py
 python scripts/cmapss_pairwise_geometry.py
 python scripts/cmapss_modes_v2.py

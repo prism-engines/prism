@@ -312,7 +312,7 @@ Most basic measure of separation.
 d(x, y) = √[Σᵢ (xᵢ - yᵢ)²]
 ```
 
-For two indicators with behavioral vectors x and y, this measures "how different are their behavioral signatures?"
+For two signals with behavioral vectors x and y, this measures "how different are their behavioral signatures?"
 
 #### Mahalanobis Distance
 
@@ -376,7 +376,7 @@ D(i,j) = C(i,j) + min(D(i-1,j), D(i,j-1), D(i-1,j-1))
 
 3. DTW distance = D(n, m)
 
-**In behavioral context:** Two indicators might traverse similar behavioral regions but at different speeds. DTW captures this.
+**In behavioral context:** Two signals might traverse similar behavioral regions but at different speeds. DTW captures this.
 
 ---
 
@@ -389,7 +389,7 @@ D(i,j) = C(i,j) + min(D(i-1,j), D(i,j-1), D(i-1,j-1))
 | State vector | Behavioral vector | Same structure, different dimensions |
 | Phase space | Behavioral space | Same concept, constructed vs. reconstructed |
 | Trajectory | Rolling window path | Same idea - motion through space |
-| Attractor | Behavioral cluster | Regions where indicators congregate |
+| Attractor | Behavioral cluster | Regions where signals congregate |
 | Lyapunov exponent | PRISM doesn't compute this directly | Could be added |
 
 ### 5.2 Key Mathematical Differences
@@ -423,7 +423,7 @@ This requires normalization before computing geometry.
 
 Classical: Usually one system moving through phase space.
 
-PRISM: Many indicators, each with a position in behavioral space. The geometry is about *relationships between entities*, not just evolution of one.
+PRISM: Many signals, each with a position in behavioral space. The geometry is about *relationships between entities*, not just evolution of one.
 
 ### 5.3 What PRISM Could Add from Classical Theory
 
@@ -521,9 +521,9 @@ How sharply is the trajectory bending?
 High curvature = sudden behavioral shifts
 Low curvature = smooth evolution
 
-### 6.3 Behavioral Divergence Between Indicators
+### 6.3 Behavioral Divergence Between Signals
 
-Track how two indicators' behavioral trajectories separate over time:
+Track how two signals' behavioral trajectories separate over time:
 
 ```
 D(t) = ||b_A(t) - b_B(t)||
@@ -531,11 +531,11 @@ D(t) = ||b_A(t) - b_B(t)||
 dD/dt = rate of divergence/convergence
 ```
 
-**Crisis indicator:** If normally-stable pairs suddenly diverge in behavioral space, something structural is changing.
+**Crisis signal:** If normally-stable pairs suddenly diverge in behavioral space, something structural is changing.
 
 ### 6.4 Phase Space Volume (Behavioral Dispersion)
 
-For a collection of indicators, track the volume of behavioral space they occupy:
+For a collection of signals, track the volume of behavioral space they occupy:
 
 ```
 Volume ≈ det(Covariance matrix of behavioral vectors)^(1/2)
@@ -544,8 +544,8 @@ Volume ≈ det(Covariance matrix of behavioral vectors)^(1/2)
 Or use convex hull volume in lower-dimensional projection.
 
 **Interpretation:**
-- Contracting volume: Indicators converging to similar behavior
-- Expanding volume: Indicators diverging, heterogeneous behavior
+- Contracting volume: Signals converging to similar behavior
+- Expanding volume: Signals diverging, heterogeneous behavior
 - Pre-crisis pattern might show contraction followed by expansion
 
 ---
@@ -556,7 +556,7 @@ Or use convex hull volume in lower-dimensional projection.
 |--------------|----------------|-------------------|
 | State vector | x = [q₁, ..., pₙ] | Behavioral vector = [H, SE, W, G, ...] |
 | Trajectory | x(t) = solution to dx/dt = f(x) | Rolling window behavioral snapshots |
-| Distance | d = √[Σ(xᵢ-yᵢ)²] | Behavioral similarity between indicators |
+| Distance | d = √[Σ(xᵢ-yᵢ)²] | Behavioral similarity between signals |
 | PCA | Eigendecomposition of covariance | Main axes of behavioral variation |
 | DTW | Optimal alignment cost | Trajectory similarity with time flexibility |
 | Lyapunov | λ = lim ln(δx(t)/δx(0))/t | Stability of behavioral dynamics |

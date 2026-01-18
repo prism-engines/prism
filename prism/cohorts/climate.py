@@ -1,13 +1,13 @@
 """
 Climate Cohort Definitions
 
-Categorizes climate indicators into cohorts by type and region.
+Categorizes climate signals into cohorts by type and region.
 Note: Most climate data is hemispheric or global, not continent-level.
 
 Hierarchy:
     Domain: data/raw/observations.parquet
     └── Cohorts: temperature_global, greenhouse_gases, cryosphere_arctic, etc.
-        └── Indicators: GISS_TEMP_GLOBAL, CO2_MONTHLY, ARCTIC_SEA_ICE_EXTENT, etc.
+        └── Signals: GISS_TEMP_GLOBAL, CO2_MONTHLY, ARCTIC_SEA_ICE_EXTENT, etc.
 """
 
 from typing import Dict, List
@@ -86,24 +86,24 @@ CLIMATE_COHORTS: Dict[str, List[str]] = {
 CLIMATE_SUB_COHORTS = CLIMATE_COHORTS
 
 
-# Reverse lookup: indicator -> cohort
+# Reverse lookup: signal -> cohort
 _INDICATOR_TO_COHORT: Dict[str, str] = {}
-for cohort, indicators in CLIMATE_COHORTS.items():
-    for indicator in indicators:
-        _INDICATOR_TO_COHORT[indicator] = cohort
+for cohort, signals in CLIMATE_COHORTS.items():
+    for signal in signals:
+        _INDICATOR_TO_COHORT[signal] = cohort
 
 
-def get_climate_cohort(indicator_id: str) -> str:
+def get_climate_cohort(signal_id: str) -> str:
     """
-    Get cohort for a climate indicator.
+    Get cohort for a climate signal.
 
     Args:
-        indicator_id: The indicator ID
+        signal_id: The signal ID
 
     Returns:
         Cohort name or 'other' if not classified
     """
-    return _INDICATOR_TO_COHORT.get(indicator_id, 'other')
+    return _INDICATOR_TO_COHORT.get(signal_id, 'other')
 
 
 # Legacy alias

@@ -36,15 +36,15 @@ except ImportError:
 
 
 def load_data(data_dir: Path):
-    """Load observations and indicators."""
+    """Load observations and signals."""
     if HAS_POLARS:
         observations = pl.read_parquet(data_dir / "raw" / "observations.parquet")
-        indicators = pl.read_parquet(data_dir / "raw" / "indicators.parquet")
-        return observations, indicators
+        signals = pl.read_parquet(data_dir / "raw" / "signals.parquet")
+        return observations, signals
     else:
         observations = pq.read_table(data_dir / "raw" / "observations.parquet").to_pandas()
-        indicators = pq.read_table(data_dir / "raw" / "indicators.parquet").to_pandas()
-        return observations, indicators
+        signals = pq.read_table(data_dir / "raw" / "signals.parquet").to_pandas()
+        return observations, signals
 
 
 def compute_cross_correlation(x, y, max_lag=10):
@@ -74,7 +74,7 @@ def compute_cross_correlation(x, y, max_lag=10):
     return best_corr, best_lag
 
 
-def compute_pairwise_geometry(observations, indicators, min_overlap=20):
+def compute_pairwise_geometry(observations, signals, min_overlap=20):
     """
     Compute vital-to-vital geometry for each patient.
 
@@ -84,10 +84,10 @@ def compute_pairwise_geometry(observations, indicators, min_overlap=20):
 
     # Get unique stays
     if HAS_POLARS:
-        stays = indicators.select(["stay_id", "regime"]).unique()
+        stays = signals.select(["stay_id", "regime"]).unique()
         stay_list = stays.to_dicts()
     else:
-        stays = indicators[["stay_id", "regime"]].drop_duplicates()
+        stays = signals[["stay_id", "regime"]].drop_duplicates()
         stay_list = stays.to_dict('records')
 
     print(f"Computing vital-to-vital geometry for {len(stay_list)} ICU stays...")
@@ -99,13 +99,13 @@ def compute_pairwise_geometry(observations, indicators, min_overlap=20):
         stay_id = stay_row["stay_id"]
         regime = stay_row["regime"]
 
-        # Get all indicators for this stay
+        # Get all signals for this stay
         if HAS_POLARS:
-            stay_indicators = indicators.filter(pl.col("stay_id") == stay_id)
-            vital_names = stay_indicators["vital_name"].unique().to_list()
+            stay_signals = signals.filter(pl.col("stay_id") == stay_id)
+            vital_names = stay_signals["vital_name"].unique().to_list()
         else:
-            stay_indicators = indicators[indicators["stay_id"] == stay_id]
-            vital_names = stay_indicators["vital_name"].unique().tolist()
+            stay_signals = signals[signals["stay_id"] == stay_id]
+            vital_names = stay_signals["vital_name"].unique().tolist()
 
         if len(vital_names) < 2:
             continue
@@ -114,19 +114,19 @@ def compute_pairwise_geometry(observations, indicators, min_overlap=20):
         vital_series = {}
         for vital in vital_names:
             if HAS_POLARS:
-                ind_row = stay_indicators.filter(pl.col("vital_name") == vital)
+                ind_row = stay_signals.filter(pl.col("vital_name") == vital)
                 if len(ind_row) == 0:
                     continue
-                indicator_id = ind_row["indicator_id"][0]
-                ts = observations.filter(pl.col("indicator_id") == indicator_id)
+                signal_id = ind_row["signal_id"][0]
+                ts = observations.filter(pl.col("signal_id") == signal_id)
                 ts = ts.sort("obs_date")
                 values = ts["value"].to_numpy()
             else:
-                ind_row = stay_indicators[stay_indicators["vital_name"] == vital]
+                ind_row = stay_signals[stay_signals["vital_name"] == vital]
                 if len(ind_row) == 0:
                     continue
-                indicator_id = ind_row["indicator_id"].iloc[0]
-                ts = observations[observations["indicator_id"] == indicator_id]
+                signal_id = ind_row["signal_id"].iloc[0]
+                ts = observations[observations["signal_id"] == signal_id]
                 ts = ts.sort_values("obs_date")
                 values = ts["value"].values
 
@@ -195,18 +195,18 @@ def main():
 
     # Load data
     print("Loading data...")
-    observations, indicators = load_data(data_dir)
+    observations, signals = load_data(data_dir)
 
     if HAS_POLARS:
         print(f"Observations: {len(observations)}")
-        print(f"Indicators: {len(indicators)}")
+        print(f"Signals: {len(signals)}")
     else:
         print(f"Observations: {len(observations)}")
-        print(f"Indicators: {len(indicators)}")
+        print(f"Signals: {len(signals)}")
     print()
 
     # Compute pairwise geometry
-    geometry = compute_pairwise_geometry(observations, indicators)
+    geometry = compute_pairwise_geometry(observations, signals)
 
     print(f"\nComputed {len(geometry)} vital pairs")
     print()

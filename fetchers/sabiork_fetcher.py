@@ -174,7 +174,7 @@ def create_prism_observations(
     Generate simulated Michaelis-Menten curves and create PRISM-format data.
     """
     observations = []
-    indicators = []
+    signals = []
 
     for entry in entries:
         km = entry.get("km")
@@ -187,12 +187,12 @@ def create_prism_observations(
         enzyme = entry.get("enzyme_name", "unknown")[:30]
         ec = entry.get("ec_number", "")
 
-        # Create indicator ID
-        indicator_id = f"sabiork_{entry_id}"
+        # Create signal ID
+        signal_id = f"sabiork_{entry_id}"
 
         # Simulate three regimes
         for regime, s_mult in [("linear", 0.2), ("transition", 1.0), ("saturating", 10.0)]:
-            regime_id = f"{indicator_id}_{regime}"
+            regime_id = f"{signal_id}_{regime}"
 
             # Simulate kinetics
             substrate, velocity = simulate_michaelis_menten(
@@ -206,15 +206,15 @@ def create_prism_observations(
             base_date = datetime(2020, 1, 1)
             for i, (s, v) in enumerate(zip(substrate, velocity)):
                 observations.append({
-                    "indicator_id": regime_id,
+                    "signal_id": regime_id,
                     "obs_date": base_date + timedelta(seconds=i),
                     "value": v,
                     "substrate": s,
                 })
 
-            # Indicator metadata
-            indicators.append({
-                "indicator_id": regime_id,
+            # Signal metadata
+            signals.append({
+                "signal_id": regime_id,
                 "entry_id": entry_id,
                 "enzyme_name": enzyme,
                 "ec_number": ec,
@@ -226,7 +226,7 @@ def create_prism_observations(
             })
 
     obs_df = pl.DataFrame(observations)
-    ind_df = pl.DataFrame(indicators)
+    ind_df = pl.DataFrame(signals)
 
     return obs_df, ind_df
 
@@ -293,7 +293,7 @@ def main():
     from datetime import timedelta
 
     observations = []
-    indicators = []
+    signals = []
 
     for entry in entries:
         km = entry["km"]
@@ -302,7 +302,7 @@ def main():
 
         # Simulate three regimes
         for regime, s_mult in [("linear", 0.1), ("transition", 1.0), ("saturating", 10.0)]:
-            indicator_id = f"sabiork_{entry_id}_{regime}"
+            signal_id = f"sabiork_{entry_id}_{regime}"
 
             # Simulate kinetics in this regime
             substrate, velocity = simulate_michaelis_menten(
@@ -316,14 +316,14 @@ def main():
             base_date = datetime(2020, 1, 1)
             for i, v in enumerate(velocity):
                 observations.append({
-                    "indicator_id": indicator_id,
+                    "signal_id": signal_id,
                     "obs_date": base_date + timedelta(seconds=i),
                     "value": float(v),
                 })
 
-            # Indicator metadata
-            indicators.append({
-                "indicator_id": indicator_id,
+            # Signal metadata
+            signals.append({
+                "signal_id": signal_id,
                 "entry_id": entry_id,
                 "enzyme_name": entry.get("enzyme_name", "")[:50],
                 "ec_number": entry.get("ec_number", ""),
@@ -337,11 +337,11 @@ def main():
 
     # Convert to DataFrames
     obs_df = pl.DataFrame(observations)
-    ind_df = pl.DataFrame(indicators)
+    ind_df = pl.DataFrame(signals)
 
     # Save to parquet
     obs_df.write_parquet(output_dir / "raw" / "observations.parquet")
-    ind_df.write_parquet(output_dir / "raw" / "indicators.parquet")
+    ind_df.write_parquet(output_dir / "raw" / "signals.parquet")
 
     # Create cohorts
     cohorts = pl.DataFrame([{
@@ -352,8 +352,8 @@ def main():
     cohorts.write_parquet(output_dir / "config" / "cohorts.parquet")
 
     cohort_members = pl.DataFrame([
-        {"cohort_id": "sabiork_enzyme_kinetics", "indicator_id": ind_id}
-        for ind_id in ind_df["indicator_id"].to_list()
+        {"cohort_id": "sabiork_enzyme_kinetics", "signal_id": ind_id}
+        for ind_id in ind_df["signal_id"].to_list()
     ])
     cohort_members.write_parquet(output_dir / "config" / "cohort_members.parquet")
 
@@ -362,7 +362,7 @@ def main():
     print("Download complete!")
     print("=" * 60)
     print(f"Entries with valid kinetics: {len(entries)}")
-    print(f"Indicators (3 regimes each): {len(ind_df)}")
+    print(f"Signals (3 regimes each): {len(ind_df)}")
     print(f"Observations: {len(obs_df)}")
     print()
 
@@ -373,7 +373,7 @@ def main():
 
     # Sample entries
     print("Sample entries:")
-    print(ind_df.select(["indicator_id", "enzyme_name", "km", "vmax", "regime"]).head(10))
+    print(ind_df.select(["signal_id", "enzyme_name", "km", "vmax", "regime"]).head(10))
 
 
 if __name__ == "__main__":

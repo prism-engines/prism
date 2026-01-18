@@ -66,8 +66,8 @@ def load_tep_data(domain: str):
     """Load TEP vector, field, and observation data."""
     from prism.db.parquet_store import get_parquet_path
 
-    vec_path = get_parquet_path('vector', 'indicator', domain)
-    field_path = get_parquet_path('vector', 'indicator_field', domain)
+    vec_path = get_parquet_path('vector', 'signal', domain)
+    field_path = get_parquet_path('vector', 'signal_field', domain)
     obs_path = get_parquet_path('raw', 'observations', domain)
 
     vec_df = pl.read_parquet(vec_path)
@@ -84,10 +84,10 @@ def load_tep_data(domain: str):
 def build_vector_features(vec_df: pl.DataFrame) -> pl.DataFrame:
     """Build feature matrix from PRISM vector data."""
 
-    # Filter to TEP process indicators (exclude FAULT)
+    # Filter to TEP process signals (exclude FAULT)
     process_df = vec_df.filter(
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT')
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT')
     )
 
     # Filter to top metrics
@@ -139,8 +139,8 @@ def build_field_features(field_df: pl.DataFrame) -> pl.DataFrame:
 
     # Filter to TEP
     tep_field = field_df.filter(
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT')
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT')
     )
 
     if len(tep_field) == 0:
@@ -204,7 +204,7 @@ def add_rolling_features(features: pl.DataFrame, windows: list = [3, 7, 14]) -> 
 
 def get_fault_labels(obs_df: pl.DataFrame):
     """Extract fault labels per date."""
-    fault_raw = obs_df.filter(pl.col('indicator_id') == 'TEP_FAULT')
+    fault_raw = obs_df.filter(pl.col('signal_id') == 'TEP_FAULT')
 
     # Get dominant fault per date
     labels = fault_raw.group_by('obs_date').agg([

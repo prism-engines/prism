@@ -61,11 +61,11 @@ def monitor_once() -> dict:
     """Get current status of all PRISM data files."""
     results = {}
 
-    # Vector indicators
-    vec_path = get_parquet_path("vector", "indicators")
+    # Vector signals
+    vec_path = get_parquet_path("vector", "signals")
     vec_stats = get_file_stats(vec_path)
-    vec_progress = get_progress_stats("vector", "indicators")
-    results["vector.indicators"] = {**vec_stats, **vec_progress}
+    vec_progress = get_progress_stats("vector", "signals")
+    results["vector.signals"] = {**vec_stats, **vec_progress}
 
     # Geometry cohorts
     geo_cohorts_path = get_parquet_path("geometry", "cohorts")

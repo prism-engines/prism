@@ -9,7 +9,7 @@ Directory Structure (domain-first):
       {domain}/                   # e.g., cmapss/, climate/, cheme/
         raw/
           observations.parquet
-          indicators.parquet
+          signals.parquet
         config/
           cohort_members.parquet
           cohorts.parquet
@@ -18,18 +18,18 @@ Directory Structure (domain-first):
           pairs.parquet
           redundant.parquet
         vector/
-          indicator.parquet       # individual indicator metrics
+          signal.parquet       # individual signal metrics
           cohort.parquet          # aggregated cohort metrics
         geometry/
-          indicator_pair.parquet  # pairwise between indicators
+          signal_pair.parquet  # pairwise between signals
           cohort.parquet          # cohort-level structure
           cohort_pair.parquet     # pairwise between cohorts (future)
         state/
-          indicator_pair.parquet  # temporal relationships
+          signal_pair.parquet  # temporal relationships
           cohort.parquet          # cohort temporal dynamics
           cohort_pair.parquet     # cohort pairwise dynamics (future)
         characterization/
-          indicator.parquet       # 6-axis classification per indicator
+          signal.parquet       # 6-axis classification per signal
           cohort.parquet          # 6-axis classification per cohort
 
       cross_domain/               # cross-domain comparisons (future)
@@ -39,14 +39,14 @@ Directory Structure (domain-first):
 Naming Convention:
     - Top folder = domain (cmapss, climate, cheme, etc.)
     - Second folder = analysis type (vector, geometry, state, characterization)
-    - Filename = scope (indicator, cohort) + _pair suffix for pairwise
+    - Filename = scope (signal, cohort) + _pair suffix for pairwise
 
 Usage:
     # Domain defaults to active domain
-    get_parquet_path('vector', 'indicator')  # -> data/{domain}/vector/indicator.parquet
+    get_parquet_path('vector', 'signal')  # -> data/{domain}/vector/signal.parquet
 
     # Explicit domain
-    get_parquet_path('vector', 'indicator', domain='cmapss')  # -> data/cmapss/vector/indicator.parquet
+    get_parquet_path('vector', 'signal', domain='cmapss')  # -> data/cmapss/vector/signal.parquet
 """
 
 import os
@@ -72,14 +72,14 @@ SCHEMAS = [
 # Table definitions per schema
 # Naming: {scope}.parquet or {scope}_pair.parquet for pairwise
 SCHEMA_TABLES = {
-    "raw": ["observations", "indicators", "domain_config"],
+    "raw": ["observations", "signals", "domain_config"],
     "config": ["cohort_members", "cohorts", "windows", "engine_min_obs"],
     "filter": ["pairs", "redundant", "curated"],
-    "vector": ["indicator", "cohort", "domain"],
-    "geometry": ["indicator_pair", "cohort", "cohort_pair", "domain"],
-    "state": ["indicator_pair", "cohort", "cohort_pair", "domain"],
-    "characterization": ["indicator", "cohort", "domain"],
-    "physics": ["indicator", "cohort", "conservation"],
+    "vector": ["signal", "cohort", "domain"],
+    "geometry": ["signal_pair", "cohort", "cohort_pair", "domain"],
+    "state": ["signal_pair", "cohort", "cohort_pair", "domain"],
+    "characterization": ["signal", "cohort", "domain"],
+    "physics": ["signal", "cohort", "conservation"],
     "delta": ["breaks", "timing", "geometry", "pairwise"],  # Delta pipeline
     "event": ["density", "regimes", "sync"],            # Event geometry
 }
@@ -91,24 +91,24 @@ SCHEMA_TABLES = {
 #        path = get_parquet_path(*VECTOR_INDICATOR)
 
 # Vector paths (intrinsic properties)
-VECTOR_INDICATOR = ("vector", "indicator")
+VECTOR_INDICATOR = ("vector", "signal")
 VECTOR_COHORT = ("vector", "cohort")
 VECTOR_DOMAIN = ("vector", "domain")
 
 # Geometry paths (structural relationships)
-GEOMETRY_INDICATOR_PAIR = ("geometry", "indicator_pair")
+GEOMETRY_INDICATOR_PAIR = ("geometry", "signal_pair")
 GEOMETRY_COHORT = ("geometry", "cohort")
 GEOMETRY_COHORT_PAIR = ("geometry", "cohort_pair")
 GEOMETRY_DOMAIN = ("geometry", "domain")
 
 # State paths (temporal dynamics)
-STATE_INDICATOR_PAIR = ("state", "indicator_pair")
+STATE_INDICATOR_PAIR = ("state", "signal_pair")
 STATE_COHORT = ("state", "cohort")
 STATE_COHORT_PAIR = ("state", "cohort_pair")
 STATE_DOMAIN = ("state", "domain")
 
 # Characterization paths (6-axis classification)
-CHAR_INDICATOR = ("characterization", "indicator")
+CHAR_INDICATOR = ("characterization", "signal")
 CHAR_COHORT = ("characterization", "cohort")
 CHAR_DOMAIN = ("characterization", "domain")
 
@@ -197,18 +197,18 @@ def get_parquet_path(schema: str, table: str, domain: str = None) -> Path:
 
     Args:
         schema: Schema name (raw, vector, geometry, state, etc.)
-        table: Table name (indicator, cohort, indicator_pair, etc.)
+        table: Table name (signal, cohort, signal_pair, etc.)
         domain: Domain name. Defaults to active domain.
 
     Returns:
-        Path to parquet file (e.g., data/cmapss/vector/indicator.parquet)
+        Path to parquet file (e.g., data/cmapss/vector/signal.parquet)
 
     Examples:
-        >>> get_parquet_path('vector', 'indicator')
-        PosixPath('.../data/cmapss/vector/indicator.parquet')
+        >>> get_parquet_path('vector', 'signal')
+        PosixPath('.../data/cmapss/vector/signal.parquet')
 
-        >>> get_parquet_path('vector', 'indicator', domain='g7')
-        PosixPath('.../data/g7/vector/indicator.parquet')
+        >>> get_parquet_path('vector', 'signal', domain='g7')
+        PosixPath('.../data/g7/vector/signal.parquet')
     """
     return get_schema_path(schema, domain) / f"{table}.parquet"
 

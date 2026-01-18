@@ -1,12 +1,12 @@
 """
 PRISM Local Outlier Factor Engine
 
-Detects anomalous indicators in behavioral space using density-based analysis.
+Detects anomalous signals in behavioral space using density-based analysis.
 
 Measures:
-- LOF score per indicator (>1 = outlier, <1 = inlier)
+- LOF score per signal (>1 = outlier, <1 = inlier)
 - Number of outliers at various thresholds
-- Most anomalous indicators
+- Most anomalous signals
 - Average local reachability density
 
 Phase: Structure
@@ -18,8 +18,8 @@ Interpretation:
 - LOF > 3.0: Extreme outlier in behavioral space
 
 Use Cases:
-- Identify indicators with unusual behavioral patterns
-- Early warning: outliers may be leading indicators
+- Identify signals with unusual behavioral patterns
+- Early warning: outliers may be leading signals
 - Data quality: extreme outliers may have data issues
 """
 
@@ -52,7 +52,7 @@ class LOFEngine(BaseEngine):
     """
     Local Outlier Factor engine for behavioral space.
     
-    Identifies indicators whose behavioral signatures are unusual
+    Identifies signals whose behavioral signatures are unusual
     compared to their local neighborhood in behavioral space.
     
     LOF compares the local density around each point to the local
@@ -60,7 +60,7 @@ class LOFEngine(BaseEngine):
     than their neighbors are considered outliers.
     
     Outputs:
-        - results.lof_scores: Per-indicator LOF scores
+        - results.lof_scores: Per-signal LOF scores
     """
     
     name = "lof"
@@ -83,7 +83,7 @@ class LOFEngine(BaseEngine):
         Run LOF analysis on behavioral space.
         
         Args:
-            df: Behavioral vectors (rows=dimensions, cols=indicators)
+            df: Behavioral vectors (rows=dimensions, cols=signals)
             run_id: Unique run identifier
             n_neighbors: Number of neighbors for LOF (default 5)
             contamination: Expected proportion of outliers ("auto" or float)
@@ -91,17 +91,17 @@ class LOFEngine(BaseEngine):
         Returns:
             Dict with summary metrics
         """
-        indicators = list(df.columns)
-        n_indicators = len(indicators)
+        signals = list(df.columns)
+        n_signals = len(signals)
         
-        if n_indicators < n_neighbors + 1:
-            n_neighbors = max(2, n_indicators - 1)
+        if n_signals < n_neighbors + 1:
+            n_neighbors = max(2, n_signals - 1)
             logger.warning(f"Reduced n_neighbors to {n_neighbors} due to small sample")
         
         window_start, window_end = get_window_dates(df)
         
         # Prepare data: LOF expects (n_samples, n_features)
-        # df.T gives us (n_indicators, n_dimensions)
+        # df.T gives us (n_signals, n_dimensions)
         X = df.T.values
         
         # Fit LOF
@@ -120,7 +120,7 @@ class LOFEngine(BaseEngine):
         
         # Create score DataFrame
         score_df = pd.DataFrame({
-            "indicator_id": indicators,
+            "signal_id": signals,
             "lof_score": lof_scores,
             "is_outlier": labels == -1,
         })
@@ -142,16 +142,16 @@ class LOFEngine(BaseEngine):
         outliers_3_0 = (lof_scores > 3.0).sum()
         
         # Top outliers
-        top_outliers = score_df.head(5)["indicator_id"].tolist()
+        top_outliers = score_df.head(5)["signal_id"].tolist()
         
         # Most normal (lowest LOF)
-        most_normal = score_df.tail(5)["indicator_id"].tolist()
+        most_normal = score_df.tail(5)["signal_id"].tolist()
         
         metrics = {
-            "n_indicators": n_indicators,
+            "n_signals": n_signals,
             "n_neighbors": n_neighbors,
             "n_outliers_auto": int(n_outliers),
-            "outlier_rate_auto": float(n_outliers / n_indicators),
+            "outlier_rate_auto": float(n_outliers / n_signals),
             "n_outliers_1_5": int(outliers_1_5),
             "n_outliers_2_0": int(outliers_2_0),
             "n_outliers_3_0": int(outliers_3_0),
@@ -163,7 +163,7 @@ class LOFEngine(BaseEngine):
         }
         
         logger.info(
-            f"LOF complete: {n_indicators} indicators, "
+            f"LOF complete: {n_signals} signals, "
             f"{n_outliers} outliers (auto), "
             f"max LOF={metrics['max_lof_score']:.2f}, "
             f"top outliers: {top_outliers[:3]}"
@@ -178,11 +178,11 @@ class LOFEngine(BaseEngine):
         window_end: date,
         run_id: str,
     ):
-        """Store LOF scores per indicator."""
+        """Store LOF scores per signal."""
         records = []
         for _, row in score_df.iterrows():
             records.append({
-                "indicator_id": row["indicator_id"],
+                "signal_id": row["signal_id"],
                 "window_start": window_start,
                 "window_end": window_end,
                 "lof_score": float(row["lof_score"]),

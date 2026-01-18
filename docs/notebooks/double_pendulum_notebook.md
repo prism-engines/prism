@@ -45,7 +45,7 @@ Energy conservation verified: < 1e-6 relative error (except 90° at E≈0).
 | 120° | chaotic | 0.819 | 0.187 | 0.111 | 0.438 | 1.035 |
 | 150° | chaotic | 0.860 | 0.186 | 0.117 | 0.442 | 1.123 |
 
-### Theta1 (Primary Chaos Indicator)
+### Theta1 (Primary Chaos Signal)
 
 | Angle | Hurst | Lyapunov | SampEn | Interpretation |
 |-------|-------|----------|--------|----------------|

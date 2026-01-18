@@ -27,12 +27,12 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-# Step 1: Indicator Vector
+# Step 1: Signal Vector
 echo
 echo "=============================================="
-echo "Step 1/4: Computing indicator vectors..."
+echo "Step 1/4: Computing signal vectors..."
 echo "=============================================="
-python -m prism.entry_points.indicator_vector --domain $DOMAIN
+python -m prism.entry_points.signal_vector --domain $DOMAIN
 
 # Step 2: Geometry
 echo

@@ -11,8 +11,8 @@ Entry points are the execution layer of PRISM. Each entry point computes measure
 ```
 prism/entry_points/           # CLI entry points (python -m prism.entry_points.*)
 ├── fetch.py                 # Data fetching to Parquet
-├── characterize.py          # 6-axis indicator classification
-├── indicator_vector.py      # Layer 1: Vector metrics (51 per indicator)
+├── characterize.py          # 6-axis signal classification
+├── signal_vector.py      # Layer 1: Vector metrics (51 per signal)
 ├── laplace.py               # Layer 2: Laplace field computation
 ├── laplace_pairwise.py      # Layer 2: Pairwise geometry (vectorized)
 ├── geometry.py              # Layer 3: Cohort geometry + modes + wavelet
@@ -49,7 +49,7 @@ python -m prism.entry_points.fetch --femto
 python -m prism.entry_points.fetch --hydraulic
 
 # Layer 1: Vector Computation
-python -m prism.entry_points.indicator_vector --domain cmapss
+python -m prism.entry_points.signal_vector --domain cmapss
 
 # Layer 2: Laplace Field
 python -m prism.entry_points.laplace --domain cmapss
@@ -93,7 +93,7 @@ python -m prism.entry_points.hybrid --domain cmapss --model xgboost
 |-------------|-------|---------|
 | `fetch.py` | 0 | Data ingestion from fetchers |
 | `characterize.py` | 0.5 | 6-axis dynamical classification |
-| `indicator_vector.py` | 1 | 51 behavioral metrics per indicator |
+| `signal_vector.py` | 1 | 51 behavioral metrics per signal |
 | `laplace.py` | 2 | Laplace field computation |
 | `laplace_pairwise.py` | 2 | Pairwise geometry (vectorized) |
 | `geometry.py` | 3 | Cohort geometry + modes + wavelet |

@@ -188,17 +188,17 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
 
                 if feature in features:
                     all_observations.append({
-                        "indicator_id": f"NASA_{test_set.upper()}_B{bearing_idx + 1}_{feature.upper()}",
+                        "signal_id": f"NASA_{test_set.upper()}_B{bearing_idx + 1}_{feature.upper()}",
                         "observed_at": obs_date,
                         "value": features[feature],
                         "source": SOURCE,
                     })
 
-                    # Also add all features as separate indicators
+                    # Also add all features as separate signals
                     for feat_name, feat_value in features.items():
                         if feat_name != feature:  # Already added main feature
                             all_observations.append({
-                                "indicator_id": f"NASA_{test_set.upper()}_B{bearing_idx + 1}_{feat_name.upper()}",
+                                "signal_id": f"NASA_{test_set.upper()}_B{bearing_idx + 1}_{feat_name.upper()}",
                                 "observed_at": obs_date,
                                 "value": feat_value,
                                 "source": SOURCE,

@@ -325,17 +325,17 @@ def save_to_prism_format(all_trajectories, data_dir):
                 conc_vars.append(('C', traj['C']))
 
         for var_name, values in conc_vars:
-            indicator_id = f"{traj_name}_{var_name}"
+            signal_id = f"{traj_name}_{var_name}"
 
             for i, val in enumerate(values):
                 obs_rows.append({
-                    'indicator_id': indicator_id,
+                    'signal_id': signal_id,
                     'obs_date': base_date + timedelta(seconds=float(t[i])),
                     'value': float(val),
                 })
 
             ind_rows.append({
-                'indicator_id': indicator_id,
+                'signal_id': signal_id,
                 'name': f"{traj_name} - {var_name}",
                 'description': f"Concentration of {var_name}",
                 'source': 'simulation',
@@ -352,15 +352,15 @@ def save_to_prism_format(all_trajectories, data_dir):
     print(f"Wrote {len(obs_rows)} observations")
 
     ind_df = pl.DataFrame(ind_rows)
-    ind_df.write_parquet(data_dir / 'raw' / 'indicators.parquet')
-    print(f"Wrote {len(ind_rows)} indicators")
+    ind_df.write_parquet(data_dir / 'raw' / 'signals.parquet')
+    print(f"Wrote {len(ind_rows)} signals")
 
     # Cohort config
     pl.DataFrame([
         {'cohort_id': 'chemical_kinetics', 'name': 'Chemical Kinetics', 'domain': 'chemistry'},
     ]).write_parquet(data_dir / 'config' / 'cohorts.parquet')
 
-    member_rows = [{'cohort_id': 'chemical_kinetics', 'indicator_id': r['indicator_id']} for r in ind_rows]
+    member_rows = [{'cohort_id': 'chemical_kinetics', 'signal_id': r['signal_id']} for r in ind_rows]
     pl.DataFrame(member_rows).write_parquet(data_dir / 'config' / 'cohort_members.parquet')
 
     # Summary

@@ -20,7 +20,7 @@ from prism.engines.utils.parallel import (
     run_workers,
     parse_date,
     get_available_snapshots,
-    get_indicators,
+    get_signals,
 )
 
 __all__ = [
@@ -35,5 +35,5 @@ __all__ = [
     "run_workers",
     "parse_date",
     "get_available_snapshots",
-    "get_indicators",
+    "get_signals",
 ]

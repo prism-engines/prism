@@ -128,7 +128,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
         config: Dict with keys:
             - aggregate: How to aggregate within-cycle samples
                          "mean", "std", "max", "min", or "all" (default: "mean")
-            - include_labels: Include component conditions as indicators
+            - include_labels: Include component conditions as signals
             - cache_dir: Directory for cached downloads
 
     Returns:
@@ -179,7 +179,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
                 for sample_idx, value in enumerate(cycle_data):
                     if not np.isnan(value):
                         all_observations.append({
-                            "indicator_id": f"HYD_{sensor_name}",
+                            "signal_id": f"HYD_{sensor_name}",
                             "observed_at": obs_date,
                             "value": float(value),
                             "source": SOURCE,
@@ -193,7 +193,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
             if not np.isnan(value):
                 obs_date = base_date + timedelta(days=cycle_idx)
                 all_observations.append({
-                    "indicator_id": f"HYD_{sensor_name}",
+                    "signal_id": f"HYD_{sensor_name}",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": SOURCE,
@@ -206,7 +206,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
             for cycle_idx, value in enumerate(profile[col]):
                 obs_date = base_date + timedelta(days=cycle_idx)
                 all_observations.append({
-                    "indicator_id": f"HYD_{col.upper()}",
+                    "signal_id": f"HYD_{col.upper()}",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": SOURCE,

@@ -24,15 +24,15 @@ prism/
 │   ├── entropy.py       # Sample/permutation entropy
 │   ├── garch.py         # Volatility modeling
 │   ├── rqa.py           # Recurrence quantification
-│   ├── lyapunov.py      # Chaos indicator
+│   ├── lyapunov.py      # Chaos signal
 │   ├── pca.py           # Principal components
 │   ├── granger.py       # Granger causality
 │   └── ...              # 14 more engines
 │
 ├── entry_points/        # CLI entry points (15 total)
 │   ├── fetch.py         # Data fetching to Parquet
-│   ├── characterize.py  # 6-axis indicator classification
-│   ├── indicator_vector.py # Layer 1: Vector metrics
+│   ├── characterize.py  # 6-axis signal classification
+│   ├── signal_vector.py # Layer 1: Vector metrics
 │   ├── laplace.py       # Layer 2: Laplace field
 │   ├── geometry.py      # Layer 3: Cohort geometry
 │   ├── state.py         # Layer 4: State derivation
@@ -84,7 +84,7 @@ from prism.db.parquet_store import get_parquet_path
 observations = pl.read_parquet(get_parquet_path('raw', 'observations'))
 
 # Query data
-df = observations.filter(pl.col('indicator_id') == 'sensor_T30')
+df = observations.filter(pl.col('signal_id') == 'sensor_T30')
 ```
 
 ### CLI Entry Points
@@ -95,7 +95,7 @@ python -m prism.entry_points.fetch --cmapss
 python -m prism.entry_points.fetch --femto
 
 # Run pipeline
-python -m prism.entry_points.indicator_vector --domain cmapss
+python -m prism.entry_points.signal_vector --domain cmapss
 python -m prism.entry_points.laplace --domain cmapss
 python -m prism.entry_points.geometry --domain cmapss
 ```
@@ -106,7 +106,7 @@ python -m prism.entry_points.geometry --domain cmapss
 
 ```
 fetch → characterize
-  → indicator_vector → laplace → geometry → state
+  → signal_vector → laplace → geometry → state
 ```
 
 **Key:** Observations → Vector Metrics → Laplace Field → Geometry → State
@@ -117,8 +117,8 @@ fetch → characterize
 
 | Category | Count | Purpose | Interface |
 |----------|-------|---------|-----------|
-| **Vector** | 9 | Single-indicator intrinsic properties | `f(array) -> dict` |
-| **Geometry** | 9 | Multi-indicator relational structure | `Engine.compute(matrix)` |
+| **Vector** | 9 | Single-signal intrinsic properties | `f(array) -> dict` |
+| **Geometry** | 9 | Multi-signal relational structure | `Engine.compute(matrix)` |
 | **State** | 7 | Temporal dynamics and causality | `Engine.compute(x, y)` |
 | **Temporal Dynamics** | 5 | Geometry evolution over time | `Engine.compute(snapshots)` |
 | **Observation** | 3 | Discontinuity detection | `f(array) -> dict` |
@@ -147,13 +147,13 @@ data/{domain}/
 │   ├── observations.parquet
 │   └── characterization.parquet
 ├── vector/             # Layer 1-2: Vector metrics + Laplace field
-│   ├── indicator.parquet
-│   └── indicator_field.parquet
+│   ├── signal.parquet
+│   └── signal_field.parquet
 ├── geometry/           # Layer 3: Structural snapshots
 │   ├── cohort.parquet
-│   └── indicator_pair.parquet
+│   └── signal_pair.parquet
 └── state/              # Layer 4: Temporal dynamics
-    └── indicator.parquet
+    └── signal.parquet
 ```
 
 ---

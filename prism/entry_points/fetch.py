@@ -104,7 +104,7 @@ def fetch_to_parquet(
     yaml_path: Path,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    indicators: Optional[List[str]] = None,
+    signals: Optional[List[str]] = None,
 ) -> int:
     """
     Fetch data using config and write to Parquet.
@@ -113,7 +113,7 @@ def fetch_to_parquet(
         yaml_path: Path to YAML config file
         start_date: Override start date
         end_date: Override end date
-        indicators: Override indicator list
+        signals: Override signal list
 
     Returns:
         Number of observations written
@@ -131,13 +131,13 @@ def fetch_to_parquet(
         config["start_date"] = start_date
     if end_date:
         config["end_date"] = end_date
-    if indicators:
-        config["indicators"] = indicators
+    if signals:
+        config["signals"] = signals
 
     logger.info(f"Fetching from {source}...")
     logger.info(f"Config: {yaml_path}")
-    if "indicators" in config:
-        logger.info(f"Indicators: {len(config['indicators'])}")
+    if "signals" in config:
+        logger.info(f"Signals: {len(config['signals'])}")
 
     # Load fetcher and fetch data
     fetch_func = load_fetcher(source)
@@ -157,7 +157,7 @@ def fetch_to_parquet(
         df = df.rename({"observed_at": "obs_date"})
 
     # Ensure required columns
-    required_cols = ["indicator_id", "obs_date", "value"]
+    required_cols = ["signal_id", "obs_date", "value"]
     for col in required_cols:
         if col not in df.columns:
             raise ValueError(f"Missing required column: {col}")
@@ -165,7 +165,7 @@ def fetch_to_parquet(
     # Select and cast columns
     df = df.select(
         [
-            pl.col("indicator_id").cast(pl.Utf8),
+            pl.col("signal_id").cast(pl.Utf8),
             pl.col("obs_date").cast(pl.Date),
             pl.col("value").cast(pl.Float64),
         ]
@@ -177,9 +177,9 @@ def fetch_to_parquet(
     # Ensure directories exist for this domain
     ensure_directories(domain)
 
-    # Write to Parquet (upsert on indicator_id + obs_date)
+    # Write to Parquet (upsert on signal_id + obs_date)
     target_path = get_parquet_path("raw", "observations", domain=domain)
-    total_rows = upsert_parquet(df, target_path, key_cols=["indicator_id", "obs_date"])
+    total_rows = upsert_parquet(df, target_path, key_cols=["signal_id", "obs_date"])
 
     logger.info(f"Wrote {total_rows:,} rows to {target_path}")
 
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     # Options
     parser.add_argument("--start-date", type=str, help="Override start date")
     parser.add_argument("--end-date", type=str, help="Override end date")
-    parser.add_argument("--indicators", type=str, help="Comma-separated indicator list")
+    parser.add_argument("--signals", type=str, help="Comma-separated signal list")
 
     args = parser.parse_args()
 
@@ -224,10 +224,10 @@ if __name__ == "__main__":
     except ValueError as e:
         parser.error(str(e))
 
-    # Parse indicators if provided
-    indicators = None
-    if args.indicators:
-        indicators = [i.strip() for i in args.indicators.split(",")]
+    # Parse signals if provided
+    signals = None
+    if args.signals:
+        signals = [i.strip() for i in args.signals.split(",")]
 
     # Run fetch
     try:
@@ -235,7 +235,7 @@ if __name__ == "__main__":
             yaml_path=yaml_path,
             start_date=args.start_date,
             end_date=args.end_date,
-            indicators=indicators,
+            signals=signals,
         )
         print(f"\nFetched {count:,} observations to Parquet")
     except Exception as e:

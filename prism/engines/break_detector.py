@@ -17,12 +17,12 @@ WHAT IT DETECTS:
 
 OUTPUTS:
     Per-observation:
-        - break_flag: 0/1 indicator
+        - break_flag: 0/1 signal
         - break_zscore: magnitude of break
         - break_direction: +1 (up) / -1 (down) / 0 (none)
         - inter_break_interval: observations since last break
     
-    Per-indicator summary:
+    Per-signal summary:
         - n_breaks: total breaks detected
         - break_rate: breaks per observation
         - mean_interval: average inter-break interval
@@ -104,7 +104,7 @@ class BreakPattern:
 @dataclass
 class BreakResult:
     """Complete break detection result."""
-    indicator_id: str
+    signal_id: str
     n_observations: int
     breaks: List[BreakPoint]
     pattern: BreakPattern
@@ -129,7 +129,7 @@ def detect_zscore_breaks(
     Uses MAD (median absolute deviation) for robustness.
     
     Returns:
-        flags: Binary break indicators
+        flags: Binary break signals
         zscores: Z-score at each point
         directions: +1 (up), -1 (down), 0 (no break)
     """
@@ -195,7 +195,7 @@ def detect_cusum_breaks(
     Detects persistent shifts in mean.
     
     Returns:
-        flags: Binary break indicators
+        flags: Binary break signals
     """
     n = len(values)
     flags = np.zeros(n, dtype=np.int8)
@@ -238,7 +238,7 @@ def detect_volatility_breaks(
     Detect breaks in volatility regime.
     
     Returns:
-        flags: Binary break indicators
+        flags: Binary break signals
     """
     n = len(values)
     flags = np.zeros(n, dtype=np.int8)
@@ -273,7 +273,7 @@ def detect_trend_breaks(
     Uses change in rolling regression slope.
     
     Returns:
-        flags: Binary break indicators
+        flags: Binary break signals
     """
     n = len(values)
     flags = np.zeros(n, dtype=np.int8)
@@ -320,7 +320,7 @@ def compute_breaks(
     
     Returns:
         Dict with break detection results:
-            - break_flags: Binary indicators
+            - break_flags: Binary signals
             - break_zscores: Z-scores
             - break_directions: Directions
             - inter_break_intervals: Intervals
@@ -571,17 +571,17 @@ def _classify_pattern(
 def compute_breaks_polars(
     df: pl.DataFrame,
     value_col: str = 'value',
-    indicator_col: str = 'indicator_id',
+    signal_col: str = 'signal_id',
     time_col: str = 'observed_at',
     config: Optional[Dict] = None,
 ) -> pl.DataFrame:
     """
-    Compute breaks for all indicators in a Polars DataFrame.
+    Compute breaks for all signals in a Polars DataFrame.
     
     Args:
         df: DataFrame with observations
         value_col: Column containing values
-        indicator_col: Column containing indicator IDs
+        signal_col: Column containing signal IDs
         time_col: Column containing timestamps
         config: Configuration dict
     
@@ -593,9 +593,9 @@ def compute_breaks_polars(
     
     results = []
     
-    # Process each indicator
-    for indicator_id in df.select(indicator_col).unique().to_series():
-        ind_df = df.filter(pl.col(indicator_col) == indicator_id).sort(time_col)
+    # Process each signal
+    for signal_id in df.select(signal_col).unique().to_series():
+        ind_df = df.filter(pl.col(signal_col) == signal_id).sort(time_col)
         
         values = ind_df.select(value_col).to_series().to_numpy()
         timestamps = ind_df.select(time_col).to_series().to_numpy()
@@ -606,7 +606,7 @@ def compute_breaks_polars(
         # Build result DataFrame
         n = len(values)
         result_df = pl.DataFrame({
-            indicator_col: [indicator_id] * n,
+            signal_col: [signal_id] * n,
             time_col: timestamps,
             value_col: values,
             'break_flag': break_result['break_flags'],
@@ -622,22 +622,22 @@ def compute_breaks_polars(
 
 def compute_break_summary_polars(
     break_df: pl.DataFrame,
-    indicator_col: str = 'indicator_id',
+    signal_col: str = 'signal_id',
 ) -> pl.DataFrame:
     """
-    Compute break pattern summary for each indicator.
+    Compute break pattern summary for each signal.
     
     Args:
         break_df: DataFrame from compute_breaks_polars()
-        indicator_col: Column containing indicator IDs
+        signal_col: Column containing signal IDs
     
     Returns:
-        DataFrame with one row per indicator containing pattern analysis
+        DataFrame with one row per signal containing pattern analysis
     """
     summaries = []
     
-    for indicator_id in break_df.select(indicator_col).unique().to_series():
-        ind_df = break_df.filter(pl.col(indicator_col) == indicator_id)
+    for signal_id in break_df.select(signal_col).unique().to_series():
+        ind_df = break_df.filter(pl.col(signal_col) == signal_id)
         
         # Extract break result
         break_result = {
@@ -649,7 +649,7 @@ def compute_break_summary_polars(
         pattern = analyze_break_pattern(break_result)
         
         summaries.append({
-            indicator_col: indicator_id,
+            signal_col: signal_id,
             'n_observations': len(ind_df),
             'n_breaks': pattern.n_breaks,
             'break_rate': pattern.break_rate,
@@ -672,7 +672,7 @@ def compute_break_summary_polars(
 def create_adaptive_windows(
     df: pl.DataFrame,
     break_df: pl.DataFrame,
-    indicator_col: str = 'indicator_id',
+    signal_col: str = 'signal_id',
     time_col: str = 'observed_at',
 ) -> pl.DataFrame:
     """
@@ -684,7 +684,7 @@ def create_adaptive_windows(
     Args:
         df: Original observations DataFrame
         break_df: DataFrame from compute_breaks_polars()
-        indicator_col: Column containing indicator IDs
+        signal_col: Column containing signal IDs
         time_col: Column containing timestamps
     
     Returns:
@@ -692,13 +692,13 @@ def create_adaptive_windows(
     """
     results = []
     
-    for indicator_id in df.select(indicator_col).unique().to_series():
+    for signal_id in df.select(signal_col).unique().to_series():
         # Get original data
-        ind_df = df.filter(pl.col(indicator_col) == indicator_id).sort(time_col)
+        ind_df = df.filter(pl.col(signal_col) == signal_id).sort(time_col)
         
-        # Get breaks for this indicator
+        # Get breaks for this signal
         ind_breaks = break_df.filter(
-            (pl.col(indicator_col) == indicator_id) &
+            (pl.col(signal_col) == signal_id) &
             (pl.col('break_flag') == 1)
         ).sort(time_col)
         
@@ -735,7 +735,7 @@ def create_adaptive_windows(
 def identify_break_regions(
     break_df: pl.DataFrame,
     buffer: int = 20,
-    indicator_col: str = 'indicator_id',
+    signal_col: str = 'signal_id',
     time_col: str = 'observed_at',
 ) -> Tuple[pl.DataFrame, pl.DataFrame]:
     """
@@ -747,7 +747,7 @@ def identify_break_regions(
     Args:
         break_df: DataFrame from compute_breaks_polars()
         buffer: Observations before/after break to include
-        indicator_col: Column containing indicator IDs
+        signal_col: Column containing signal IDs
         time_col: Column containing timestamps
     
     Returns:
@@ -756,8 +756,8 @@ def identify_break_regions(
     break_regions = []
     quiet_regions = []
     
-    for indicator_id in break_df.select(indicator_col).unique().to_series():
-        ind_df = break_df.filter(pl.col(indicator_col) == indicator_id).sort(time_col)
+    for signal_id in break_df.select(signal_col).unique().to_series():
+        ind_df = break_df.filter(pl.col(signal_col) == signal_id).sort(time_col)
         
         # Get break indices
         break_mask = ind_df.select('break_flag').to_series().to_numpy() == 1
@@ -791,13 +791,13 @@ def identify_break_regions(
 # CONVENIENCE FUNCTIONS
 # =============================================================================
 
-def compute_indicator_breaks(
+def compute_signal_breaks(
     values: np.ndarray,
-    indicator_id: str = 'unknown',
+    signal_id: str = 'unknown',
     config: Optional[Dict] = None,
 ) -> Dict[str, Any]:
     """
-    One-shot break detection for a single indicator.
+    One-shot break detection for a single signal.
     
     Returns dict with all break info suitable for storage.
     """
@@ -811,7 +811,7 @@ def compute_indicator_breaks(
     pattern = analyze_break_pattern(break_result, config)
     
     return {
-        'indicator_id': indicator_id,
+        'signal_id': signal_id,
         'n_observations': len(values),
         'n_breaks': pattern.n_breaks,
         'break_rate': pattern.break_rate,
@@ -839,7 +839,7 @@ def get_break_metrics(
     
     These can be included alongside hurst, entropy, etc.
     """
-    result = compute_indicator_breaks(values, config=config)
+    result = compute_signal_breaks(values, config=config)
     
     return {
         'break_n': float(result['n_breaks']),
@@ -889,7 +889,7 @@ if __name__ == '__main__':
             # Clear level shifts with low noise
             values[i] = regime * 20 + np.random.randn() * 1.0
         
-        result = compute_indicator_breaks(values, 'periodic_test', demo_config)
+        result = compute_signal_breaks(values, 'periodic_test', demo_config)
         print(f"   N breaks: {result['n_breaks']} (expected ~10)")
         print(f"   Pattern: {result['break_pattern']}")
         print(f"   Mean interval: {result['mean_interval']:.1f}")
@@ -912,7 +912,7 @@ if __name__ == '__main__':
                 current += 25  # Level shift
             values[i] = current + np.random.randn() * 1.0
         
-        result = compute_indicator_breaks(values, 'accelerating_test', demo_config)
+        result = compute_signal_breaks(values, 'accelerating_test', demo_config)
         print(f"   N breaks: {result['n_breaks']} (expected ~{len(break_times)})")
         print(f"   Pattern: {result['break_pattern']}")
         print(f"   Interval trend: {result['interval_trend']:.2f} (negative = accelerating)")
@@ -927,7 +927,7 @@ if __name__ == '__main__':
             values[t:] += np.random.choice([-1, 1]) * (15 + np.random.rand() * 10)
         values += np.random.randn(n) * 1.0
         
-        result = compute_indicator_breaks(values, 'irregular_test', demo_config)
+        result = compute_signal_breaks(values, 'irregular_test', demo_config)
         print(f"   N breaks: {result['n_breaks']}")
         print(f"   Pattern: {result['break_pattern']}")
         print(f"   CV: {result['interval_cv']:.3f} (high = irregular)")
@@ -937,7 +937,7 @@ if __name__ == '__main__':
         print("-" * 50)
         values = 100 + np.random.randn(n) * 2.0  # Just noise
         
-        result = compute_indicator_breaks(values, 'stable_test', demo_config)
+        result = compute_signal_breaks(values, 'stable_test', demo_config)
         print(f"   N breaks: {result['n_breaks']} (expected: few/none)")
         print(f"   Pattern: {result['break_pattern']}")
         
@@ -952,7 +952,7 @@ if __name__ == '__main__':
             values[t:] -= 3  # Each break drops level
         values += np.random.randn(n) * 0.5
         
-        result = compute_indicator_breaks(values, 'cmapss_like', demo_config)
+        result = compute_signal_breaks(values, 'cmapss_like', demo_config)
         print(f"   N breaks: {result['n_breaks']}")
         print(f"   Pattern: {result['break_pattern']}")
         print(f"   Interval trend: {result['interval_trend']:.2f}")

@@ -2,7 +2,7 @@
 PRISM Laplace Module
 ====================
 
-Inline Laplace field computation. Called by indicator_vector
+Inline Laplace field computation. Called by signal_vector
 to compute field vectors from engine metrics.
 
 This module provides the core Laplace computations that can be
@@ -26,9 +26,9 @@ Usage:
 ------
     from prism.modules.laplace import compute_laplace_for_series
 
-    # In indicator_vector after computing metrics:
+    # In signal_vector after computing metrics:
     field_rows = compute_laplace_for_series(
-        indicator_id='SENSOR_01',
+        signal_id='SENSOR_01',
         dates=window_dates,
         values=metric_values,
         engine='hurst',
@@ -123,7 +123,7 @@ def compute_laplacian(values: np.ndarray) -> np.ndarray:
 
 
 def compute_laplace_for_series(
-    indicator_id: str,
+    signal_id: str,
     dates: List[datetime],
     values: np.ndarray,
     engine: str,
@@ -132,11 +132,11 @@ def compute_laplace_for_series(
     """
     Compute Laplace field quantities for a single metric series.
 
-    This is called for each (indicator, engine, metric) combination
+    This is called for each (signal, engine, metric) combination
     after the engine has computed metrics across all windows.
 
     Args:
-        indicator_id: The indicator identifier
+        signal_id: The signal identifier
         dates: List of window_end dates (sorted ascending)
         values: Array of metric values corresponding to dates
         engine: Engine name (e.g., 'hurst')
@@ -144,7 +144,7 @@ def compute_laplace_for_series(
 
     Returns:
         List of dicts, one per date, with field quantities:
-            - indicator_id, window_end, engine, metric_name
+            - signal_id, window_end, engine, metric_name
             - metric_value, gradient, laplacian, gradient_magnitude
     """
     n = len(values)
@@ -163,7 +163,7 @@ def compute_laplace_for_series(
             continue
 
         row = {
-            'indicator_id': indicator_id,
+            'signal_id': signal_id,
             'window_end': dates[i],
             'engine': engine,
             'metric_name': metric_name,
@@ -177,11 +177,11 @@ def compute_laplace_for_series(
     return results
 
 
-def compute_divergence_for_indicator(
+def compute_divergence_for_signal(
     field_rows: List[Dict[str, Any]],
 ) -> Dict[datetime, Dict[str, float]]:
     """
-    Compute divergence (sum of laplacians) per window for an indicator.
+    Compute divergence (sum of laplacians) per window for an signal.
 
     Divergence = Σ ∇²V across all metrics at time t
     - Positive = SOURCE (energy injection)
@@ -226,7 +226,7 @@ def add_divergence_to_field_rows(
 
     Args:
         field_rows: List of field row dicts
-        divergence_by_window: From compute_divergence_for_indicator
+        divergence_by_window: From compute_divergence_for_signal
         source_threshold: Divergence above this = source
         sink_threshold: Divergence below this = sink
 

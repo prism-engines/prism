@@ -1,7 +1,7 @@
 """
 PRISM Coupled Inertia Engine
 
-Measures resistance to co-movement change between two indicators.
+Measures resistance to co-movement change between two signals.
 
 Core Concept:
     Coupled inertia = stability of coupling over multiple timescales.
@@ -45,7 +45,7 @@ METADATA = EngineMetadata(
 
 class CoupledInertiaEngine(BaseEngine):
     """
-    Coupled Inertia Engine - Measures stability of coupling between indicators.
+    Coupled Inertia Engine - Measures stability of coupling between signals.
 
     Analyzes how resistant a pair's co-movement is to change by measuring
     correlation variance across multiple timescales.
@@ -70,10 +70,10 @@ class CoupledInertiaEngine(BaseEngine):
         **params
     ) -> Dict[str, Any]:
         """
-        Compute coupled inertia for a pair of indicators.
+        Compute coupled inertia for a pair of signals.
 
         Args:
-            df: DataFrame with 2 columns (the indicator pair)
+            df: DataFrame with 2 columns (the signal pair)
             run_id: Unique run identifier
             **params: Additional parameters
 

@@ -31,16 +31,16 @@ def load_data():
     test_df = pl.read_parquet(CMAPSS_DIR / 'test_FD001.parquet')
     rul_df = pl.read_parquet(CMAPSS_DIR / 'RUL_FD001.parquet')
 
-    vec = pl.read_parquet(PRISM_DIR / 'vector' / 'indicator.parquet')
-    field = pl.read_parquet(PRISM_DIR / 'vector' / 'indicator_field.parquet')
+    vec = pl.read_parquet(PRISM_DIR / 'vector' / 'signal.parquet')
+    field = pl.read_parquet(PRISM_DIR / 'vector' / 'signal_field.parquet')
 
     return train_df, test_df, rul_df, vec, field
 
 
 def extract_unit(df: pl.DataFrame) -> pl.DataFrame:
-    """Extract unit from indicator_id."""
+    """Extract unit from signal_id."""
     return df.with_columns(
-        pl.col('indicator_id').str.extract(r'FD001_(\d+)_', 1).cast(pl.Int64).alias('raw_unit')
+        pl.col('signal_id').str.extract(r'FD001_(\d+)_', 1).cast(pl.Int64).alias('raw_unit')
     ).filter(pl.col('raw_unit').is_not_null())
 
 

@@ -30,7 +30,7 @@ def create_observations(t: np.ndarray, data: dict, domain: str) -> pl.DataFrame:
         obs_date = base_date + timedelta(days=i)
         for name, values in data.items():
             rows.append({
-                'indicator_id': f'{domain}_{name}',
+                'signal_id': f'{domain}_{name}',
                 'obs_date': obs_date,
                 'value': float(values[i])
             })

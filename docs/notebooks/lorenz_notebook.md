@@ -80,13 +80,13 @@ sol = solve_ivp(
 ### PRISM Observation Format
 
 The trajectory was converted to PRISM observation format:
-- Each variable (x, y, z) becomes a separate indicator
+- Each variable (x, y, z) becomes a separate signal
 - Time units mapped to synthetic dates (1 time unit = 1 day)
 - Base date: 2020-01-01
 
 ```python
-indicators = ['lorenz_x', 'lorenz_y', 'lorenz_z', 'lorenz_lobe']
-observations = 40,000  # 4 indicators × 10,000 time points
+signals = ['lorenz_x', 'lorenz_y', 'lorenz_z', 'lorenz_lobe']
+observations = 40,000  # 4 signals × 10,000 time points
 ```
 
 ### Lobe Detection
@@ -134,12 +134,12 @@ is_transition = (lobe[t] != lobe[t-1])
 PRISM_DOMAIN=lorenz python -m prism.runners.characterize
 ```
 
-**Output:** 4 indicators characterized
+**Output:** 4 signals characterized
 
-### Step 2: Indicator Vector
+### Step 2: Signal Vector
 
 ```bash
-PRISM_DOMAIN=lorenz python -m prism.runners.indicator_vector --indicator
+PRISM_DOMAIN=lorenz python -m prism.runners.signal_vector --signal
 ```
 
 **Output:**
@@ -149,7 +149,7 @@ PRISM_DOMAIN=lorenz python -m prism.runners.indicator_vector --indicator
 
 ### Step 3: Laplace Field
 
-Automatically chained from indicator_vector.
+Automatically chained from signal_vector.
 
 **Output:** 702,909 field rows with gradient, laplacian, divergence
 
@@ -176,7 +176,7 @@ PRISM_DOMAIN=lorenz python -m prism.runners.geometry --cohort
 | **lorenz_z** | STATIONARY_OSCILLATORY_DETERMINISTIC | 0.70 | 0.645 | **1.0** | 0.490 | **0.967** | 0.0 |
 | **lorenz_lobe** | STATIONARY_PERSISTENT_APERIODIC_DETERMINISTIC | 0.70 | 0.911 | 0.0 | 0.400 | **0.999** | 0.02 |
 
-### Key Metrics (Indicator Vector)
+### Key Metrics (Signal Vector)
 
 | Metric | lorenz_x | lorenz_y | lorenz_z | lorenz_lobe |
 |--------|----------|----------|----------|-------------|
@@ -216,7 +216,7 @@ PRISM_DOMAIN=lorenz python -m prism.runners.geometry --cohort
 | Divergence mean | -0.030 |
 | Divergence std | 3.296 |
 
-**Assessment:** The cohort-level field topology shows approximately balanced sources (51) and sinks (43), with a ratio of 1.19. This confirms at the cohort level what we observe at the indicator level — the Lorenz attractor is a stable strange attractor that neither expands nor contracts on average.
+**Assessment:** The cohort-level field topology shows approximately balanced sources (51) and sinks (43), with a ratio of 1.19. This confirms at the cohort level what we observe at the signal level — the Lorenz attractor is a stable strange attractor that neither expands nor contracts on average.
 
 ---
 
@@ -279,7 +279,7 @@ PRISM_DOMAIN=lorenz python -m prism.runners.geometry --cohort
 
 ### ✓ Field Topology
 
-**Indicator-Level:**
+**Signal-Level:**
 
 | Metric | Value | Expected | Result |
 |--------|-------|----------|--------|
@@ -295,7 +295,7 @@ PRISM_DOMAIN=lorenz python -m prism.runners.geometry --cohort
 | Source windows | 51 | ~50 | **PASS** |
 | Sink windows | 43 | ~50 | **PASS** |
 
-**Assessment:** The Lorenz attractor is a stable strange attractor — it neither expands nor contracts on average. PRISM's field topology shows approximately balanced sources and sinks at both indicator and cohort levels, confirming the attractor's stability.
+**Assessment:** The Lorenz attractor is a stable strange attractor — it neither expands nor contracts on average. PRISM's field topology shows approximately balanced sources and sinks at both signal and cohort levels, confirming the attractor's stability.
 
 ---
 
@@ -339,8 +339,8 @@ PRISM_DOMAIN=lorenz python -m prism.runners.geometry --cohort
 ```
 data/lorenz/
 ├── raw/
-│   ├── observations.parquet       # 40,000 rows (4 indicators × 10,000 points)
-│   ├── indicators.parquet         # 4 indicator definitions
+│   ├── observations.parquet       # 40,000 rows (4 signals × 10,000 points)
+│   ├── signals.parquet         # 4 signal definitions
 │   ├── characterization.parquet   # 4 rows (6-axis classification)
 │   └── lorenz_trajectory.parquet  # 10,000 rows (x, y, z, lobe, is_transition)
 ├── config/
@@ -348,8 +348,8 @@ data/lorenz/
 │   ├── cohorts.parquet            # 1 row (lorenz_attractor)
 │   └── domain_members.parquet     # 1 row
 ├── vector/
-│   ├── indicator.parquet          # 702,909 rows (51 metrics per indicator)
-│   ├── indicator_field.parquet    # 702,909 rows (indicator Laplace field)
+│   ├── signal.parquet          # 702,909 rows (51 metrics per signal)
+│   ├── signal_field.parquet    # 702,909 rows (signal Laplace field)
 │   └── cohort_field.parquet       # 1,485 rows (cohort Laplace field)
 ├── geometry/
 │   └── cohort.parquet             # 99 rows (cohort-window geometry)
@@ -369,7 +369,7 @@ PRISM correctly characterizes the Lorenz chaotic attractor:
 | X/Y aperiodic | YES | periodicity=0.0 | ✓ PASS |
 | Volatility clustering (x,y) | YES | volatility=1.0 | ✓ PASS |
 | Positive Lyapunov | YES | ~0.1 | ✓ PASS |
-| Stable attractor (indicator) | YES | Sources≈Sinks (1.14-1.23) | ✓ PASS |
+| Stable attractor (signal) | YES | Sources≈Sinks (1.14-1.23) | ✓ PASS |
 | Stable attractor (cohort) | YES | Sources≈Sinks (1.19) | ✓ PASS |
 | High memory (DFA) | YES | 0.64-0.91 | ✓ PASS |
 
@@ -385,7 +385,7 @@ PYTHONPATH=/Users/jasonrudder/prism-mac python scripts/lorenz_validation.py
 
 # Or run steps individually:
 PRISM_DOMAIN=lorenz python -m prism.runners.characterize
-PRISM_DOMAIN=lorenz python -m prism.runners.indicator_vector --indicator
+PRISM_DOMAIN=lorenz python -m prism.runners.signal_vector --signal
 PRISM_DOMAIN=lorenz python -m prism.runners.geometry --cohort
 ```
 

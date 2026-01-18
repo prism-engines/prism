@@ -47,7 +47,7 @@ def load_data(domain: str):
     """Load TEP data."""
     from prism.db.parquet_store import get_parquet_path
 
-    vec_path = get_parquet_path('vector', 'indicator', domain)
+    vec_path = get_parquet_path('vector', 'signal', domain)
     obs_path = get_parquet_path('raw', 'observations', domain)
 
     vec_df = pl.read_parquet(vec_path)
@@ -59,10 +59,10 @@ def load_data(domain: str):
 def get_break_features(vec_df: pl.DataFrame) -> pl.DataFrame:
     """Extract break detection features per date."""
 
-    # Filter to TEP process indicators
+    # Filter to TEP process signals
     process_df = vec_df.filter(
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT')
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT')
     )
 
     # Filter to break detection metrics
@@ -104,7 +104,7 @@ def get_break_features(vec_df: pl.DataFrame) -> pl.DataFrame:
 
 def get_fault_onsets(obs_df: pl.DataFrame) -> pl.DataFrame:
     """Find fault onset timestamps (0 -> fault transition)."""
-    fault_df = obs_df.filter(pl.col('indicator_id') == 'TEP_FAULT').select([
+    fault_df = obs_df.filter(pl.col('signal_id') == 'TEP_FAULT').select([
         'obs_date',
         pl.col('value').alias('fault_code')
     ]).group_by('obs_date').agg(

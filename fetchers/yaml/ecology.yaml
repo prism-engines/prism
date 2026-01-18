@@ -1,10 +1,10 @@
 # Ecology Fetch Configuration
-# Ecosystem health and climate-consequence indicators
+# Ecosystem health and climate-consequence signals
 
 source: ecology
 domain: ecology
 
-indicators:
+signals:
   # ==========================================================================
   # VEGETATION & PRIMARY PRODUCTIVITY (NASA MODIS/VIIRS)
   # ==========================================================================

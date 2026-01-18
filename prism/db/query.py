@@ -16,10 +16,10 @@ Note:
     >>>
     >>> # Read and filter
     >>> observations = read_table('raw', 'observations')
-    >>> spy_data = observations.filter(pl.col('indicator_id') == 'SENSOR_01')
+    >>> spy_data = observations.filter(pl.col('signal_id') == 'SENSOR_01')
     >>>
     >>> # Aggregations
-    >>> avg_by_indicator = observations.group_by('indicator_id').agg(
+    >>> avg_by_signal = observations.group_by('signal_id').agg(
     ...     pl.col('value').mean().alias('avg_value')
     ... )
     >>>
@@ -27,7 +27,7 @@ Note:
     >>> from prism.db import get_parquet_path
     >>> obs = pl.read_parquet(get_parquet_path('raw', 'observations'))
     >>> members = pl.read_parquet(get_parquet_path('config', 'cohort_members'))
-    >>> joined = obs.join(members, on='indicator_id')
+    >>> joined = obs.join(members, on='signal_id')
 """
 
 import polars as pl
@@ -54,7 +54,7 @@ def describe_table(schema: str, table: str) -> pl.DataFrame:
         | ---          | ---         |
         | str          | str         |
         +==============+=============+
-        | indicator_id | Utf8        |
+        | signal_id | Utf8        |
         | obs_date     | Date        |
         | value        | Float64     |
         +--------------+-------------+

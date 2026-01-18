@@ -124,7 +124,7 @@ def compute_wavelet_decomposition(
 
 def compute_band_snr_evolution(
     observations: pl.DataFrame,
-    indicator_id: str,
+    signal_id: str,
     window_size: int = 21,
     step_size: int = 7,
     wavelet: str = 'db4',
@@ -133,8 +133,8 @@ def compute_band_snr_evolution(
     Track SNR evolution per frequency band over time.
 
     Args:
-        observations: Signal data with 'indicator_id', 'obs_date', 'value'
-        indicator_id: Indicator to analyze
+        observations: Signal data with 'signal_id', 'obs_date', 'value'
+        signal_id: Signal to analyze
         window_size: Rolling window size
         step_size: Step between windows
         wavelet: Wavelet family
@@ -146,7 +146,7 @@ def compute_band_snr_evolution(
         return pl.DataFrame()
 
     ind_data = observations.filter(
-        pl.col('indicator_id') == indicator_id
+        pl.col('signal_id') == signal_id
     ).sort('obs_date')
 
     if len(ind_data) == 0:
@@ -176,7 +176,7 @@ def compute_band_snr_evolution(
             continue
 
         row = {
-            'indicator_id': indicator_id,
+            'signal_id': signal_id,
             'window_end': window_end,
             'window_start_idx': start,
             'total_energy': sum(b.energy for b in bands),
@@ -229,7 +229,7 @@ def identify_degradation_band(
         return {}
 
     results = {
-        'indicator_id': band_evolution['indicator_id'][0],
+        'signal_id': band_evolution['signal_id'][0],
     }
 
     # Compare early vs late windows
@@ -293,7 +293,7 @@ def identify_degradation_band(
 def run_wavelet_microscope(
     observations: pl.DataFrame,
     cohort_id: str,
-    indicator_ids: Optional[List[str]] = None,
+    signal_ids: Optional[List[str]] = None,
     top_n_snr_variance: int = 5,
     window_size: int = 21,
 ) -> pl.DataFrame:
@@ -303,33 +303,33 @@ def run_wavelet_microscope(
     Args:
         observations: Raw observation data
         cohort_id: Cohort to analyze
-        indicator_ids: Specific indicators (default: auto-select by variance)
-        top_n_snr_variance: Number of top variance indicators to analyze
+        signal_ids: Specific signals (default: auto-select by variance)
+        top_n_snr_variance: Number of top variance signals to analyze
         window_size: Window size for wavelet decomposition
 
     Returns:
-        DataFrame with wavelet degradation analysis per indicator
+        DataFrame with wavelet degradation analysis per signal
     """
     if not HAS_PYWT:
         logger.warning("PyWavelets not available, skipping wavelet analysis")
         return pl.DataFrame()
 
-    # Filter to cohort indicators
+    # Filter to cohort signals
     if 'cohort_id' in observations.columns:
         cohort_obs = observations.filter(pl.col('cohort_id') == cohort_id)
     else:
-        # Infer from indicator_id pattern (e.g., u001_s1 -> u001)
+        # Infer from signal_id pattern (e.g., u001_s1 -> u001)
         cohort_obs = observations.filter(
-            pl.col('indicator_id').str.starts_with(cohort_id + '_')
+            pl.col('signal_id').str.starts_with(cohort_id + '_')
         )
 
     if len(cohort_obs) == 0:
         return pl.DataFrame()
 
-    # Auto-select high variance indicators if not specified
-    if indicator_ids is None:
-        # Compute variance per indicator
-        var_stats = cohort_obs.group_by('indicator_id').agg([
+    # Auto-select high variance signals if not specified
+    if signal_ids is None:
+        # Compute variance per signal
+        var_stats = cohort_obs.group_by('signal_id').agg([
             pl.col('value').std().alias('std'),
             pl.col('value').count().alias('n'),
         ]).filter(pl.col('n') >= window_size)
@@ -338,19 +338,19 @@ def run_wavelet_microscope(
             return pl.DataFrame()
 
         # Get top N by variance
-        indicator_ids = (
+        signal_ids = (
             var_stats
             .sort('std', descending=True)
             .head(top_n_snr_variance)
-            ['indicator_id']
+            ['signal_id']
             .to_list()
         )
 
-    logger.info(f"Analyzing {len(indicator_ids)} indicators with wavelet microscope")
+    logger.info(f"Analyzing {len(signal_ids)} signals with wavelet microscope")
 
     results = []
 
-    for ind_id in indicator_ids:
+    for ind_id in signal_ids:
         # Compute band evolution
         band_evo = compute_band_snr_evolution(
             cohort_obs, ind_id, window_size=window_size
@@ -395,7 +395,7 @@ def extract_wavelet_features(
 
     features = {'cohort_id': cohort_id}
 
-    # Aggregate degradation scores across indicators
+    # Aggregate degradation scores across signals
     if 'worst_degradation_score' in cohort_data.columns:
         features['wavelet_max_degradation'] = float(cohort_data['worst_degradation_score'].max())
         features['wavelet_mean_degradation'] = float(cohort_data['worst_degradation_score'].mean())
@@ -448,7 +448,7 @@ WHAT IT DOES:
 
 OUTPUT:
   wavelet_analysis.parquet with columns:
-    - indicator_id, cohort_id
+    - signal_id, cohort_id
     - {band}_snr_change: SNR change from early to late lifecycle
     - {band}_energy_change: Energy change from early to late lifecycle
     - {band}_degradation_score: Combined degradation metric
@@ -466,7 +466,7 @@ KEY INSIGHT:
     parser.add_argument('--domain', required=True, help='Domain ID (required)')
     parser.add_argument('--cohort', action='append', help='Cohort ID(s)')
     parser.add_argument('--all-cohorts', action='store_true', help='Process all cohorts')
-    parser.add_argument('--top-n', type=int, default=5, help='Top N high-variance indicators')
+    parser.add_argument('--top-n', type=int, default=5, help='Top N high-variance signals')
     parser.add_argument('--window-size', type=int, default=21, help='Wavelet window size')
 
     args = parser.parse_args()
@@ -484,8 +484,8 @@ KEY INSIGHT:
         if 'cohort_id' in observations.columns:
             cohorts = observations['cohort_id'].unique().to_list()
         else:
-            # Infer from indicator_id pattern
-            ids = observations['indicator_id'].unique().to_list()
+            # Infer from signal_id pattern
+            ids = observations['signal_id'].unique().to_list()
             cohorts = list(set(i.rsplit('_', 1)[0] for i in ids if '_' in i))
     else:
         cohorts = args.cohort or []

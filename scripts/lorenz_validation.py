@@ -20,7 +20,7 @@ Output:
     data/lorenz/raw/lorenz_trajectory.parquet
 
 Then run PRISM:
-    python -m prism.entry_points.indicator_vector --indicator --domain lorenz --report indicator
+    python -m prism.entry_points.signal_vector --signal --domain lorenz --report signal
 """
 
 import numpy as np
@@ -110,10 +110,10 @@ def create_prism_observations(lorenz_df: pl.DataFrame) -> pl.DataFrame:
     rows = []
     for i, row in enumerate(lorenz_df.iter_rows(named=True)):
         obs_date = base_date + timedelta(days=i)
-        rows.append({'indicator_id': 'lorenz_x', 'obs_date': obs_date, 'value': row['x']})
-        rows.append({'indicator_id': 'lorenz_y', 'obs_date': obs_date, 'value': row['y']})
-        rows.append({'indicator_id': 'lorenz_z', 'obs_date': obs_date, 'value': row['z']})
-        rows.append({'indicator_id': 'lorenz_lobe', 'obs_date': obs_date,
+        rows.append({'signal_id': 'lorenz_x', 'obs_date': obs_date, 'value': row['x']})
+        rows.append({'signal_id': 'lorenz_y', 'obs_date': obs_date, 'value': row['y']})
+        rows.append({'signal_id': 'lorenz_z', 'obs_date': obs_date, 'value': row['z']})
+        rows.append({'signal_id': 'lorenz_lobe', 'obs_date': obs_date,
                      'value': 1.0 if row['lobe'] == 'right' else 0.0})
 
     return pl.DataFrame(rows)
@@ -141,7 +141,7 @@ def main():
     print("\n--- Creating PRISM observations ---")
     obs_df = create_prism_observations(lorenz_df)
     print(f"Observations: {len(obs_df):,}")
-    print(f"Indicators: {obs_df['indicator_id'].unique().to_list()}")
+    print(f"Signals: {obs_df['signal_id'].unique().to_list()}")
 
     # Save to lorenz domain
     data_root = get_data_root('lorenz')
@@ -161,7 +161,7 @@ def main():
     print("COMPLETE")
     print("=" * 70)
     print("\nNext: Run PRISM pipeline:")
-    print("  python -m prism.entry_points.indicator_vector --indicator --domain lorenz --report indicator")
+    print("  python -m prism.entry_points.signal_vector --signal --domain lorenz --report signal")
 
 
 if __name__ == '__main__':

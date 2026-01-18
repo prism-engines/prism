@@ -109,7 +109,7 @@ Early warning is flagged when `composite > 1.0` in the 7-day pre-onset window.
 
 ## Layer 3: MODE (Behavioral Trajectory)
 
-**Purpose:** Track behavioral mode transitions as indicators of regime change.
+**Purpose:** Track behavioral mode transitions as signals of regime change.
 
 ### Mode Discovery Results
 
@@ -160,7 +160,7 @@ Mode 1 (the rare 4%) emerged as a critical early warning signal.
 
 1. **Dominated by XMEAS03 (D Feed)** - 58% of Mode 1 assignments
    - D Feed is a reactor input stream
-   - Early indicator of upstream disturbances
+   - Early signal of upstream disturbances
 
 2. **Lower Affinity (0.937 vs 0.965)**
    - Indicates behavioral uncertainty
@@ -180,7 +180,7 @@ Mode 1 (the rare 4%) emerged as a critical early warning signal.
 
 ### August 16, 2000 Case Study
 
-On this date, 30 indicators were assigned to Mode 1 (vs typical 1-2). Investigation revealed:
+On this date, 30 signals were assigned to Mode 1 (vs typical 1-2). Investigation revealed:
 
 - **Previous fault:** IDV20 ended Aug 12
 - **Next fault:** IDV08 started Aug 20
@@ -274,9 +274,9 @@ Mode 1 interpretation:
 
 1. **Individual layers have moderate detection rates** (47-65%), but combining them achieves near-perfect early warning.
 
-2. **Mode 1 is a precursor signal** - its rarity (4%) makes it valuable; when indicators enter Mode 1, the system is transitioning.
+2. **Mode 1 is a precursor signal** - its rarity (4%) makes it valuable; when signals enter Mode 1, the system is transitioning.
 
-3. **XMEAS03 (D Feed) is a leading indicator** - as a reactor input stream, it shows disturbances before they propagate downstream.
+3. **XMEAS03 (D Feed) is a leading signal** - as a reactor input stream, it shows disturbances before they propagate downstream.
 
 4. **Low affinity = high uncertainty** - Mode 1's lower affinity (0.937) indicates the system is not firmly in any stable behavioral mode.
 

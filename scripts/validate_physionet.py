@@ -42,21 +42,21 @@ def run_prism_engines(observations: pl.DataFrame) -> pl.DataFrame:
     """Run PRISM vector engines on observations."""
 
     results = []
-    indicators = observations["indicator_id"].unique().to_list()
+    signals = observations["signal_id"].unique().to_list()
 
-    print(f"Processing {len(indicators)} indicators...")
+    print(f"Processing {len(signals)} signals...")
 
-    for i, indicator_id in enumerate(indicators):
+    for i, signal_id in enumerate(signals):
         if i % 20 == 0:
-            print(f"  {i}/{len(indicators)}...")
+            print(f"  {i}/{len(signals)}...")
 
-        ts = observations.filter(pl.col("indicator_id") == indicator_id)
+        ts = observations.filter(pl.col("signal_id") == signal_id)
         values = ts["value"].to_numpy()
 
         if len(values) < 50:
             continue
 
-        row = {"indicator_id": indicator_id}
+        row = {"signal_id": signal_id}
 
         # Hurst (using standalone function)
         try:
@@ -102,25 +102,25 @@ def main():
     # Load data
     print("Loading data...")
     observations = pl.read_parquet(data_dir / "raw" / "observations.parquet")
-    indicators = pl.read_parquet(data_dir / "raw" / "indicators.parquet")
+    signals = pl.read_parquet(data_dir / "raw" / "signals.parquet")
 
     print(f"Observations: {len(observations)}")
-    print(f"Indicators: {len(indicators)}")
+    print(f"Signals: {len(signals)}")
     print()
 
     # Run PRISM
     print("Running PRISM engines...")
     metrics = run_prism_engines(observations)
 
-    # Merge with indicator metadata
-    results = metrics.join(indicators, on="indicator_id", how="inner")
+    # Merge with signal metadata
+    results = metrics.join(signals, on="signal_id", how="inner")
 
-    print(f"\nResults: {len(results)} indicators with metrics")
+    print(f"\nResults: {len(results)} signals with metrics")
     print()
 
     # Save results
-    results.write_parquet(data_dir / "vector" / "indicator.parquet")
-    print(f"Saved to {data_dir / 'vector' / 'indicator.parquet'}")
+    results.write_parquet(data_dir / "vector" / "signal.parquet")
+    print(f"Saved to {data_dir / 'vector' / 'signal.parquet'}")
     print()
 
     # Analysis by regime
@@ -223,7 +223,7 @@ def main():
     # Sample results
     print("Sample results:")
     print(results_filtered.select([
-        "indicator_id", "regime", "arrhythmia_ratio",
+        "signal_id", "regime", "arrhythmia_ratio",
         "hurst", "sample_entropy", "spectral_entropy"
     ]).head(15).to_pandas().to_string(index=False))
 

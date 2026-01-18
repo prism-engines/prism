@@ -182,7 +182,7 @@ class Displacement:
     severity: str  # 'major', 'significant', 'minor', 'noise'
     primary_driver: str  # which component drove the displacement
 
-    # Direction indicators
+    # Direction signals
     direction: str  # 'stabilizing', 'destabilizing', 'mixed'
     direction_score: float  # composite score (positive = destabilizing)
     pca_direction: float  # PC1 change (positive = stabilizing)

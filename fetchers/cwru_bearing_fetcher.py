@@ -229,19 +229,19 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
                 for feat_idx, features in enumerate(features_list):
                     obs_date = base_date + timedelta(days=obs_idx)
 
-                    # Main feature as primary indicator
+                    # Main feature as primary signal
                     if feature in features:
                         all_observations.append({
-                            "indicator_id": f"CWRU_{condition.upper()}_{location}_{feature.upper()}",
+                            "signal_id": f"CWRU_{condition.upper()}_{location}_{feature.upper()}",
                             "observed_at": obs_date,
                             "value": features[feature],
                             "source": SOURCE,
                         })
 
-                    # All features as separate indicators
+                    # All features as separate signals
                     for feat_name, feat_value in features.items():
                         all_observations.append({
-                            "indicator_id": f"CWRU_{condition.upper()}_{location}_{feat_name.upper()}",
+                            "signal_id": f"CWRU_{condition.upper()}_{location}_{feat_name.upper()}",
                             "observed_at": obs_date,
                             "value": feat_value,
                             "source": SOURCE,

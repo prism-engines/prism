@@ -211,8 +211,8 @@ def merge_temp_results(
         >>> temp_paths = [Path('/tmp/worker_0.parquet'), Path('/tmp/worker_1.parquet')]
         >>> merge_temp_results(
         ...     temp_paths,
-        ...     get_parquet_path('vector', 'indicators'),
-        ...     key_cols=['indicator_id', 'obs_date', 'engine', 'metric_name']
+        ...     get_parquet_path('vector', 'signals'),
+        ...     key_cols=['signal_id', 'obs_date', 'engine', 'metric_name']
         ... )
     """
     # Read all temp files
@@ -277,8 +277,8 @@ def merge_to_table(
     Example:
         >>> merge_to_table(
         ...     temp_paths,
-        ...     'vector', 'indicators',
-        ...     key_cols=['indicator_id', 'obs_date', 'engine', 'metric_name']
+        ...     'vector', 'signals',
+        ...     key_cols=['signal_id', 'obs_date', 'engine', 'metric_name']
         ... )
     """
     target_path = get_parquet_path(schema, table)
@@ -294,13 +294,13 @@ class ParquetBatchWriter:
 
     Usage:
         with ParquetBatchWriter() as writer:
-            for indicator in indicators:
-                metrics = compute(indicator)
+            for signal in signals:
+                metrics = compute(signal)
                 writer.append(pl.DataFrame(metrics))
 
             # Write all at once
-            writer.write_to(get_parquet_path('vector', 'indicators'),
-                           key_cols=['indicator_id', 'obs_date', 'engine'])
+            writer.write_to(get_parquet_path('vector', 'signals'),
+                           key_cols=['signal_id', 'obs_date', 'engine'])
     """
 
     def __init__(self, max_batch_size: int = 100_000):

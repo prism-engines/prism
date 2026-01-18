@@ -6,7 +6,7 @@ How to run PRISM without AI assistance.
 
 ```bash
 # 1. Compute behavioral metrics (Layer 1)
-python -m prism.entry_points.indicator_vector --domain cheme
+python -m prism.entry_points.signal_vector --domain cheme
 
 # 2. Compute geometry/relationships (Layer 2)
 python -m prism.entry_points.geometry --domain cheme
@@ -22,9 +22,9 @@ python -m prism.assessments.run --domain cheme
 
 ## What Each Step Does
 
-### Step 1: Indicator Vector (`indicator_vector`)
+### Step 1: Signal Vector (`signal_vector`)
 
-**What it computes:** 51 behavioral metrics for each indicator (signal topology)
+**What it computes:** 51 behavioral metrics for each signal (signal topology)
 
 **Key metrics:**
 | Category | Metrics | What They Measure |
@@ -34,25 +34,25 @@ python -m prism.assessments.run --domain cheme
 | Entropy | sample, permutation | Randomness/complexity |
 | Breaks | break_n, dirac, heaviside | Structural changes |
 
-**Output:** `data/{domain}/vector/indicator.parquet`
+**Output:** `data/{domain}/vector/signal.parquet`
 
-**Runtime:** ~5-10 min for 50 indicators, ~2-3 hours for 1000+
+**Runtime:** ~5-10 min for 50 signals, ~2-3 hours for 1000+
 
 ---
 
 ### Step 2: Geometry (`geometry`)
 
-**What it computes:** Relationships between indicators
+**What it computes:** Relationships between signals
 
 **Key outputs:**
 - PCA (dimensionality reduction)
-- MST (minimum spanning tree - which indicators cluster)
+- MST (minimum spanning tree - which signals cluster)
 - Distance matrices
 - Outlier detection (LOF)
 
 **Output:** `data/{domain}/geometry/cohort.parquet`
 
-**Runtime:** ~10-30 min depending on indicator count
+**Runtime:** ~10-30 min depending on signal count
 
 ---
 
@@ -67,8 +67,8 @@ python -m prism.assessments.run --domain cheme
 - Modes (behavioral clusters via GMM)
 
 **Output:**
-- `data/{domain}/vector/indicator_field.parquet`
-- `data/{domain}/vector/indicator_modes.parquet`
+- `data/{domain}/vector/signal_field.parquet`
+- `data/{domain}/vector/signal_modes.parquet`
 
 **Runtime:** ~30 min - 2 hours (memory intensive)
 
@@ -154,8 +154,8 @@ domains:
 ```
 
 To add a new domain, copy the `_template` section and fill in:
-- `indicator_prefix`: How your indicators are named
-- `fault_indicator`: The label/target column
+- `signal_prefix`: How your signals are named
+- `fault_signal`: The label/target column
 - `exclude_pattern`: What to exclude from analysis
 
 ---
@@ -184,7 +184,7 @@ python -m prism.entry_points.laplace --domain cheme
 
 1. Check if `when_features` have data:
    ```bash
-   python -c "import polars as pl; df = pl.read_parquet('data/cheme/vector/indicator.parquet'); print(df.filter(pl.col('metric_name') == 'break_n')['metric_value'].describe())"
+   python -c "import polars as pl; df = pl.read_parquet('data/cheme/vector/signal.parquet'); print(df.filter(pl.col('metric_name') == 'break_n')['metric_value'].describe())"
    ```
 
 2. Adjust thresholds in `config/assessment.yaml`
@@ -198,7 +198,7 @@ python -m prism.entry_points.laplace --domain cheme
 export PRISM_DOMAIN=cheme
 
 # Run full pipeline
-python -m prism.entry_points.indicator_vector --domain $PRISM_DOMAIN
+python -m prism.entry_points.signal_vector --domain $PRISM_DOMAIN
 python -m prism.entry_points.geometry --domain $PRISM_DOMAIN
 python -m prism.entry_points.laplace --domain $PRISM_DOMAIN
 python -m prism.assessments.run --domain $PRISM_DOMAIN
@@ -247,7 +247,7 @@ Divergence measures stress flow direction:
 ```python
 # Check divergence ranking
 import polars as pl
-field_df = pl.read_parquet('data/{domain}/vector/indicator_field.parquet')
+field_df = pl.read_parquet('data/{domain}/vector/signal_field.parquet')
 
 # Aggregate per entity (bearing, unit, etc.)
 stats = field_df.group_by('entity_id').agg([
@@ -294,7 +294,7 @@ acceleration = np.diff(velocity)
 
 ```bash
 # Full analysis pipeline
-python -m prism.entry_points.indicator_vector --domain femto
+python -m prism.entry_points.signal_vector --domain femto
 python -m prism.entry_points.laplace --domain femto
 python -m prism.assessments.run --domain femto
 ```
@@ -308,9 +308,9 @@ data/{domain}/
 ├── raw/
 │   └── observations.parquet      # Input signal topology
 ├── vector/
-│   ├── indicator.parquet         # 51 metrics per indicator
-│   ├── indicator_field.parquet   # Laplace geometric field
-│   └── indicator_modes.parquet   # Behavioral mode assignments
+│   ├── signal.parquet         # 51 metrics per signal
+│   ├── signal_field.parquet   # Laplace geometric field
+│   └── signal_modes.parquet   # Behavioral mode assignments
 ├── geometry/
 │   └── cohort.parquet            # Structural relationships
 └── state/

@@ -130,7 +130,7 @@ class StateClassifier:
         # Define feature columns (exclude metadata)
         self.feature_cols = [
             c for c in features_df.columns
-            if c not in ['window_end', 'leader_indicator']
+            if c not in ['window_end', 'leader_signal']
         ]
 
         X = features_df.select(self.feature_cols).to_numpy()
@@ -296,7 +296,7 @@ def find_optimal_clusters(
             - classifier: Fitted StateClassifier with optimal k
     """
     features_df = signatures_to_features(signatures)
-    feature_cols = [c for c in features_df.columns if c not in ['window_end', 'leader_indicator']]
+    feature_cols = [c for c in features_df.columns if c not in ['window_end', 'leader_signal']]
     X = features_df.select(feature_cols).to_numpy()
     X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
 

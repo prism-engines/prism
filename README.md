@@ -2,7 +2,7 @@
 
 **Persistent Relational Inference & Structural Measurement**
 
-A behavioral geometry engine for signal topology analysis. PRISM transforms raw observations into a **Laplace Vector Field** representation, where indicators self-organize into natural cohorts based on field topology. **THE MATH REVEALS STRUCTURE.**
+A behavioral geometry engine for signal topology analysis. PRISM transforms raw observations into a **Laplace Vector Field** representation, where signals self-organize into natural cohorts based on field topology. **THE MATH REVEALS STRUCTURE.**
 
 ---
 
@@ -32,15 +32,15 @@ Layer 0.5: CHARACTERIZE (characterize.py)
          Axes: stationarity, memory, periodicity,
                complexity, determinism, volatility
 
-Layer 1: VECTOR (indicator_vector.py)
-         Raw observations → 51 behavioral metrics per indicator
-         "What is this indicator doing in isolation?"
-         Output: vector/indicator.parquet
+Layer 1: VECTOR (signal_vector.py)
+         Raw observations → 51 behavioral metrics per signal
+         "What is this signal doing in isolation?"
+         Output: vector/signal.parquet
 
 Layer 2: LAPLACE (laplace.py)
-         Indicator vectors → Laplace Field representation
+         Signal vectors → Laplace Field representation
          252/21 windowing (1 year window, 21 day stride)
-         "What is the field dynamics of this indicator?"
+         "What is the field dynamics of this signal?"
          Output: vector/laplace_field.parquet
 
          Mathematical Foundation:
@@ -51,13 +51,13 @@ Layer 2: LAPLACE (laplace.py)
 
 Layer 3: GEOMETRY (geometry.py)
          Field vectors → pairwise relationships + structure
-         "How do indicators relate in field space?"
-         Output: geometry/indicator_pair.parquet
+         "How do signals relate in field space?"
+         Output: geometry/signal_pair.parquet
 
 Layer 4: STATE (state.py)
          Position in field topology at time t
-         "Where does this indicator sit in the stress flow?"
-         Output: state/indicator.parquet
+         "Where does this signal sit in the stress flow?"
+         Output: state/signal.parquet
 
 Layer 5: PHYSICS (physics.py) [EXPERIMENTAL]
          Test universal laws in behavioral space
@@ -67,7 +67,7 @@ Layer 5: PHYSICS (physics.py) [EXPERIMENTAL]
 REGIME CHANGE = field topology deformation
 ```
 
-**Key Insight:** Indicators self-organize through Laplace field topology. SOURCES emanate stress, SINKS absorb it. No predefined cohorts — the math reveals natural groupings.
+**Key Insight:** Signals self-organize through Laplace field topology. SOURCES emanate stress, SINKS absorb it. No predefined cohorts — the math reveals natural groupings.
 
 ---
 
@@ -75,28 +75,28 @@ REGIME CHANGE = field topology deformation
 
 ```
 SOURCES (div > 0) — Stress emanates outward
-├── Leading indicators
+├── Leading signals
 ├── Process inputs
 └── Early-warning signals
 
 SINKS (div < 0) — Stress absorbed
-├── Lagging indicators
+├── Lagging signals
 ├── Process outputs
 └── Absorbing variables
 
 BRIDGES (div ≈ 0) — Stress transmitters
 ├── Intermediary variables
 ├── Transfer points
-└── Coupling indicators
+└── Coupling signals
 ```
 
-**Key Insight:** The field topology reveals natural structure - indicators self-organize based on their role in the system dynamics.
+**Key Insight:** The field topology reveals natural structure - signals self-organize based on their role in the system dynamics.
 
 ---
 
 ## C-MAPSS Turbofan Engine Field Topology
 
-NASA C-MAPSS run-to-failure data: 100 engines × 25 sensors = 2,500 indicators.
+NASA C-MAPSS run-to-failure data: 100 engines × 25 sensors = 2,500 signals.
 **THE MATH ORGANIZES WHAT THE PHYSICS IS.**
 
 ```
@@ -203,7 +203,7 @@ python scripts/cmapss_evaluate_v4.py
 
 ### Vector Engines (Layer 1)
 
-Each indicator produces a **51-dimensional behavioral fingerprint** from 9 vector engines.
+Each signal produces a **51-dimensional behavioral fingerprint** from 9 vector engines.
 
 ---
 
@@ -437,13 +437,13 @@ Transforms engine outputs into a physics-grounded field representation.
 
 #### Mathematical Foundation
 
-Given normalized engine outputs $E(i,t)$ for indicator $i$ at time $t$, within each 252-day window:
+Given normalized engine outputs $E(i,t)$ for signal $i$ at time $t$, within each 252-day window:
 
 **1. GRADIENT FIELD (velocity):**
 
 $$\nabla E(t) = \frac{E(t+1) - E(t-1)}{2}$$
 
-First derivative: how fast is the indicator changing?
+First derivative: how fast is the signal changing?
 
 **2. LAPLACIAN FIELD (acceleration):**
 
@@ -481,7 +481,7 @@ Count where $\nabla^2 E$ changes sign = regime transition markers.
 
 **Self-Organization:**
 
-Indicators naturally cluster by field similarity:
+Signals naturally cluster by field similarity:
 - **SOURCES**: High positive divergence (stress originators)
 - **SINKS**: High negative divergence (stress absorbers)
 - **BRIDGES**: Near-zero divergence (stress transmitters)
@@ -498,7 +498,7 @@ Computed on **Laplace field vectors**, capturing dynamics not just correlation.
 
 **Eigendecomposition of covariance matrix:**
 
-Given matrix $X$ ($n_{indicators} \times 51_{metrics}$), centered:
+Given matrix $X$ ($n_{signals} \times 51_{metrics}$), centered:
 
 $$C = \frac{X^T X}{n-1}$$
 
@@ -620,9 +620,9 @@ Position of each entity within its hierarchical context.
 
 ---
 
-#### Position in Cohort (for indicators)
+#### Position in Cohort (for signals)
 
-Given indicator $i$ in cohort $C$:
+Given signal $i$ in cohort $C$:
 
 **1. Centroid of $C$:**
 $$\boldsymbol{\mu}_C = \frac{1}{|C|} \sum_{j \in C} \mathbf{v}_j$$
@@ -656,23 +656,23 @@ Same computation but cohort vectors in domain space.
 data/
 ├── raw/
 │   ├── observations.parquet      # Signal data
-│   ├── indicators.parquet        # Indicator metadata
+│   ├── signals.parquet        # Signal metadata
 │   └── characterization.parquet  # 6-axis classification
 ├── config/
-│   ├── cohort_members.parquet    # Indicator → Cohort mapping
+│   ├── cohort_members.parquet    # Signal → Cohort mapping
 │   ├── cohorts.parquet           # Cohort definitions
 │   └── domain_members.parquet    # Cohort → Domain mapping
 ├── vector/
-│   ├── indicator.parquet         # Layer 1: 51 metrics per indicator
+│   ├── signal.parquet         # Layer 1: 51 metrics per signal
 │   ├── cohort.parquet            # Layer 3: Cohort fingerprint (long)
 │   └── cohort_wide.parquet       # Layer 3: Cohort fingerprint (wide)
 ├── geometry/
 │   ├── cohort.parquet            # Layer 2: Cohort structural metrics
-│   ├── indicator_pair.parquet    # Layer 2: Pairwise indicator geometry
+│   ├── signal_pair.parquet    # Layer 2: Pairwise signal geometry
 │   ├── domain.parquet            # Layer 4: Domain structural metrics
 │   └── cohort_pair.parquet       # Layer 4: Pairwise cohort geometry
 └── state/
-    ├── indicator.parquet         # Layer 5: Indicator hierarchical position
+    ├── signal.parquet         # Layer 5: Signal hierarchical position
     └── cohort.parquet            # Layer 5: Cohort hierarchical position
 ```
 
@@ -688,7 +688,7 @@ pip install -e ".[all]"
 
 ```bash
 python -m prism.entry_points.fetch --cmapss          # Fetch NASA turbofan data
-python -m prism.entry_points.indicator_vector        # Compute metrics
+python -m prism.entry_points.signal_vector        # Compute metrics
 python -m prism.entry_points.laplace --domain cmapss       # Laplace field
 python -m prism.entry_points.laplace_pairwise --domain cmapss  # Pairwise
 ```
@@ -714,14 +714,14 @@ python -m prism.entry_points.physics                 # Conservation laws (experi
 
 ```bash
 # Subset of data for quick iteration
-python -m prism.entry_points.indicator_vector --domain cmapss --testing
+python -m prism.entry_points.signal_vector --domain cmapss --testing
 ```
 
 ---
 
 ## Six-Axis Characterization
 
-Before analysis, each indicator is classified on 6 dynamical axes:
+Before analysis, each signal is classified on 6 dynamical axes:
 
 | Axis | Range | Measures |
 |------|-------|----------|
@@ -772,7 +772,7 @@ Before analysis, each indicator is classified on 6 dynamical axes:
 **PRISM DOES:**
 - Show you the shape of structural stress
 - Identify when current geometry matches historical patterns
-- Reveal which indicators belong together
+- Reveal which signals belong together
 - Detect regime boundaries mathematically
 
 ---

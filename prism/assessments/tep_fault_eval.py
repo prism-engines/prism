@@ -35,7 +35,7 @@ def load_tep_data(domain: str):
     """Load TEP vector and observation data."""
     from prism.db.parquet_store import get_parquet_path
 
-    vec_path = get_parquet_path('vector', 'indicator', domain)
+    vec_path = get_parquet_path('vector', 'signal', domain)
     obs_path = get_parquet_path('raw', 'observations', domain)
 
     vec_df = pl.read_parquet(vec_path)
@@ -62,16 +62,16 @@ def build_feature_matrix(vec_df: pl.DataFrame, key_metrics: list = None):
             'vector_score', 'score_entropy', 'score_hurst',
         ]
 
-    # Filter to TEP process indicators (exclude FAULT)
+    # Filter to TEP process signals (exclude FAULT)
     process_df = vec_df.filter(
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT')
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT')
     )
 
     # Filter to key metrics
     filtered = process_df.filter(pl.col('metric_name').is_in(key_metrics))
 
-    # Aggregate by date - mean and std across all indicators
+    # Aggregate by date - mean and std across all signals
     agg_df = filtered.group_by(['obs_date', 'engine', 'metric_name']).agg([
         pl.col('metric_value').mean().alias('mean'),
         pl.col('metric_value').std().alias('std'),
@@ -103,7 +103,7 @@ def build_feature_matrix(vec_df: pl.DataFrame, key_metrics: list = None):
 
 def get_fault_labels(obs_df: pl.DataFrame):
     """Extract fault labels per date."""
-    fault_raw = obs_df.filter(pl.col('indicator_id') == 'TEP_FAULT')
+    fault_raw = obs_df.filter(pl.col('signal_id') == 'TEP_FAULT')
 
     # Get dominant fault per date
     labels = fault_raw.group_by('obs_date').agg([

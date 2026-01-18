@@ -213,21 +213,21 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
 
             for feat_name, feat_value in features.items():
                 all_observations.append({
-                    "indicator_id": f"FEMTO_{bearing_id}_{feat_name.upper()}",
+                    "signal_id": f"FEMTO_{bearing_id}_{feat_name.upper()}",
                     "observed_at": obs_date,
                     "value": feat_value,
                     "source": SOURCE,
                 })
 
-            # Add speed and load as reference indicators
+            # Add speed and load as reference signals
             all_observations.append({
-                "indicator_id": f"FEMTO_{bearing_id}_SPEED",
+                "signal_id": f"FEMTO_{bearing_id}_SPEED",
                 "observed_at": obs_date,
                 "value": float(op_cond["speed"]),
                 "source": SOURCE,
             })
             all_observations.append({
-                "indicator_id": f"FEMTO_{bearing_id}_LOAD",
+                "signal_id": f"FEMTO_{bearing_id}_LOAD",
                 "observed_at": obs_date,
                 "value": float(op_cond["load"]),
                 "source": SOURCE,

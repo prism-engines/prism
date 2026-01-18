@@ -6,7 +6,7 @@ Tracks system state over time, maintaining history of:
 - Current regime (state ID and characteristics)
 - Transition history (all detected regime changes)
 - State duration (time since last transition)
-- Early warning indicators (signs of impending transition)
+- Early warning signals (signs of impending transition)
 
 The tracker operates incrementally, updating state as new data arrives.
 
@@ -14,7 +14,7 @@ Usage:
     from prism.state import RegimeTracker
 
     tracker = RegimeTracker(zscore_threshold=3.0)
-    result = tracker.update(field_df, exclude_indicators=['TEP_FAULT'])
+    result = tracker.update(field_df, exclude_signals=['TEP_FAULT'])
     print(f"Current state: {tracker.current_state}")
     print(f"Early warning: {result['early_warning']}")
 """
@@ -40,14 +40,14 @@ class RegimeState:
         current_time: Most recent observation time
         duration_windows: Number of windows in this regime
         stability: 0 = unstable (just transitioned), 1 = stable (long duration)
-        leading_indicators: Top indicators from recent transitions
+        leading_signals: Top signals from recent transitions
     """
     state_id: int
     start_time: str
     current_time: str
     duration_windows: int
     stability: float  # 0 = unstable, 1 = stable
-    leading_indicators: List[str]
+    leading_signals: List[str]
 
 
 @dataclass
@@ -114,7 +114,7 @@ class RegimeTracker:
         self,
         field_df: pl.DataFrame,
         modes_df: Optional[pl.DataFrame] = None,
-        exclude_indicators: Optional[List[str]] = None,
+        exclude_signals: Optional[List[str]] = None,
     ) -> Dict:
         """
         Update tracker with new data.
@@ -123,9 +123,9 @@ class RegimeTracker:
         early warning signs of impending transitions.
 
         Args:
-            field_df: Indicator field data
+            field_df: Signal field data
             modes_df: Optional cohort modes data
-            exclude_indicators: Indicators to exclude (e.g., fault labels)
+            exclude_signals: Signals to exclude (e.g., fault labels)
 
         Returns:
             Dictionary with:
@@ -138,7 +138,7 @@ class RegimeTracker:
         _, transitions = detect_transitions(
             field_df,
             zscore_threshold=self.zscore_threshold,
-            exclude_indicators=exclude_indicators,
+            exclude_signals=exclude_signals,
         )
 
         # Find new transitions (not in history)
@@ -153,7 +153,7 @@ class RegimeTracker:
                 # Extract signature for new transition
                 try:
                     sig = extract_signature(
-                        field_df, modes_df, t.window_end, exclude_indicators
+                        field_df, modes_df, t.window_end, exclude_signals
                     )
                     self.history.signatures.append(sig)
                 except Exception:
@@ -171,7 +171,7 @@ class RegimeTracker:
                 current_time=latest_transition.window_end,
                 duration_windows=1,
                 stability=0.0,  # Just transitioned
-                leading_indicators=[t.leading_indicator for t in new_transitions[-3:]],
+                leading_signals=[t.leading_signal for t in new_transitions[-3:]],
             )
             self.history.states.append(self.current_state)
 
@@ -189,7 +189,7 @@ class RegimeTracker:
                 self.current_state.current_time = str(latest_window)
 
         # Check for early warning
-        early_warning = self._check_early_warning(field_df, exclude_indicators)
+        early_warning = self._check_early_warning(field_df, exclude_signals)
 
         return {
             'transitions_detected': new_transitions,
@@ -201,7 +201,7 @@ class RegimeTracker:
     def _check_early_warning(
         self,
         field_df: pl.DataFrame,
-        exclude_indicators: Optional[List[str]] = None,
+        exclude_signals: Optional[List[str]] = None,
     ) -> bool:
         """
         Check for early warning signs of impending transition.
@@ -210,16 +210,16 @@ class RegimeTracker:
         which often precedes a transition.
 
         Args:
-            field_df: Indicator field data
-            exclude_indicators: Indicators to exclude
+            field_df: Signal field data
+            exclude_signals: Signals to exclude
 
         Returns:
             True if early warning signs detected
         """
         # Filter data
         data = field_df
-        if exclude_indicators:
-            data = data.filter(~pl.col('indicator_id').is_in(exclude_indicators))
+        if exclude_signals:
+            data = data.filter(~pl.col('signal_id').is_in(exclude_signals))
 
         # Get recent gradient magnitudes
         recent = data.sort('window_end', descending=True)
@@ -255,10 +255,10 @@ class RegimeTracker:
                 - current_state_id: ID of current regime
                 - current_stability: Stability score of current regime
                 - current_duration: Duration of current regime
-                - top_leading_indicators: Most frequent transition leaders
+                - top_leading_signals: Most frequent transition leaders
                 - avg_regime_duration: Average duration between transitions
         """
-        leaders = [t.leading_indicator for t in self.history.transitions]
+        leaders = [t.leading_signal for t in self.history.transitions]
         top_leaders = [ind for ind, _ in Counter(leaders).most_common(5)]
 
         # Calculate average regime duration
@@ -281,7 +281,7 @@ class RegimeTracker:
             'current_state_id': self.current_state.state_id if self.current_state else None,
             'current_stability': self.current_state.stability if self.current_state else None,
             'current_duration': self.current_state.duration_windows if self.current_state else 0,
-            'top_leading_indicators': top_leaders,
+            'top_leading_signals': top_leaders,
             'avg_regime_duration': avg_duration,
         }
 
@@ -293,15 +293,15 @@ class RegimeTracker:
             DataFrame with transition history:
                 - window_end: Transition date
                 - divergence_zscore: Significance score
-                - leading_indicator: Top responding indicator
-                - n_affected: Count of affected indicators
+                - leading_signal: Top responding signal
+                - n_affected: Count of affected signals
         """
         if not self.history.transitions:
             return pl.DataFrame({
                 'window_end': [],
                 'divergence_zscore': [],
                 'total_divergence': [],
-                'leading_indicator': [],
+                'leading_signal': [],
                 'n_affected': [],
             })
 
@@ -311,8 +311,8 @@ class RegimeTracker:
                 'window_end': t.window_end,
                 'divergence_zscore': t.divergence_zscore,
                 'total_divergence': t.total_divergence,
-                'leading_indicator': t.leading_indicator,
-                'n_affected': t.n_affected_indicators,
+                'leading_signal': t.leading_signal,
+                'n_affected': t.n_affected_signals,
             })
 
         return pl.DataFrame(records).sort('window_end')
@@ -328,15 +328,15 @@ class RegimeTracker:
 def track_regime_from_file(
     field_path: str,
     zscore_threshold: float = 3.0,
-    exclude_indicators: Optional[List[str]] = None,
+    exclude_signals: Optional[List[str]] = None,
 ) -> RegimeTracker:
     """
     Convenience function to track regime from a parquet file.
 
     Args:
-        field_path: Path to indicator_field.parquet
+        field_path: Path to signal_field.parquet
         zscore_threshold: Z-score threshold for transitions
-        exclude_indicators: Indicators to exclude
+        exclude_signals: Signals to exclude
 
     Returns:
         Fitted RegimeTracker with full history
@@ -344,6 +344,6 @@ def track_regime_from_file(
     field_df = pl.read_parquet(field_path)
 
     tracker = RegimeTracker(zscore_threshold=zscore_threshold)
-    tracker.update(field_df, exclude_indicators=exclude_indicators)
+    tracker.update(field_df, exclude_signals=exclude_signals)
 
     return tracker

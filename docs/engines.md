@@ -10,9 +10,9 @@ PRISM engines divide into three classes based on what they measure and how:
 
 | Class | Scope | Time Required? | Question Answered |
 |-------|-------|----------------|-------------------|
-| **Vector** | One indicator | No | "What are the intrinsic properties of this series?" |
-| **Geometry** | Multiple indicators | No | "What is the static relational structure?" |
-| **State** | Multiple indicators | Yes | "How do relationships evolve through time?" |
+| **Vector** | One signal | No | "What are the intrinsic properties of this series?" |
+| **Geometry** | Multiple signals | No | "What is the static relational structure?" |
+| **State** | Multiple signals | Yes | "How do relationships evolve through time?" |
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -44,7 +44,7 @@ PRISM engines divide into three classes based on what they measure and how:
 
 Each vector engine answers: *"What is this series doing on its own?"*
 
-These measurements are **intrinsic** — they don't depend on other indicators and produce a behavioral descriptor for each series.
+These measurements are **intrinsic** — they don't depend on other signals and produce a behavioral descriptor for each series.
 
 | Engine | Measures | Output Dimensions |
 |--------|----------|-------------------|
@@ -222,7 +222,7 @@ $$f_c = \frac{\sum_f f \cdot P(f)}{\sum_f P(f)}$$
 
 ### Lyapunov Exponent
 
-**Measures:** Sensitivity to initial conditions (chaos indicator).
+**Measures:** Sensitivity to initial conditions (chaos signal).
 
 **Question:** Do nearby trajectories in phase space diverge exponentially?
 
@@ -288,11 +288,11 @@ where $P(v)$ = histogram of vertical line lengths. High LAM indicates intermitte
 
 ## Geometry Engines
 
-**Purpose:** Measure static relational structure between indicators.
+**Purpose:** Measure static relational structure between signals.
 
 Each geometry engine answers: *"What is the structural relationship right now?"*
 
-These measurements are **relational** — they require multiple indicators but do not need time ordering. They analyze positions in behavioral space, not trajectories.
+These measurements are **relational** — they require multiple signals but do not need time ordering. They analyze positions in behavioral space, not trajectories.
 
 | Engine | Measures | Input |
 |--------|----------|-------|
@@ -313,7 +313,7 @@ These measurements are **relational** — they require multiple indicators but d
 
 **Question:** How much movement is common vs idiosyncratic?
 
-**Why it matters:** If PC1 explains 80% of variance, indicators move together as a bloc. If variance is spread across many components, they're mostly independent. PCA reveals the true dimensionality and factor structure of the system.
+**Why it matters:** If PC1 explains 80% of variance, signals move together as a bloc. If variance is spread across many components, they're mostly independent. PCA reveals the true dimensionality and factor structure of the system.
 
 #### Formula: Eigendecomposition
 
@@ -322,7 +322,7 @@ $$\Sigma \mathbf{v}_k = \lambda_k \mathbf{v}_k$$
 where:
 - $\Sigma$ = covariance matrix
 - $\lambda_k$ = variance explained by component $k$
-- $\mathbf{v}_k$ = loadings (how each indicator contributes)
+- $\mathbf{v}_k$ = loadings (how each signal contributes)
 
 #### Variance Explained
 
@@ -334,17 +334,17 @@ $$r_{eff} = \exp\left(-\sum_k \hat{\lambda}_k \ln \hat{\lambda}_k\right)$$
 
 where $\hat{\lambda}_k = \lambda_k / \sum_i \lambda_i$. Ranges from 1 (everything moves together) to N (all independent).
 
-**Minimum indicators:** 3
+**Minimum signals:** 3
 
 ---
 
 ### Clustering
 
-**Measures:** Natural groupings among indicators.
+**Measures:** Natural groupings among signals.
 
-**Question:** Which indicators behave similarly?
+**Question:** Which signals behave similarly?
 
-**Why it matters:** Indicators may cluster by domain, regime, or latent factor. Clustering reveals structure that pairwise correlation misses and identifies behavioral regimes.
+**Why it matters:** Signals may cluster by domain, regime, or latent factor. Clustering reveals structure that pairwise correlation misses and identifies behavioral regimes.
 
 #### Formula: Silhouette Score
 
@@ -368,15 +368,15 @@ Between-cluster to within-cluster variance ratio.
 | s ≈ 0 | Overlapping clusters |
 | s < 0 | Likely misclassified |
 
-**Minimum indicators:** 4
+**Minimum signals:** 4
 
 ---
 
 ### Distance Metrics
 
-**Measures:** Pairwise dissimilarity between indicators.
+**Measures:** Pairwise dissimilarity between signals.
 
-**Question:** How far apart are these indicators in behavioral space?
+**Question:** How far apart are these signals in behavioral space?
 
 **Why it matters:** Distance is the foundation for clustering, MST, and anomaly detection. Different metrics capture different notions of similarity.
 
@@ -468,7 +468,7 @@ Correlation of ranks.
 
 **Measures:** Essential connectivity structure.
 
-**Question:** What is the minimal network connecting all indicators?
+**Question:** What is the minimal network connecting all signals?
 
 **Why it matters:** MST extracts the backbone of relationships, filtering noise. Central nodes in the MST are systemically important; peripheral nodes are idiosyncratic.
 
@@ -492,7 +492,7 @@ subject to $T$ connecting all nodes with $n-1$ edges.
 
 **Measures:** Anomaly score based on local density.
 
-**Question:** Which indicators are behavioral outliers?
+**Question:** Which signals are behavioral outliers?
 
 **Why it matters:** Outliers may signal regime changes, data errors, or unique dynamics. LOF detects outliers relative to local neighborhood density, robust to varying densities across the space.
 
@@ -520,7 +520,7 @@ $$lrd(x) = \frac{|N_k(x)|}{\sum_{y \in N_k(x)} \text{reach-dist}_k(x, y)}$$
 
 **Question:** What is the boundary of the behavioral space?
 
-**Why it matters:** Indicators on the convex hull are extreme in some dimension. Distance to hull center measures how "typical" an indicator is. Hull volume measures the spread of the system.
+**Why it matters:** Signals on the convex hull are extreme in some dimension. Distance to hull center measures how "typical" an signal is. Hull volume measures the spread of the system.
 
 #### Centrality Score
 
@@ -662,7 +662,7 @@ $$\text{similarity} = \frac{1}{1 + DTW(X,Y)}$$
 
 **Measures:** Coherent spatiotemporal modes and frequencies.
 
-**Question:** What are the dominant dynamic patterns across indicators?
+**Question:** What are the dominant dynamic patterns across signals?
 
 **Why it matters:** DMD extracts oscillation frequencies and growth/decay rates from multivariate signal topology. It approximates the underlying linear operator governing system dynamics, revealing modes that may not be apparent from individual series analysis.
 
@@ -727,7 +727,7 @@ Positive means net information flow from X to Y.
 
 ## Engine Summary Table
 
-### Vector Engines (Per-Indicator)
+### Vector Engines (Per-Signal)
 
 | Engine | Measures | Key Formula | Min Samples |
 |--------|----------|-------------|-------------|
@@ -739,9 +739,9 @@ Positive means net information flow from X to Y.
 | Lyapunov | Chaos | $\lambda = \lim \frac{1}{t}\ln\frac{\|\delta x(t)\|}{\|\delta x(0)\|}$ | 200 |
 | RQA | Recurrence | $R_{i,j} = \Theta(\epsilon - \|x_i - x_j\|)$ | 100 |
 
-### Geometry Engines (Multi-Indicator, Static)
+### Geometry Engines (Multi-Signal, Static)
 
-| Engine | Measures | Key Formula | Min Indicators |
+| Engine | Measures | Key Formula | Min Signals |
 |--------|----------|-------------|----------------|
 | PCA | Shared variance | $\Sigma v = \lambda v$ | 3 |
 | Clustering | Groupings | $s = (b-a)/\max(a,b)$ | 4 |
@@ -752,7 +752,7 @@ Positive means net information flow from X to Y.
 | LOF | Outliers | $LOF = \text{avg}(lrd_{neighbors}/lrd)$ | 4 |
 | Convex Hull | Extent | Boundary + centrality | 3 |
 
-### State Engines (Multi-Indicator, Temporal)
+### State Engines (Multi-Signal, Temporal)
 
 | Engine | Measures | Key Formula | Min Samples |
 |--------|----------|-------------|-------------|
@@ -775,7 +775,7 @@ Raw Observations
       ▼
 ┌─────────────────┐
 │ VECTOR ENGINES  │  "What is each series?"
-│ (per-indicator) │
+│ (per-signal) │
 └────────┬────────┘
          │ Behavioral Descriptors
          ▼
@@ -795,7 +795,7 @@ Raw Observations
 
 1. **Vector engines** produce behavioral descriptors that compress each signal topology into a fixed-dimensional representation.
 
-2. **Geometry engines** analyze relationships between these descriptors without needing the original time ordering — they see indicators as points in behavioral space.
+2. **Geometry engines** analyze relationships between these descriptors without needing the original time ordering — they see signals as points in behavioral space.
 
 3. **State engines** require the full temporal structure to analyze causality, lead-lag relationships, and dynamic coupling that geometry cannot capture.
 

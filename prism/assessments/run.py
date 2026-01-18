@@ -26,9 +26,9 @@ from prism.assessments.config import (
     get_what_features,
     get_when_features,
     get_mode_features,
-    get_indicator_patterns,
+    get_signal_patterns,
     get_precursor_mode,
-    get_precursor_indicators,
+    get_precursor_signals,
     print_config,
 )
 
@@ -39,9 +39,9 @@ def load_data(domain: str):
     """Load all data sources for assessment."""
     from prism.db.parquet_store import get_parquet_path
 
-    vec_path = get_parquet_path('vector', 'indicator', domain)
+    vec_path = get_parquet_path('vector', 'signal', domain)
     obs_path = get_parquet_path('raw', 'observations', domain)
-    modes_path = get_parquet_path('vector', 'indicator_modes', domain)
+    modes_path = get_parquet_path('vector', 'signal_modes', domain)
 
     vec_df = pl.read_parquet(vec_path) if vec_path.exists() else None
     obs_df = pl.read_parquet(obs_path) if obs_path.exists() else None
@@ -50,31 +50,31 @@ def load_data(domain: str):
     return vec_df, obs_df, modes_df
 
 
-def filter_indicators(df: pl.DataFrame, domain: str) -> pl.DataFrame:
-    """Filter to domain indicators, excluding fault labels."""
-    patterns = get_indicator_patterns(domain)
+def filter_signals(df: pl.DataFrame, domain: str) -> pl.DataFrame:
+    """Filter to domain signals, excluding fault labels."""
+    patterns = get_signal_patterns(domain)
 
     if not patterns['prefix']:
         return df
 
-    filtered = df.filter(pl.col('indicator_id').str.starts_with(patterns['prefix']))
+    filtered = df.filter(pl.col('signal_id').str.starts_with(patterns['prefix']))
 
     if patterns['exclude_pattern']:
-        filtered = filtered.filter(~pl.col('indicator_id').str.contains(patterns['exclude_pattern']))
+        filtered = filtered.filter(~pl.col('signal_id').str.contains(patterns['exclude_pattern']))
 
     return filtered
 
 
 def get_fault_events(obs_df: pl.DataFrame, domain: str) -> pl.DataFrame:
     """Get fault onset events from observations."""
-    patterns = get_indicator_patterns(domain)
+    patterns = get_signal_patterns(domain)
 
-    if not patterns['fault_indicator']:
-        print(f"Warning: No fault_indicator configured for {domain}")
+    if not patterns['fault_signal']:
+        print(f"Warning: No fault_signal configured for {domain}")
         return pl.DataFrame()
 
     fault_df = obs_df.filter(
-        pl.col('indicator_id') == patterns['fault_indicator']
+        pl.col('signal_id') == patterns['fault_signal']
     ).select([
         'obs_date',
         pl.col('value').alias('fault_code')
@@ -103,7 +103,7 @@ def get_what_signals(vec_df: pl.DataFrame, date, domain: str) -> Dict[str, float
     """Get WHAT layer features for a date."""
     features = get_what_features(domain)
 
-    day_data = filter_indicators(vec_df, domain).filter(
+    day_data = filter_signals(vec_df, domain).filter(
         (pl.col('obs_date') == date) &
         pl.col('metric_name').is_in(features)
     )
@@ -132,7 +132,7 @@ def get_when_signals(vec_df: pl.DataFrame, date, domain: str) -> Dict[str, float
     """Get WHEN layer features for a date."""
     features = get_when_features(domain)
 
-    day_data = filter_indicators(vec_df, domain).filter(
+    day_data = filter_signals(vec_df, domain).filter(
         (pl.col('obs_date') == date) &
         pl.col('metric_name').is_in(features)
     )
@@ -162,7 +162,7 @@ def get_mode_signals(modes_df: pl.DataFrame, date, domain: str) -> Dict[str, flo
     if modes_df is None:
         return {}
 
-    day_data = filter_indicators(modes_df, domain).filter(pl.col('obs_date') == date)
+    day_data = filter_signals(modes_df, domain).filter(pl.col('obs_date') == date)
 
     if len(day_data) == 0:
         return {}
@@ -190,9 +190,9 @@ def get_precursor_mode_signal(modes_df: pl.DataFrame, date, domain: str) -> Dict
         return {'precursor_count': 0, 'precursor_present': False}
 
     precursor_mode = get_precursor_mode(domain)
-    known_precursors = get_precursor_indicators(domain)
+    known_precursors = get_precursor_signals(domain)
 
-    day_data = filter_indicators(modes_df, domain).filter(pl.col('obs_date') == date)
+    day_data = filter_signals(modes_df, domain).filter(pl.col('obs_date') == date)
 
     if len(day_data) == 0:
         return {'precursor_count': 0, 'precursor_present': False}
@@ -201,16 +201,16 @@ def get_precursor_mode_signal(modes_df: pl.DataFrame, date, domain: str) -> Dict
     precursor_data = day_data.filter(pl.col('mode_id') == precursor_mode)
     precursor_count = len(precursor_data)
 
-    # Get indicators in precursor mode
-    precursor_indicators = precursor_data['indicator_id'].to_list() if precursor_count > 0 else []
+    # Get signals in precursor mode
+    precursor_signals = precursor_data['signal_id'].to_list() if precursor_count > 0 else []
 
-    # Check if known precursor indicators are in the mode
-    known_in_mode = [ind for ind in precursor_indicators if ind in known_precursors]
+    # Check if known precursor signals are in the mode
+    known_in_mode = [ind for ind in precursor_signals if ind in known_precursors]
 
     return {
         'precursor_count': precursor_count,
         'precursor_present': precursor_count > 0,
-        'precursor_indicators': precursor_indicators[:5],
+        'precursor_signals': precursor_signals[:5],
         'known_precursors_active': len(known_in_mode) > 0,
     }
 
@@ -307,7 +307,7 @@ def run_assessment(domain: str, max_onsets: int = 30):
     """Run integrated assessment for a domain."""
 
     config = get_domain_config(domain)
-    patterns = get_indicator_patterns(domain)
+    patterns = get_signal_patterns(domain)
     precursor_mode = get_precursor_mode(domain)
 
     print("=" * 100)
@@ -325,7 +325,7 @@ def run_assessment(domain: str, max_onsets: int = 30):
     vec_df, obs_df, modes_df = load_data(domain)
 
     if vec_df is None:
-        print("ERROR: Vector data not found. Run indicator_vector first.")
+        print("ERROR: Vector data not found. Run signal_vector first.")
         return
 
     if obs_df is None:
@@ -341,7 +341,7 @@ def run_assessment(domain: str, max_onsets: int = 30):
     print(f"  Found {len(onsets)} fault onsets")
 
     if len(onsets) == 0:
-        print("No fault onsets found. Check fault_indicator config.")
+        print("No fault onsets found. Check fault_signal config.")
         return
 
     # Analyze each onset
@@ -406,8 +406,8 @@ def run_assessment(domain: str, max_onsets: int = 30):
 
         total_before = sum(r['precursor_before'] for r in results)
         total_at = sum(r['precursor_at'] for r in results)
-        print(f"  Before onset: {total_before} indicator-days")
-        print(f"  At onset:     {total_at} indicator-days")
+        print(f"  Before onset: {total_before} signal-days")
+        print(f"  At onset:     {total_at} signal-days")
 
     print()
     print("=" * 100)

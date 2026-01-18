@@ -13,7 +13,7 @@ Core Concept:
 
 Weights are loaded from config/stride.yaml (default: 21d=0.5, 63d=1.0, 126d=2.0, 252d=4.0)
 
-Computes per indicator:
+Computes per signal:
     - barycenter: conviction-weighted center of mass across timescales
     - dispersion: tension between shortest and longest window (scout vs anchor)
     - alignment: coherence across all windows (1 = perfect agreement)
@@ -58,12 +58,12 @@ def _load_weights() -> Dict[int, float]:
         return {21: 0.5, 63: 1.0, 126: 2.0, 252: 4.0}
 
 
-def compute_indicator_barycenter(
+def compute_signal_barycenter(
     vectors: Dict[int, np.ndarray],
     weights: Optional[Dict[int, float]] = None,
 ) -> Tuple[Optional[np.ndarray], Optional[float], Optional[float]]:
     """
-    Calculate conviction-weighted barycenter and tension metrics for an indicator.
+    Calculate conviction-weighted barycenter and tension metrics for an signal.
 
     Args:
         vectors: Dict mapping window_days -> feature vector
@@ -120,7 +120,7 @@ class BarycenterEngine(BaseEngine):
 
     Outputs:
         - Cohort-level: mean_dispersion, mean_alignment, n_computed
-        - Per-indicator: barycenter vector, dispersion, alignment
+        - Per-signal: barycenter vector, dispersion, alignment
     """
 
     name = "barycenter"
@@ -143,20 +143,20 @@ class BarycenterEngine(BaseEngine):
         Run barycenter analysis.
 
         Args:
-            df: Normalized indicator data (rows=dates, cols=indicators)
+            df: Normalized signal data (rows=dates, cols=signals)
                 This is the "current" window's data matrix.
             run_id: Unique run identifier
-            window_vectors: Dict mapping indicator_id -> {window_days: vector}
-                Pre-computed vectors for each indicator at each window size.
+            window_vectors: Dict mapping signal_id -> {window_days: vector}
+                Pre-computed vectors for each signal at each window size.
                 If not provided, only returns empty metrics.
             weights: Optional custom weights (loads from config if not provided)
 
         Returns:
             Dict with cohort-level aggregates:
-                - mean_dispersion: Average tension across indicators
-                - mean_alignment: Average coherence across indicators
-                - n_computed: Number of indicators with valid barycenters
-                - per_indicator: Dict of per-indicator results (for storage)
+                - mean_dispersion: Average tension across signals
+                - mean_alignment: Average coherence across signals
+                - n_computed: Number of signals with valid barycenters
+                - per_signal: Dict of per-signal results (for storage)
         """
         if weights is None:
             weights = _load_weights()
@@ -167,38 +167,38 @@ class BarycenterEngine(BaseEngine):
                 'mean_dispersion': None,
                 'mean_alignment': None,
                 'n_computed': 0,
-                'per_indicator': {},
+                'per_signal': {},
             }
 
-        # Compute barycenter for each indicator
+        # Compute barycenter for each signal
         dispersions = []
         alignments = []
-        per_indicator = {}
+        per_signal = {}
 
-        for indicator_id, vectors in window_vectors.items():
-            barycenter, dispersion, alignment = compute_indicator_barycenter(
+        for signal_id, vectors in window_vectors.items():
+            barycenter, dispersion, alignment = compute_signal_barycenter(
                 vectors, weights
             )
 
             if barycenter is not None:
                 dispersions.append(dispersion)
                 alignments.append(alignment)
-                per_indicator[indicator_id] = {
+                per_signal[signal_id] = {
                     'barycenter': barycenter,
                     'dispersion': dispersion,
                     'alignment': alignment,
                     'available_windows': sorted(vectors.keys()),
                 }
 
-        n_computed = len(per_indicator)
+        n_computed = len(per_signal)
 
         if n_computed == 0:
-            logger.warning("No indicators had sufficient windows for barycenter computation")
+            logger.warning("No signals had sufficient windows for barycenter computation")
             return {
                 'mean_dispersion': None,
                 'mean_alignment': None,
                 'n_computed': 0,
-                'per_indicator': {},
+                'per_signal': {},
             }
 
         # Compute cohort-level aggregates
@@ -206,7 +206,7 @@ class BarycenterEngine(BaseEngine):
         mean_alignment = float(np.mean(alignments))
 
         logger.info(
-            f"Barycenter complete: {n_computed} indicators, "
+            f"Barycenter complete: {n_computed} signals, "
             f"mean_dispersion={mean_dispersion:.3f}, mean_alignment={mean_alignment:.3f}"
         )
 
@@ -214,7 +214,7 @@ class BarycenterEngine(BaseEngine):
             'mean_dispersion': mean_dispersion,
             'mean_alignment': mean_alignment,
             'n_computed': n_computed,
-            'per_indicator': per_indicator,
+            'per_signal': per_signal,
         }
 
 
@@ -227,16 +227,16 @@ def compute_barycenter(
     weights: Optional[Dict[int, float]] = None,
 ) -> Dict[str, Any]:
     """
-    Compute barycenters for a set of indicators.
+    Compute barycenters for a set of signals.
 
     Convenience function that wraps BarycenterEngine.
 
     Args:
-        window_vectors: Dict mapping indicator_id -> {window_days: vector}
+        window_vectors: Dict mapping signal_id -> {window_days: vector}
         weights: Optional custom weights
 
     Returns:
-        Dict with mean_dispersion, mean_alignment, n_computed, per_indicator
+        Dict with mean_dispersion, mean_alignment, n_computed, per_signal
     """
     engine = BarycenterEngine()
     return engine.run(

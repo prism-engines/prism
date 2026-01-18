@@ -17,7 +17,7 @@ Usage:
 
     class GeometryOrchestrator(ParquetOrchestrator):
         schema = 'geometry'
-        table = 'indicators'
+        table = 'signals'
         key_cols = ['cohort_id', 'window_end', 'window_days']
 
         def get_work_items(self):
@@ -66,7 +66,7 @@ class WorkerAssignment:
 
     worker_id: int
     temp_path: Path  # Path to worker's temp parquet file
-    items: List[Any]  # dates, indicators, cohorts - whatever the unit of work is
+    items: List[Any]  # dates, signals, cohorts - whatever the unit of work is
     config: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -161,8 +161,8 @@ def get_cohorts_from_parquet() -> List[str]:
     return []
 
 
-def get_indicators_from_parquet(cohort: Optional[str] = None) -> List[str]:
-    """Get indicator IDs from parquet files."""
+def get_signals_from_parquet(cohort: Optional[str] = None) -> List[str]:
+    """Get signal IDs from parquet files."""
     obs_path = get_parquet_path("raw", "observations")
     if not obs_path.exists():
         return []
@@ -172,16 +172,16 @@ def get_indicators_from_parquet(cohort: Optional[str] = None) -> List[str]:
         members_path = get_parquet_path("config", "cohort_members")
         if members_path.exists():
             members = pl.read_parquet(members_path)
-            indicator_ids = (
-                members.filter(pl.col("cohort_id") == cohort)["indicator_id"]
+            signal_ids = (
+                members.filter(pl.col("cohort_id") == cohort)["signal_id"]
                 .unique()
                 .to_list()
             )
-            return indicator_ids
+            return signal_ids
 
-    # All indicators
-    df = pl.scan_parquet(obs_path).select("indicator_id").unique().collect()
-    return df["indicator_id"].to_list()
+    # All signals
+    df = pl.scan_parquet(obs_path).select("signal_id").unique().collect()
+    return df["signal_id"].to_list()
 
 
 # =============================================================================
@@ -271,7 +271,7 @@ class ParquetOrchestrator(ABC):
 
     Subclasses must define:
         - schema: str (e.g., 'vector', 'geometry', 'state')
-        - table: str (e.g., 'indicators', 'cohorts')
+        - table: str (e.g., 'signals', 'cohorts')
         - key_cols: List[str] (columns for upsert deduplication)
         - get_work_items(): Get items to process
         - worker_task(): Process a single assignment
@@ -302,7 +302,7 @@ class ParquetOrchestrator(ABC):
     @abstractmethod
     def get_work_items(self) -> List[Any]:
         """
-        Get the items to be processed (dates, indicators, etc.).
+        Get the items to be processed (dates, signals, etc.).
         Must be implemented by subclass.
         """
         pass
@@ -507,7 +507,7 @@ def parse_date(s: str) -> date:
 
 def get_available_snapshots(
     schema: str = "vector",
-    table: str = "indicators",
+    table: str = "signals",
     start: Optional[date] = None,
     end: Optional[date] = None,
     date_col: str = "window_end",

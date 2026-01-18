@@ -1,10 +1,10 @@
 # Tennessee Eastman Process (TEP) Cohort Configuration
 # =====================================================
 #
-# TEP has 53 indicators:
+# TEP has 53 signals:
 #   - XMEAS01-XMEAS41: 41 process measurements
 #   - XMV01-XMV11: 11 manipulated variables (control valves)
-#   - FAULT: Fault code indicator
+#   - FAULT: Fault code signal
 #
 # Cohort groupings based on process unit and function
 
@@ -15,7 +15,7 @@ cohorts:
 
   feeds:
     description: "Feed streams (A, D, E, A+C)"
-    indicators:
+    signals:
       - TEP_XMEAS01  # A feed (stream 1)
       - TEP_XMEAS02  # D feed (stream 2)
       - TEP_XMEAS03  # E feed (stream 3)
@@ -25,7 +25,7 @@ cohorts:
 
   reactor:
     description: "Reactor conditions (pressure, level, temperature)"
-    indicators:
+    signals:
       - TEP_XMEAS07  # Reactor pressure
       - TEP_XMEAS08  # Reactor level
       - TEP_XMEAS09  # Reactor temperature
@@ -33,7 +33,7 @@ cohorts:
 
   separator:
     description: "Product separator conditions"
-    indicators:
+    signals:
       - TEP_XMEAS11  # Product separator temperature
       - TEP_XMEAS12  # Product separator level
       - TEP_XMEAS13  # Product separator pressure
@@ -42,7 +42,7 @@ cohorts:
 
   stripper:
     description: "Stripper column conditions"
-    indicators:
+    signals:
       - TEP_XMEAS15  # Stripper level
       - TEP_XMEAS16  # Stripper pressure
       - TEP_XMEAS17  # Stripper underflow
@@ -51,7 +51,7 @@ cohorts:
 
   utilities:
     description: "Compressor and purge"
-    indicators:
+    signals:
       - TEP_XMEAS10  # Purge rate (stream 9)
       - TEP_XMEAS20  # Compressor work
 
@@ -61,7 +61,7 @@ cohorts:
 
   composition_reactor:
     description: "Reactor feed composition (mol%)"
-    indicators:
+    signals:
       - TEP_XMEAS23  # Reactor feed A (mol%)
       - TEP_XMEAS24  # Reactor feed B (mol%)
       - TEP_XMEAS25  # Reactor feed C (mol%)
@@ -71,7 +71,7 @@ cohorts:
 
   composition_purge:
     description: "Purge stream composition (mol%)"
-    indicators:
+    signals:
       - TEP_XMEAS29  # Purge A (mol%)
       - TEP_XMEAS30  # Purge B (mol%)
       - TEP_XMEAS31  # Purge C (mol%)
@@ -83,7 +83,7 @@ cohorts:
 
   composition_product:
     description: "Product composition (mol%)"
-    indicators:
+    signals:
       - TEP_XMEAS37  # Product D (mol%)
       - TEP_XMEAS38  # Product E (mol%)
       - TEP_XMEAS39  # Product F (mol%)
@@ -96,7 +96,7 @@ cohorts:
 
   controls:
     description: "Manipulated variables (control valve positions)"
-    indicators:
+    signals:
       - TEP_XMV01   # D feed flow valve
       - TEP_XMV02   # E feed flow valve
       - TEP_XMV03   # A feed flow valve
@@ -115,7 +115,7 @@ cohorts:
 
   fault:
     description: "Fault code (for validation)"
-    indicators:
+    signals:
       - TEP_FAULT
 
 # Meta-cohorts for higher-level analysis

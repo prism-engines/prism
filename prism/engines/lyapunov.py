@@ -56,7 +56,7 @@ METADATA = EngineMetadata(
 
 def compute_lyapunov_with_derivation(
     values: np.ndarray,
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -74,7 +74,7 @@ def compute_lyapunov_with_derivation(
     deriv = Derivation(
         engine_name="lyapunov_exponent",
         method_name="Rosenstein Algorithm (Largest Lyapunov Exponent)",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -217,7 +217,7 @@ def compute_lyapunov_with_derivation(
 def compute_lyapunov(values: np.ndarray, embedding_dim: int = 3,
                      time_delay: int = 1) -> dict:
     """
-    Compute Lyapunov exponent for a single indicator.
+    Compute Lyapunov exponent for a single signal.
 
     Args:
         values: Array of observed values
@@ -452,7 +452,7 @@ class LyapunovEngine(BaseEngine):
     - LLE < 0: Stable (convergent)
 
     Outputs:
-        - results.lyapunov: Per-indicator Lyapunov estimates
+        - results.lyapunov: Per-signal Lyapunov estimates
     """
 
     @property
@@ -477,7 +477,7 @@ class LyapunovEngine(BaseEngine):
         Run Lyapunov exponent estimation.
 
         Args:
-            df: Normalized indicator data
+            df: Normalized signal data
             run_id: Unique run identifier
             embedding_dim: Embedding dimension (auto if None)
             time_delay: Time delay for embedding (auto if None)
@@ -488,20 +488,20 @@ class LyapunovEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = df_clean.columns.tolist()
-        n_indicators = len(indicators)
+        signals = df_clean.columns.tolist()
+        n_signals = len(signals)
 
         window_start = df_clean.index.min().date()
         window_end = df_clean.index.max().date()
 
-        # Compute Lyapunov exponent for each indicator
+        # Compute Lyapunov exponent for each signal
         records = []
         all_lle = []
         n_chaotic = 0
         n_stable = 0
 
-        for indicator in indicators:
-            x = df_clean[indicator].values
+        for signal in signals:
+            x = df_clean[signal].values
 
             # Estimate embedding parameters if not provided
             if embedding_dim is None or time_delay is None:
@@ -526,7 +526,7 @@ class LyapunovEngine(BaseEngine):
                     n_stable += 1
 
             records.append({
-                "indicator_id": indicator,
+                "signal_id": signal,
                 "window_start": window_start,
                 "window_end": window_end,
                 "lyapunov_exponent": float(lle) if not np.isnan(lle) else None,
@@ -543,7 +543,7 @@ class LyapunovEngine(BaseEngine):
 
         # Summary metrics
         metrics = {
-            "n_indicators": n_indicators,
+            "n_signals": n_signals,
             "n_samples": len(df_clean),
             "n_successful": len(all_lle),
             "avg_lyapunov": float(np.mean(all_lle)) if all_lle else None,
@@ -555,7 +555,7 @@ class LyapunovEngine(BaseEngine):
         }
 
         logger.info(
-            f"Lyapunov complete: {n_indicators} indicators, "
+            f"Lyapunov complete: {n_signals} signals, "
             f"avg_LLE={metrics['avg_lyapunov']}, "
             f"chaotic={n_chaotic}, stable={n_stable}"
         )

@@ -9,8 +9,8 @@ THE MATH ORGANIZES WHAT THE DOMAIN IS.
 
 Usage:
 ------
-    # Level 1: Indicator vectors → Indicator field
-    python -m prism.entry_points.laplace --level indicator
+    # Level 1: Signal vectors → Signal field
+    python -m prism.entry_points.laplace --level signal
 
     # Level 2: Geometry → Geometry field
     python -m prism.entry_points.laplace --level geometry
@@ -37,7 +37,7 @@ For any entity E at any level L, within each window:
 
 Pipeline:
 ---------
-observations → indicator_vector → laplace(indicator) → geometry → laplace(geometry) → physics
+observations → signal_vector → laplace(signal) → geometry → laplace(geometry) → physics
 """
 
 import argparse
@@ -191,7 +191,7 @@ def compute_window_field(
 ) -> Optional[Dict]:
     """
     Compute Laplace field quantities for a single window.
-    Works at ANY level - indicator, cohort, domain.
+    Works at ANY level - signal, cohort, domain.
     """
     # Filter to window (handle both date and datetime types)
     ws = _to_date(window_start)
@@ -262,12 +262,12 @@ def compute_laplace_field(
 
     DELTA LOGIC: Computes gradient/laplacian as CHANGE between consecutive
     windows (sorted by date). No additional windowing - the input data
-    already has windows from indicator_vector.
+    already has windows from signal_vector.
 
     Parameters:
-        df: Input DataFrame (from indicator_vector with window structure)
-        entity_col: Column identifying entities (indicator_id, cohort_id, domain_id)
-        date_col: Column with dates (window end dates from indicator_vector)
+        df: Input DataFrame (from signal_vector with window structure)
+        entity_col: Column identifying entities (signal_id, cohort_id, domain_id)
+        date_col: Column with dates (window end dates from signal_vector)
         value_col: Column with values (auto-detected if None)
         metric_cols: Columns that define metric groups (e.g., ['engine', 'metric_name'])
         config: Window configuration (for min_observations threshold only)
@@ -453,8 +453,8 @@ THE MATH ORGANIZES WHAT THE DOMAIN IS.
 
 Same hammer, different nails:
 
-  # Indicator level (default)
-  python -m prism.entry_points.laplace --level indicator
+  # Signal level (default)
+  python -m prism.entry_points.laplace --level signal
 
   # Geometry level
   python -m prism.entry_points.laplace --level geometry --input geometry/cohort.parquet
@@ -466,9 +466,9 @@ Same hammer, different nails:
     parser.add_argument(
         '--level',
         type=str,
-        choices=['indicator', 'geometry'],
-        default='indicator',
-        help='Pipeline level (default: indicator)'
+        choices=['signal', 'geometry'],
+        default='signal',
+        help='Pipeline level (default: signal)'
     )
     parser.add_argument(
         '--domain',
@@ -547,20 +547,20 @@ Same hammer, different nails:
     if args.stride:
         config.stride_days = args.stride
 
-    if args.level == 'indicator':
+    if args.level == 'signal':
         if args.input:
             input_path = Path(args.input)
         else:
-            input_path = get_parquet_path('vector', 'indicator', domain=domain)
+            input_path = get_parquet_path('vector', 'signal', domain=domain)
 
         # Output path depends on value column (raw vs normalized)
         if args.output:
             output_path = Path(args.output)
         elif args.value_col == 'metric_value_norm':
-            output_path = get_parquet_path('vector', 'indicator_field_norm', domain=domain)
+            output_path = get_parquet_path('vector', 'signal_field_norm', domain=domain)
         else:
-            output_path = get_parquet_path('vector', 'indicator_field', domain=domain)
-        entity_col = args.entity_col or 'indicator_id'
+            output_path = get_parquet_path('vector', 'signal_field', domain=domain)
+        entity_col = args.entity_col or 'signal_id'
 
     elif args.level == 'geometry':
         input_path = Path(args.input) if args.input else get_parquet_path('geometry', 'cohort', domain=domain)
@@ -590,7 +590,7 @@ Same hammer, different nails:
     if args.entity_col:
         entity_col = args.entity_col
     elif entity_col not in schema.names():
-        for col in ['indicator_id', 'cohort_id', 'domain_id', 'entity_id']:
+        for col in ['signal_id', 'cohort_id', 'domain_id', 'entity_id']:
             if col in schema.names():
                 entity_col = col
                 break

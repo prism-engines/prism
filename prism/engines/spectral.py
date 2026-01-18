@@ -163,7 +163,7 @@ def compute_spectral_features(
     bands: dict = None
 ) -> SpectralFeatures:
     """
-    Compute comprehensive spectral features for a single indicator.
+    Compute comprehensive spectral features for a single signal.
 
     Args:
         values: Array of observed values
@@ -283,7 +283,7 @@ def compute_spectral_features(
 
 def compute_spectral(values: np.ndarray, method: str = "welch") -> dict:
     """
-    Compute spectral metrics for a single indicator.
+    Compute spectral metrics for a single signal.
 
     Backward-compatible wrapper around compute_spectral_features().
 
@@ -301,7 +301,7 @@ def compute_spectral(values: np.ndarray, method: str = "welch") -> dict:
 def compute_spectral_entropy_with_derivation(
     values: np.ndarray,
     method: str = "welch",
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "unknown",
     window_start: str = "",
     window_end: str = "",
@@ -322,7 +322,7 @@ def compute_spectral_entropy_with_derivation(
     derivation = Derivation(
         engine_name="spectral_entropy",
         method_name="Welch's Power Spectral Density",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -497,7 +497,7 @@ class SpectralEngine(BaseEngine):
         Run spectral analysis.
         
         Args:
-            df: Indicator data (preferably detrended)
+            df: Signal data (preferably detrended)
             run_id: Unique run identifier
             method: 'welch' or 'periodogram'
             n_peaks: Number of spectral peaks to identify
@@ -506,7 +506,7 @@ class SpectralEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = list(df_clean.columns)
+        signals = list(df_clean.columns)
         n_samples = len(df_clean)
         
         window_start = df_clean.index.min().date()
@@ -514,8 +514,8 @@ class SpectralEngine(BaseEngine):
         
         results = []
         
-        for indicator in indicators:
-            series = df_clean[indicator].values
+        for signal in signals:
+            series = df_clean[signal].values
             
             # Compute power spectral density
             if method == "welch":
@@ -544,7 +544,7 @@ class SpectralEngine(BaseEngine):
             spectral_entropy = -np.sum(psd_norm * np.log(psd_norm + 1e-10))
             
             results.append({
-                "indicator_id": indicator,
+                "signal_id": signal,
                 "dominant_frequency": float(dominant_freq),
                 "dominant_period": float(dominant_period) if not np.isinf(dominant_period) else None,
                 "spectral_entropy": float(spectral_entropy),
@@ -559,7 +559,7 @@ class SpectralEngine(BaseEngine):
         df_results = pd.DataFrame(results)
         
         metrics = {
-            "n_indicators": len(indicators),
+            "n_signals": len(signals),
             "n_samples": n_samples,
             "method": method,
             "avg_spectral_entropy": float(df_results["spectral_entropy"].mean()),
@@ -567,7 +567,7 @@ class SpectralEngine(BaseEngine):
         }
         
         logger.info(
-            f"Spectral analysis complete: {len(results)} indicators, "
+            f"Spectral analysis complete: {len(results)} signals, "
             f"avg entropy={metrics['avg_spectral_entropy']:.2f}"
         )
         
@@ -588,7 +588,7 @@ class SpectralEngine(BaseEngine):
                 value = r[dim]
                 if value is not None:
                     records.append({
-                        "indicator_id": r["indicator_id"],
+                        "signal_id": r["signal_id"],
                         "window_start": window_start,
                         "window_end": window_end,
                         "dimension": dim,

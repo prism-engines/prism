@@ -112,15 +112,15 @@ class CopulaEngine(BaseEngine):
         Run copula dependence analysis.
 
         Args:
-            df: Indicator data (will be rank-transformed internally)
+            df: Signal data (will be rank-transformed internally)
             run_id: Unique run identifier
 
         Returns:
             Dict with summary metrics
         """
         df_clean = df
-        indicators = df_clean.columns.tolist()
-        n_indicators = len(indicators)
+        signals = df_clean.columns.tolist()
+        n_signals = len(signals)
 
         window_start, window_end = get_window_dates(df_clean)
 
@@ -135,8 +135,8 @@ class CopulaEngine(BaseEngine):
         kendalls = []
         spearmans = []
 
-        for i in range(n_indicators):
-            for j in range(i + 1, n_indicators):
+        for i in range(n_signals):
+            for j in range(i + 1, n_signals):
                 u = df_uniform.iloc[:, i].values
                 v = df_uniform.iloc[:, j].values
 
@@ -153,8 +153,8 @@ class CopulaEngine(BaseEngine):
                 spearmans.append(rho)
 
                 records.append({
-                    "indicator_1": indicators[i],
-                    "indicator_2": indicators[j],
+                    "signal_1": signals[i],
+                    "signal_2": signals[j],
                     "window_start": window_start,
                     "window_end": window_end,
                     "lower_tail_dependence": float(lower_tail),
@@ -172,7 +172,7 @@ class CopulaEngine(BaseEngine):
         n_pairs = len(records)
 
         metrics = {
-            "n_indicators": n_indicators,
+            "n_signals": n_signals,
             "n_pairs": n_pairs,
             "n_samples": len(df_clean),
             "avg_lower_tail": float(np.mean(lower_tails)) if lower_tails else 0.0,
@@ -185,7 +185,7 @@ class CopulaEngine(BaseEngine):
         }
 
         logger.info(
-            f"Copula complete: {n_indicators} indicators, "
+            f"Copula complete: {n_signals} signals, "
             f"avg_lower_tail={metrics['avg_lower_tail']:.4f}, "
             f"avg_upper_tail={metrics['avg_upper_tail']:.4f}"
         )

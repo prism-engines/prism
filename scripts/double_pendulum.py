@@ -193,16 +193,16 @@ def save_to_prism_format(trajectories, data_dir):
         n = len(traj['t'])
         angle = traj['initial_angle']
 
-        # Create indicators for each variable
+        # Create signals for each variable
         variables = ['theta1', 'omega1', 'theta2', 'omega2', 'x2', 'y2', 'energy']
 
         for var in variables:
-            indicator_id = f"{traj_name}_{var}"
+            signal_id = f"{traj_name}_{var}"
             values = traj[var]
 
             for i, val in enumerate(values):
                 obs_rows.append({
-                    'indicator_id': indicator_id,
+                    'signal_id': signal_id,
                     'obs_date': base_date + timedelta(hours=i),
                     'value': float(val),
                 })
@@ -212,7 +212,7 @@ def save_to_prism_format(trajectories, data_dir):
     obs_df.write_parquet(data_dir / 'raw' / 'observations.parquet')
     print(f"Wrote {len(obs_rows)} observations")
 
-    # Create indicators metadata
+    # Create signals metadata
     ind_rows = []
     for traj_name, traj in trajectories.items():
         angle = traj['initial_angle']
@@ -231,7 +231,7 @@ def save_to_prism_format(trajectories, data_dir):
 
         for var, desc in zip(variables, descriptions):
             ind_rows.append({
-                'indicator_id': f"{traj_name}_{var}",
+                'signal_id': f"{traj_name}_{var}",
                 'name': f"Double Pendulum {angle}° - {var}",
                 'description': desc,
                 'source': 'simulation',
@@ -242,8 +242,8 @@ def save_to_prism_format(trajectories, data_dir):
             })
 
     ind_df = pl.DataFrame(ind_rows)
-    ind_df.write_parquet(data_dir / 'raw' / 'indicators.parquet')
-    print(f"Wrote {len(ind_rows)} indicators")
+    ind_df.write_parquet(data_dir / 'raw' / 'signals.parquet')
+    print(f"Wrote {len(ind_rows)} signals")
 
     # Create cohort configuration
     cohort_rows = [
@@ -252,7 +252,7 @@ def save_to_prism_format(trajectories, data_dir):
     pl.DataFrame(cohort_rows).write_parquet(data_dir / 'config' / 'cohorts.parquet')
 
     # Create cohort members
-    member_rows = [{'cohort_id': 'double_pendulum', 'indicator_id': r['indicator_id']}
+    member_rows = [{'cohort_id': 'double_pendulum', 'signal_id': r['signal_id']}
                    for r in ind_rows]
     pl.DataFrame(member_rows).write_parquet(data_dir / 'config' / 'cohort_members.parquet')
 

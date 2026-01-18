@@ -5,8 +5,8 @@ PRISM State Layer - State Signature Extraction
 Extracts the "fingerprint" of a transition for classification.
 Different fault types have different transition signatures based on:
 - Divergence characteristics (magnitude, direction)
-- Leading indicator identity and response strength
-- Response cascade (which indicators follow, in what order)
+- Leading signal identity and response strength
+- Response cascade (which signals follow, in what order)
 - Energy flow topology (sources vs sinks)
 
 Usage:
@@ -35,20 +35,20 @@ class StateSignature:
         divergence_magnitude: Total absolute divergence
         divergence_direction: 'expansion' (+) or 'contraction' (-)
 
-        # Leading indicator info
-        leading_indicator: Indicator with strongest response
+        # Leading signal info
+        leading_signal: Signal with strongest response
         leader_gradient_mag: Leader's gradient magnitude
         leader_divergence: Leader's divergence value
 
         # Response cascade
-        response_order: Top 10 responding indicators
+        response_order: Top 10 responding signals
         response_timing: Gradient magnitudes of top responders
         n_affected: Count of above-median responders
-        affected_ratio: Proportion of indicators affected
+        affected_ratio: Proportion of signals affected
 
         # Energy flow (from Laplace field topology)
-        n_sources: Count of energy-radiating indicators
-        n_sinks: Count of energy-absorbing indicators
+        n_sources: Count of energy-radiating signals
+        n_sinks: Count of energy-absorbing signals
         energy_balance: n_sources - n_sinks
     """
     window_end: str
@@ -57,8 +57,8 @@ class StateSignature:
     divergence_magnitude: float
     divergence_direction: str  # 'expansion' or 'contraction'
 
-    # Leading indicator info
-    leading_indicator: str
+    # Leading signal info
+    leading_signal: str
     leader_gradient_mag: float
     leader_divergence: float
 
@@ -78,18 +78,18 @@ def extract_signature(
     field_df: pl.DataFrame,
     modes_df: Optional[pl.DataFrame],
     window_end,
-    exclude_indicators: Optional[List[str]] = None,
+    exclude_signals: Optional[List[str]] = None,
 ) -> StateSignature:
     """
     Extract the full signature of a transition.
 
     Args:
-        field_df: Indicator field data with columns:
-            - window_end, indicator_id, divergence, gradient_magnitude
+        field_df: Signal field data with columns:
+            - window_end, signal_id, divergence, gradient_magnitude
             - is_source, is_sink (optional, for energy flow)
         modes_df: Cohort modes data (optional, for cluster context)
         window_end: Date of transition window (str or date)
-        exclude_indicators: Indicators to exclude from analysis
+        exclude_signals: Signals to exclude from analysis
 
     Returns:
         StateSignature capturing the fingerprint of this transition
@@ -99,10 +99,10 @@ def extract_signature(
 
     Example:
         >>> sig = extract_signature(field_df, None, '2000-07-28')
-        >>> print(f"Leader: {sig.leading_indicator}, Direction: {sig.divergence_direction}")
+        >>> print(f"Leader: {sig.leading_signal}, Direction: {sig.divergence_direction}")
     """
-    if exclude_indicators is None:
-        exclude_indicators = []
+    if exclude_signals is None:
+        exclude_signals = []
 
     # Convert window_end to string for comparison
     window_str = str(window_end)
@@ -112,9 +112,9 @@ def extract_signature(
         pl.col('window_end').cast(pl.Utf8) == window_str
     )
 
-    if exclude_indicators:
+    if exclude_signals:
         transition_data = transition_data.filter(
-            ~pl.col('indicator_id').is_in(exclude_indicators)
+            ~pl.col('signal_id').is_in(exclude_signals)
         )
 
     if len(transition_data) == 0:
@@ -126,11 +126,11 @@ def extract_signature(
         total_div = 0.0
     divergence_direction = 'expansion' if total_div > 0 else 'contraction'
 
-    # Leading indicator (highest gradient magnitude)
+    # Leading signal (highest gradient magnitude)
     sorted_by_grad = transition_data.sort('gradient_magnitude', descending=True)
     leader = sorted_by_grad.head(1)
 
-    leading_indicator = leader['indicator_id'][0]
+    leading_signal = leader['signal_id'][0]
     leader_gradient_mag = leader['gradient_magnitude'][0]
     leader_divergence = leader['divergence'][0]
 
@@ -141,11 +141,11 @@ def extract_signature(
         leader_divergence = 0.0
 
     # Response cascade
-    response_order = sorted_by_grad['indicator_id'].head(10).to_list()
+    response_order = sorted_by_grad['signal_id'].head(10).to_list()
     response_timing = sorted_by_grad['gradient_magnitude'].head(10).to_list()
     response_timing = [x if x is not None else 0.0 for x in response_timing]
 
-    # Affected indicators (above median gradient)
+    # Affected signals (above median gradient)
     median_grad = transition_data['gradient_magnitude'].median()
     if median_grad is None or median_grad == 0:
         median_grad = 0.0
@@ -154,8 +154,8 @@ def extract_signature(
         affected = transition_data.filter(pl.col('gradient_magnitude') > median_grad)
         n_affected = len(affected)
 
-    total_indicators = len(transition_data)
-    affected_ratio = n_affected / total_indicators if total_indicators > 0 else 0.0
+    total_signals = len(transition_data)
+    affected_ratio = n_affected / total_signals if total_signals > 0 else 0.0
 
     # Energy flow (from Laplace field topology)
     if 'is_source' in transition_data.columns:
@@ -174,7 +174,7 @@ def extract_signature(
         window_end=window_str,
         divergence_magnitude=abs(float(total_div)),
         divergence_direction=divergence_direction,
-        leading_indicator=leading_indicator,
+        leading_signal=leading_signal,
         leader_gradient_mag=float(leader_gradient_mag),
         leader_divergence=float(leader_divergence),
         response_order=response_order,
@@ -204,16 +204,16 @@ def signatures_to_features(signatures: List[StateSignature]) -> pl.DataFrame:
             - is_expansion: 1 if expansion, 0 if contraction
             - leader_gradient_mag: Leader's gradient magnitude
             - leader_divergence: Leader's divergence value
-            - n_affected: Count of affected indicators
+            - n_affected: Count of affected signals
             - affected_ratio: Proportion affected
             - n_sources: Energy source count
             - n_sinks: Energy sink count
             - energy_balance: n_sources - n_sinks
-            - leader_indicator: Leading indicator ID (metadata)
+            - leader_signal: Leading signal ID (metadata)
 
     Example:
         >>> features = signatures_to_features(signatures)
-        >>> X = features.select([c for c in features.columns if c not in ['window_end', 'leader_indicator']])
+        >>> X = features.select([c for c in features.columns if c not in ['window_end', 'leader_signal']])
     """
     if not signatures:
         return pl.DataFrame({
@@ -227,7 +227,7 @@ def signatures_to_features(signatures: List[StateSignature]) -> pl.DataFrame:
             'n_sources': [],
             'n_sinks': [],
             'energy_balance': [],
-            'leader_indicator': [],
+            'leader_signal': [],
         })
 
     records = []
@@ -244,7 +244,7 @@ def signatures_to_features(signatures: List[StateSignature]) -> pl.DataFrame:
             'n_sources': sig.n_sources,
             'n_sinks': sig.n_sinks,
             'energy_balance': sig.energy_balance,
-            'leader_indicator': sig.leading_indicator,
+            'leader_signal': sig.leading_signal,
         })
 
     return pl.DataFrame(records)
@@ -254,16 +254,16 @@ def extract_all_signatures(
     field_df: pl.DataFrame,
     window_ends: List,
     modes_df: Optional[pl.DataFrame] = None,
-    exclude_indicators: Optional[List[str]] = None,
+    exclude_signals: Optional[List[str]] = None,
 ) -> List[StateSignature]:
     """
     Extract signatures for multiple windows.
 
     Args:
-        field_df: Indicator field data
+        field_df: Signal field data
         window_ends: List of window dates to extract
         modes_df: Optional modes data
-        exclude_indicators: Indicators to exclude
+        exclude_signals: Signals to exclude
 
     Returns:
         List of StateSignature objects (skips windows with no data)
@@ -276,7 +276,7 @@ def extract_all_signatures(
 
     for window in window_ends:
         try:
-            sig = extract_signature(field_df, modes_df, window, exclude_indicators)
+            sig = extract_signature(field_df, modes_df, window, exclude_signals)
             signatures.append(sig)
         except ValueError:
             # Skip windows with no data
@@ -311,7 +311,7 @@ def compare_signatures(
     direction_match = 1.0 if sig_a.divergence_direction == sig_b.divergence_direction else 0.0
 
     # Leader match
-    leader_match = 1.0 if sig_a.leading_indicator == sig_b.leading_indicator else 0.0
+    leader_match = 1.0 if sig_a.leading_signal == sig_b.leading_signal else 0.0
 
     # Response order overlap (Jaccard)
     set_a = set(sig_a.response_order)

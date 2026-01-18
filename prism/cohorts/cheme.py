@@ -206,7 +206,7 @@ CHEME_COHORTS: Dict[str, List[str]] = {
     'tep': TEP_ALL,
 }
 
-# All ChemE indicators
+# All ChemE signals
 CHEME_ALL = TURBOFAN_ALL + TEP_ALL
 
 
@@ -214,39 +214,39 @@ CHEME_ALL = TURBOFAN_ALL + TEP_ALL
 # LOOKUP FUNCTIONS
 # =============================================================================
 
-# Reverse lookup: indicator -> cohort
+# Reverse lookup: signal -> cohort
 _INDICATOR_TO_COHORT: Dict[str, str] = {}
-for cohort, indicators in CHEME_COHORTS.items():
-    for indicator in indicators:
-        _INDICATOR_TO_COHORT[indicator] = cohort
+for cohort, signals in CHEME_COHORTS.items():
+    for signal in signals:
+        _INDICATOR_TO_COHORT[signal] = cohort
 
 
-def get_cheme_cohort(indicator_id: str) -> str:
+def get_cheme_cohort(signal_id: str) -> str:
     """
-    Get cohort for a ChemE indicator.
+    Get cohort for a ChemE signal.
 
     Args:
-        indicator_id: The indicator ID (e.g., 'CMAPSS_T2', 'TEP_XMEAS01')
+        signal_id: The signal ID (e.g., 'CMAPSS_T2', 'TEP_XMEAS01')
 
     Returns:
         Cohort name ('turbofan', 'tep') or 'other' if not classified
     """
-    return _INDICATOR_TO_COHORT.get(indicator_id, 'other')
+    return _INDICATOR_TO_COHORT.get(signal_id, 'other')
 
 
-def get_indicator_source(indicator_id: str) -> str:
+def get_signal_source(signal_id: str) -> str:
     """
-    Get data source for a ChemE indicator.
+    Get data source for a ChemE signal.
 
     Args:
-        indicator_id: The indicator ID
+        signal_id: The signal ID
 
     Returns:
         'cmapss', 'tep', or 'unknown'
     """
-    if indicator_id.startswith('CMAPSS_'):
+    if signal_id.startswith('CMAPSS_'):
         return 'cmapss'
-    elif indicator_id.startswith('TEP_'):
+    elif signal_id.startswith('TEP_'):
         return 'tep'
     else:
         return 'unknown'

@@ -6,19 +6,19 @@ Discover behavioral modes from Laplace signatures.
 NOMENCLATURE:
     - Domain:    Required. The complete system under analysis. NO DEFAULT.
     - Cohort:    Predefined physical/logical grouping (input)
-    - Indicator: A single signal topology (input)
+    - Signal: A single signal topology (input)
     - Mode:      Discovered behavioral grouping (output)
 
-Indicators that share similar Laplace dynamics belong to the same MODE.
+Signals that share similar Laplace dynamics belong to the same MODE.
 This is NOT the same as a cohort or "laplace_cohort" (deprecated term).
 
-How Does an Indicator Get a Mode Score?
+How Does an Signal Get a Mode Score?
 ---------------------------------------
 1. Extract Laplace fingerprint (gradient/divergence statistics)
 2. Cluster fingerprints using GMM (soft assignment)
 3. Compute mode_id, mode_affinity, mode_entropy
 
-Key Insight: Low affinity / high entropy = indicator is changing modes = REGIME TRANSITION SIGNAL.
+Key Insight: Low affinity / high entropy = signal is changing modes = REGIME TRANSITION SIGNAL.
 """
 
 import numpy as np
@@ -38,11 +38,11 @@ logger = logging.getLogger(__name__)
 
 def extract_laplace_fingerprint(
     field_df: pl.DataFrame,
-    indicator_id: str,
+    signal_id: str,
     cohort_id: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """
-    Extract Laplace fingerprint for a single indicator.
+    Extract Laplace fingerprint for a single signal.
 
     Fingerprint features:
     - gradient_mean: Average rate of change
@@ -54,14 +54,14 @@ def extract_laplace_fingerprint(
 
     Args:
         field_df: Laplace field DataFrame with gradient/divergence columns
-        indicator_id: Indicator to extract fingerprint for
+        signal_id: Signal to extract fingerprint for
         cohort_id: Optional cohort filter
 
     Returns:
         Dictionary with fingerprint features, or None if insufficient data
     """
-    # Filter to indicator
-    subset = field_df.filter(pl.col('indicator_id') == indicator_id)
+    # Filter to signal
+    subset = field_df.filter(pl.col('signal_id') == signal_id)
 
     if cohort_id is not None and 'cohort_id' in field_df.columns:
         subset = subset.filter(pl.col('cohort_id') == cohort_id)
@@ -77,7 +77,7 @@ def extract_laplace_fingerprint(
         return None
 
     return {
-        'indicator_id': indicator_id,
+        'signal_id': signal_id,
         'cohort_id': cohort_id,
         'gradient_mean': float(np.nanmean(grad)),
         'gradient_std': float(np.nanstd(grad)),
@@ -91,22 +91,22 @@ def extract_laplace_fingerprint(
 def extract_cohort_fingerprints(
     field_df: pl.DataFrame,
     cohort_id: str,
-    indicators: List[str]
+    signals: List[str]
 ) -> pd.DataFrame:
     """
-    Extract Laplace fingerprints for all indicators in a cohort.
+    Extract Laplace fingerprints for all signals in a cohort.
 
     Args:
         field_df: Laplace field DataFrame
         cohort_id: Cohort identifier
-        indicators: List of indicator IDs in the cohort
+        signals: List of signal IDs in the cohort
 
     Returns:
-        DataFrame with fingerprint features per indicator
+        DataFrame with fingerprint features per signal
     """
     fingerprints = []
 
-    for ind in indicators:
+    for ind in signals:
         fp = extract_laplace_fingerprint(field_df, ind, cohort_id)
         if fp is not None:
             fingerprints.append(fp)
@@ -165,7 +165,7 @@ def compute_mode_scores(mode_probabilities: np.ndarray) -> Dict[str, np.ndarray]
     Compute mode scores from GMM probability matrix.
 
     Args:
-        mode_probabilities: (n_indicators, n_modes) probability matrix
+        mode_probabilities: (n_signals, n_modes) probability matrix
 
     Returns:
         Dictionary with mode_id, mode_affinity, mode_entropy arrays
@@ -191,7 +191,7 @@ def discover_modes(
     field_df: pl.DataFrame,
     domain_id: str,
     cohort_id: str,
-    indicators: List[str],
+    signals: List[str],
     max_modes: int = 10,
 ) -> Optional[pd.DataFrame]:
     """
@@ -206,18 +206,18 @@ def discover_modes(
         field_df: Laplace field DataFrame
         domain_id: Domain identifier
         cohort_id: Cohort identifier
-        indicators: List of indicator IDs
+        signals: List of signal IDs
         max_modes: Maximum number of modes to discover
 
     Returns:
         DataFrame with mode assignments, or None if insufficient data
     """
-    if len(indicators) < 3:
-        logger.warning(f"Cohort {cohort_id}: insufficient indicators ({len(indicators)}) for mode discovery")
+    if len(signals) < 3:
+        logger.warning(f"Cohort {cohort_id}: insufficient signals ({len(signals)}) for mode discovery")
         return None
 
     # Extract fingerprints
-    fp_df = extract_cohort_fingerprints(field_df, cohort_id, indicators)
+    fp_df = extract_cohort_fingerprints(field_df, cohort_id, signals)
 
     if len(fp_df) < 3:
         logger.warning(f"Cohort {cohort_id}: insufficient fingerprints ({len(fp_df)})")
@@ -237,7 +237,7 @@ def discover_modes(
 
     # Find optimal number of modes
     best_n = find_optimal_modes(X_scaled, max_modes)
-    logger.info(f"Cohort {cohort_id}: discovered {best_n} modes from {len(fp_df)} indicators")
+    logger.info(f"Cohort {cohort_id}: discovered {best_n} modes from {len(fp_df)} signals")
 
     # Fit GMM
     gmm = GaussianMixture(
@@ -253,7 +253,7 @@ def discover_modes(
     scores = compute_mode_scores(probs)
 
     # Build result DataFrame
-    result = fp_df[['indicator_id', 'cohort_id']].copy()
+    result = fp_df[['signal_id', 'cohort_id']].copy()
     result['domain_id'] = domain_id
     result['mode_id'] = scores['mode_id']
     result['mode_affinity'] = scores['mode_affinity']
@@ -280,61 +280,61 @@ def run_modes(
     max_modes: int = 10,
 ) -> pd.DataFrame:
     """
-    Run mode discovery on indicator field data.
+    Run mode discovery on signal field data.
 
     Args:
-        input_path: Path to indicator_field.parquet
+        input_path: Path to signal_field.parquet
         output_path: Path to save cohort_modes.parquet
         domain_id: Domain identifier (REQUIRED)
         cohort_ids: Specific cohorts to process (None = all)
-        cohort_members: DataFrame mapping cohort_id -> indicator_id
+        cohort_members: DataFrame mapping cohort_id -> signal_id
         max_modes: Maximum modes per cohort
 
     Returns:
         Combined DataFrame of all mode assignments
     """
-    logger.info(f"Loading indicator field from {input_path}")
+    logger.info(f"Loading signal field from {input_path}")
     field_df = pl.read_parquet(input_path)
 
-    # Determine cohorts and their indicators
+    # Determine cohorts and their signals
     if cohort_members is not None:
         if cohort_ids is None:
             cohort_ids = cohort_members['cohort_id'].unique().to_list()
 
-        cohort_indicator_map = {
+        cohort_signal_map = {
             cid: cohort_members.filter(
                 pl.col('cohort_id') == cid
-            )['indicator_id'].to_list()
+            )['signal_id'].to_list()
             for cid in cohort_ids
         }
     elif 'cohort_id' in field_df.columns:
         if cohort_ids is None:
             cohort_ids = field_df['cohort_id'].unique().to_list()
 
-        cohort_indicator_map = {
+        cohort_signal_map = {
             cid: field_df.filter(
                 pl.col('cohort_id') == cid
-            )['indicator_id'].unique().to_list()
+            )['signal_id'].unique().to_list()
             for cid in cohort_ids
         }
     else:
-        # Single cohort = all indicators
-        all_indicators = field_df['indicator_id'].unique().to_list()
+        # Single cohort = all signals
+        all_signals = field_df['signal_id'].unique().to_list()
         cohort_ids = ['default']
-        cohort_indicator_map = {'default': all_indicators}
+        cohort_signal_map = {'default': all_signals}
 
     logger.info(f"Processing {len(cohort_ids)} cohorts in domain {domain_id}")
 
     # Process each cohort
     all_modes = []
     for cohort_id in cohort_ids:
-        indicators = cohort_indicator_map.get(cohort_id, [])
+        signals = cohort_signal_map.get(cohort_id, [])
 
-        if len(indicators) < 3:
+        if len(signals) < 3:
             continue
 
         modes_df = discover_modes(
-            field_df, domain_id, cohort_id, indicators, max_modes
+            field_df, domain_id, cohort_id, signals, max_modes
         )
 
         if modes_df is not None and len(modes_df) > 0:
@@ -356,22 +356,22 @@ def run_modes(
 
 def compute_affinity_weighted_features(
     modes_df: pl.DataFrame,
-    indicator_metrics: pl.DataFrame,
+    signal_metrics: pl.DataFrame,
     cohort_id: str,
 ) -> Dict[str, Any]:
     """
     Compute affinity-weighted mode features.
 
-    High-affinity indicators (strongly in their mode) dominate.
-    Low-affinity indicators (transitioning between modes) are downweighted.
+    High-affinity signals (strongly in their mode) dominate.
+    Low-affinity signals (transitioning between modes) are downweighted.
 
-    Problem solved: Binary mode assignment loses information. An indicator
+    Problem solved: Binary mode assignment loses information. An signal
     with 0.51 affinity and one with 0.99 affinity are treated identically.
     This function weights by affinity to preserve that information.
 
     Args:
         modes_df: Mode assignments with mode_affinity scores
-        indicator_metrics: Per-indicator characterization metrics (long format)
+        signal_metrics: Per-signal characterization metrics (long format)
         cohort_id: Cohort to process
 
     Returns:
@@ -452,7 +452,7 @@ def compute_affinity_weighted_features(
                     contrast = abs(features[key_i] - features[key_j])
                     features[f'contrast_{mode_i}_{mode_j}_{short_name}'] = float(contrast)
 
-    # Transitioning indicator analysis
+    # Transitioning signal analysis
     # High entropy = transitioning between modes = early warning
     median_entropy = modes_pd['mode_entropy'].median()
     high_entropy_mask = modes_pd['mode_entropy'] > median_entropy
@@ -460,7 +460,7 @@ def compute_affinity_weighted_features(
     features['n_transitioning'] = int(high_entropy_mask.sum())
     features['transitioning_ratio'] = float(high_entropy_mask.mean())
 
-    # Compare transitioning vs stable indicators
+    # Compare transitioning vs stable signals
     if high_entropy_mask.sum() > 0 and (~high_entropy_mask).sum() > 0:
         transitioning = modes_pd[high_entropy_mask]
         stable = modes_pd[~high_entropy_mask]
@@ -492,9 +492,9 @@ def compute_affinity_dynamics(
     cohort_id: str,
 ) -> Dict[str, Any]:
     """
-    Track how affinity changes over time for each indicator.
+    Track how affinity changes over time for each signal.
 
-    Dropping affinity = indicator leaving its mode = regime transition.
+    Dropping affinity = signal leaving its mode = regime transition.
 
     Args:
         modes_history: Signal topology of mode assignments (multiple windows)
@@ -519,14 +519,14 @@ def compute_affinity_dynamics(
 
     features = {'cohort_id': cohort_id}
 
-    # Per-indicator affinity trajectory
-    indicators = cohort_pd['indicator_id'].unique()
+    # Per-signal affinity trajectory
+    signals = cohort_pd['signal_id'].unique()
 
     affinity_trends = []
     mode_switches = []
 
-    for ind_id in indicators:
-        ind_data = cohort_pd[cohort_pd['indicator_id'] == ind_id].sort_values(time_col)
+    for ind_id in signals:
+        ind_data = cohort_pd[cohort_pd['signal_id'] == ind_id].sort_values(time_col)
 
         if len(ind_data) < 2:
             continue
@@ -552,8 +552,8 @@ def compute_affinity_dynamics(
 
     if mode_switches:
         features['total_mode_switches'] = int(np.sum(mode_switches))
-        features['indicators_with_switches'] = int(np.sum(np.array(mode_switches) > 0))
-        features['max_switches_per_indicator'] = int(np.max(mode_switches))
+        features['signals_with_switches'] = int(np.sum(np.array(mode_switches) > 0))
+        features['max_switches_per_signal'] = int(np.max(mode_switches))
         features['switch_ratio'] = float(np.mean(np.array(mode_switches) > 0))
 
     return features
@@ -578,7 +578,7 @@ NOMENCLATURE:
 
 OUTPUT:
   cohort_modes.parquet with columns:
-    - domain_id, cohort_id, indicator_id
+    - domain_id, cohort_id, signal_id
     - mode_id: Primary mode assignment (0, 1, 2, ...)
     - mode_affinity: Confidence in assignment (0-1)
     - mode_entropy: Uncertainty (lower = more certain)
@@ -589,7 +589,7 @@ KEY INSIGHT:
         '''
     )
 
-    parser.add_argument('--input', required=True, help='indicator_field.parquet')
+    parser.add_argument('--input', required=True, help='signal_field.parquet')
     parser.add_argument('--output', required=True, help='cohort_modes.parquet')
     parser.add_argument('--domain', required=True, help='Domain ID (REQUIRED, no default)')
     parser.add_argument('--cohort', action='append', dest='cohorts', help='Cohort ID(s) to process')

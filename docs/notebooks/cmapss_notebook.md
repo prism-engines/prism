@@ -2,7 +2,7 @@
 
 ## Dataset Versions
 
-| Domain | Datasets | Units | Indicators | Best CV RMSE | Model |
+| Domain | Datasets | Units | Signals | Best CV RMSE | Model |
 |--------|----------|-------|------------|--------------|-------|
 | **C_MAPSS_v1** | FD001 only | 100 | 2,500 | **7.38** | Lasso |
 | **C_MAPSS_v2** | FD001-FD004 | 709 | 17,725 | **12.25** | GBM |
@@ -57,7 +57,7 @@
 
 *Note: This section uses the C_MAPSS_v1 domain (FD001 processed separately). Values differ from FD001 subset within v2 due to different window/stride configuration.*
 
-## Leading Indicators (FD001)
+## Leading Signals (FD001)
 
 *Retrospective analysis using known failure times — NOT predictive features.*
 
@@ -162,7 +162,7 @@
 
 **OSCILLATORY classification** requires periodicity > 0.5.
 
-In FD001, 473 indicator signal topology (19%) have periodicity > 0.5. These are concentrated in:
+In FD001, 473 signal signal topology (19%) have periodicity > 0.5. These are concentrated in:
 - **op3** (operational setting): mean periodicity 0.64
 - **T2** (inlet temperature): mean periodicity 0.64
 - **PCNfR** (corrected fan speed): mean periodicity 0.64
@@ -190,7 +190,7 @@ The OSCILLATORY patterns in FD001 reflect environmental/operational sensors, not
 
 # Physics Validation Results (Full C_MAPSS_v2)
 
-## Leading Indicators
+## Leading Signals
 
 *Retrospective analysis using known failure times — NOT predictive features.*
 
@@ -341,10 +341,10 @@ The OSCILLATORY patterns in FD001 reflect environmental/operational sensors, not
 
 ## Overview
 
-Cohort geometry computes structural metrics across indicator vectors within each cohort-window.
+Cohort geometry computes structural metrics across signal vectors within each cohort-window.
 
 **Processing:**
-- Input: 19.7M indicator field rows
+- Input: 19.7M signal field rows
 - Windows: 8,345
 - Cohorts: 98
 - Output: 1,696 cohort-window geometry snapshots
@@ -418,8 +418,8 @@ Each signal topology is characterized with **6 continuous axes** + **1 discontin
 ```
 data/C_MAPSS_v2/
 ├── vector/
-│   ├── indicator.parquet         # 19.8M rows (51 metrics per indicator)
-│   ├── indicator_field.parquet   # 19.7M rows (Laplace field)
+│   ├── signal.parquet         # 19.8M rows (51 metrics per signal)
+│   ├── signal_field.parquet   # 19.7M rows (Laplace field)
 │   └── cohort_field.parquet      # 32,224 rows
 ├── geometry/
 │   └── cohort.parquet            # 1,696 rows
@@ -428,15 +428,15 @@ data/C_MAPSS_v2/
 │   ├── feature_importance.parquet
 │   └── prism_features.parquet    # Feature matrix (700 × 24)
 └── raw/
-    └── characterization.parquet  # 17,725 indicators
+    └── characterization.parquet  # 17,725 signals
 
 data/C_MAPSS_v1/
 ├── vector/
-│   ├── indicator.parquet
-│   └── indicator_field.parquet   # 1.05M rows
+│   ├── signal.parquet
+│   └── signal_field.parquet   # 1.05M rows
 ├── summary/
 │   ├── hybrid_results.parquet
 │   └── prism_features.parquet
 └── raw/
-    └── characterization.parquet  # 2,500 indicators
+    └── characterization.parquet  # 2,500 signals
 ```

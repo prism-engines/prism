@@ -6,15 +6,15 @@ Reusable computation modules that can be called inline by entry points.
 These are NOT standalone entry points - they're building blocks.
 
 Modules:
-    characterize: Inline characterization of indicators
+    characterize: Inline characterization of signals
     laplace: Inline Laplace field computation
     modes: Behavioral mode discovery from Laplace signatures
     wavelet_microscope: Frequency-band degradation detection
-    prefilter: O(n) Laplacian pre-filter for flat/duplicate indicators
+    prefilter: O(n) Laplacian pre-filter for flat/duplicate signals
 """
 
 from prism.modules.characterize import (
-    characterize_indicator,
+    characterize_signal,
     CharacterizationResult,
 )
 
@@ -51,7 +51,7 @@ from prism.modules.prefilter import (
 
 __all__ = [
     # Characterize
-    'characterize_indicator',
+    'characterize_signal',
     'CharacterizationResult',
     # Laplace
     'compute_laplace_for_series',

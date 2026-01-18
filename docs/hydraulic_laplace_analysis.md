@@ -8,9 +8,9 @@
 
 ## Executive Summary
 
-This analysis examines the divergence field topology of 17 hydraulic system indicators across two operational states: **DEGRADED** and **HEALTHY**. The Laplace field analysis reveals fundamentally different energy/information flow patterns between system states, providing a geometric signature for system health assessment.
+This analysis examines the divergence field topology of 17 hydraulic system signals across two operational states: **DEGRADED** and **HEALTHY**. The Laplace field analysis reveals fundamentally different energy/information flow patterns between system states, providing a geometric signature for system health assessment.
 
-**Key Finding:** In degraded operation, the system exhibits a coherent SOURCE-dominated topology with systematic positive divergence across most sensors. In healthy operation, the field becomes more balanced with several indicators transitioning to SINK behavior—suggesting healthy systems dissipate energy more uniformly.
+**Key Finding:** In degraded operation, the system exhibits a coherent SOURCE-dominated topology with systematic positive divergence across most sensors. In healthy operation, the field becomes more balanced with several signals transitioning to SINK behavior—suggesting healthy systems dissipate energy more uniformly.
 
 ---
 
@@ -26,9 +26,9 @@ The analysis computes divergence metrics across sliding windows of the hydraulic
 
 ## System State Comparison
 
-### DEGRADED State (n ≈ 25,000 observations per indicator)
+### DEGRADED State (n ≈ 25,000 observations per signal)
 
-| Indicator | Total Divergence | Mean Divergence | Topology Role |
+| Signal | Total Divergence | Mean Divergence | Topology Role |
 |-----------|------------------|-----------------|---------------|
 | HYD_EPS1  | 10,443.35        | 0.4188          | SOURCE        |
 | HYD_TS4   | 350.05           | 0.0140          | SOURCE        |
@@ -50,15 +50,15 @@ The analysis computes divergence metrics across sliding windows of the hydraulic
 | HYD_STABLE_FLAG | -191.05     | -0.0077         | SINK          |
 
 **Degraded State Characteristics:**
-- 15 of 18 indicators act as SOURCEs (83%)
+- 15 of 18 signals act as SOURCEs (83%)
 - Only 1 SINK (HYD_STABLE_FLAG) and 2 NEUTRAL
-- HYD_EPS1 dominates with divergence 30x higher than next indicator
+- HYD_EPS1 dominates with divergence 30x higher than next signal
 - High variance in HYD_EPS1 (std: 68,108) indicates instability
 - Accelerating windows slightly exceed decelerating (avg ratio: 1.05)
 
-### HEALTHY State (n ≈ 192-204 observations per indicator)
+### HEALTHY State (n ≈ 192-204 observations per signal)
 
-| Indicator | Total Divergence | Mean Divergence | Topology Role |
+| Signal | Total Divergence | Mean Divergence | Topology Role |
 |-----------|------------------|-----------------|---------------|
 | HYD_EPS1  | 717.54           | 3.5174          | SOURCE        |
 | HYD_STABLE_FLAG | 293.50      | 1.6676          | SOURCE        |
@@ -83,12 +83,12 @@ The analysis computes divergence metrics across sliding windows of the hydraulic
 - 13 SOURCEs and 5 SINKs (28% SINK vs 6% in degraded)
 - HYD_STABLE_FLAG flips from SINK → SOURCE (critical diagnostic)
 - Temperature sensors (TS1, TS3) become SINKs in healthy state
-- Much lower variance across all indicators
+- Much lower variance across all signals
 - More balanced accelerating/decelerating window ratios
 
 ---
 
-## Critical Diagnostic Indicators
+## Critical Diagnostic Signals
 
 ### 1. HYD_STABLE_FLAG (Most Diagnostic)
 - **Degraded:** SINK (-191.05 total, -0.0077 mean)
@@ -140,7 +140,7 @@ SOURCE-dominated (83%)            Balanced (72% SOURCE, 28% SINK)
 
 3. **HYD_STABLE_FLAG topology role is binary diagnostic:** SINK = degraded, SOURCE = healthy.
 
-4. **HYD_EPS1 variance is the leading instability indicator** with 1,650x higher standard deviation in degraded state.
+4. **HYD_EPS1 variance is the leading instability signal** with 1,650x higher standard deviation in degraded state.
 
 5. **Field topology provides geometric signature** for predictive maintenance: transition from balanced to SOURCE-dominated precedes degradation.
 
@@ -148,7 +148,7 @@ SOURCE-dominated (83%)            Balanced (72% SOURCE, 28% SINK)
 
 ## Recommendations
 
-- Monitor HYD_STABLE_FLAG topology role as primary health indicator
+- Monitor HYD_STABLE_FLAG topology role as primary health signal
 - Track HYD_EPS1 divergence variance for early warning
 - Alert when temperature sensors (TS1, TS3) transition from SINK → SOURCE
 - Consider field topology balance ratio as continuous health metric

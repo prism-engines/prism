@@ -121,12 +121,12 @@ def get_mode_features(domain: str) -> List[str]:
     ])
 
 
-def get_indicator_patterns(domain: str) -> Dict[str, str]:
-    """Get indicator naming patterns for domain."""
+def get_signal_patterns(domain: str) -> Dict[str, str]:
+    """Get signal naming patterns for domain."""
     config = get_domain_config(domain)
     return {
-        'prefix': config.get('indicator_prefix', ''),
-        'fault_indicator': config.get('fault_indicator', ''),
+        'prefix': config.get('signal_prefix', ''),
+        'fault_signal': config.get('fault_signal', ''),
         'exclude_pattern': config.get('exclude_pattern', ''),
     }
 
@@ -138,10 +138,10 @@ def get_precursor_mode(domain: str) -> int:
     return clustering.get('precursor_mode', 1)
 
 
-def get_precursor_indicators(domain: str) -> List[str]:
-    """Get known precursor indicators for domain."""
+def get_precursor_signals(domain: str) -> List[str]:
+    """Get known precursor signals for domain."""
     config = get_domain_config(domain)
-    return config.get('precursor_indicators', [])
+    return config.get('precursor_signals', [])
 
 
 def print_config(domain: str):
@@ -153,9 +153,9 @@ def print_config(domain: str):
     print(f"Description: {config.get('description', 'N/A')}")
     print()
 
-    print("Indicator Patterns:")
-    print(f"  Prefix:          {config.get('indicator_prefix', 'N/A')}")
-    print(f"  Fault Indicator: {config.get('fault_indicator', 'N/A')}")
+    print("Signal Patterns:")
+    print(f"  Prefix:          {config.get('signal_prefix', 'N/A')}")
+    print(f"  Fault Signal: {config.get('fault_signal', 'N/A')}")
     print(f"  Exclude Pattern: {config.get('exclude_pattern', 'N/A')}")
     print()
 

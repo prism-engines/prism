@@ -54,12 +54,12 @@ defaults:
 domains:
   cheme:
     description: "Tennessee Eastman Process (TEP)"
-    indicator_prefix: "TEP_"
-    fault_indicator: "TEP_FAULT"
+    signal_prefix: "TEP_"
+    fault_signal: "TEP_FAULT"
     exclude_pattern: "FAULT"  # Exclude fault label from analysis
 
     # TEP-specific: Mode 1 dominated by XMEAS03 (D Feed)
-    precursor_indicators:
+    precursor_signals:
       - "TEP_XMEAS03"     # D Feed - upstream reactor input
 
     # Override defaults if needed
@@ -69,8 +69,8 @@ domains:
 
   turbofan:
     description: "CMAPSS Turbofan Engine Degradation"
-    indicator_prefix: "CMAPSS_"
-    fault_indicator: "CMAPSS_RUL"  # Remaining Useful Life
+    signal_prefix: "CMAPSS_"
+    fault_signal: "CMAPSS_RUL"  # Remaining Useful Life
     exclude_pattern: "RUL"
 
     # Turbofan-specific settings
@@ -85,11 +85,11 @@ domains:
   # Template for new domains
   _template:
     description: "Domain description"
-    indicator_prefix: "PREFIX_"
-    fault_indicator: "PREFIX_LABEL"
+    signal_prefix: "PREFIX_"
+    fault_signal: "PREFIX_LABEL"
     exclude_pattern: "LABEL"
 
     # Optional overrides
     windows: {}
     thresholds: {}
-    precursor_indicators: []
+    precursor_signals: []

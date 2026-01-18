@@ -42,7 +42,7 @@ class GrangerEngine(BaseEngine):
     """
     Granger Causality engine.
     
-    Tests pairwise Granger causality between indicators.
+    Tests pairwise Granger causality between signals.
     
     Outputs:
         - results.granger_causality: Pairwise causality tests
@@ -69,7 +69,7 @@ class GrangerEngine(BaseEngine):
         Run Granger causality analysis.
         
         Args:
-            df: Indicator data
+            df: Signal data
             run_id: Unique run identifier
             max_lag: Maximum lag to test (default 5)
             significance: Significance level (default 0.05)
@@ -79,8 +79,8 @@ class GrangerEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = list(df_clean.columns)
-        n = len(indicators)
+        signals = list(df_clean.columns)
+        n = len(signals)
         
         window_start, window_end = get_window_dates(df_clean)
         
@@ -94,8 +94,8 @@ class GrangerEngine(BaseEngine):
         results = []
         significant_count = 0
         
-        for i, ind1 in enumerate(indicators):
-            for j, ind2 in enumerate(indicators):
+        for i, ind1 in enumerate(signals):
+            for j, ind2 in enumerate(signals):
                 if i == j:
                     continue
                 
@@ -113,8 +113,8 @@ class GrangerEngine(BaseEngine):
                         significant_count += 1
                     
                     results.append({
-                        "indicator_from": ind1,
-                        "indicator_to": ind2,
+                        "signal_from": ind1,
+                        "signal_to": ind2,
                         "window_start": window_start,
                         "window_end": window_end,
                         "lag": int(optimal_lag),
@@ -129,14 +129,14 @@ class GrangerEngine(BaseEngine):
         # Note: Detailed pairwise results stored internally
         # Summary metrics returned to geometry.py → results.geometry
         # The store_results call is disabled to avoid schema mismatch
-        # with results.granger_causality (indicator_from vs indicator_1)
+        # with results.granger_causality (signal_from vs signal_1)
         
         # Bonferroni correction info
         n_tests = n * (n - 1)
         bonferroni_threshold = significance / n_tests if n_tests > 0 else significance
         
         metrics = {
-            "n_indicators": n,
+            "n_signals": n,
             "n_tests": len(results),
             "significant_pairs": significant_count,
             "significance_level": significance,
@@ -259,8 +259,8 @@ class GrangerEngine(BaseEngine):
 def compute_granger_with_derivation(
     x: np.ndarray,
     y: np.ndarray,
-    indicator_x: str = "X",
-    indicator_y: str = "Y",
+    signal_x: str = "X",
+    signal_y: str = "Y",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -274,7 +274,7 @@ def compute_granger_with_derivation(
     Args:
         x: Signal X (potential cause)
         y: Signal Y (potential effect)
-        indicator_x, indicator_y: Names for the indicators
+        signal_x, signal_y: Names for the signals
         window_id: Window identifier
         max_lag: Maximum lag to test
 
@@ -288,7 +288,7 @@ def compute_granger_with_derivation(
     deriv = Derivation(
         engine_name="granger_causality",
         method_name="Granger Causality F-Test",
-        indicator_id=f"{indicator_x}_causes_{indicator_y}",
+        signal_id=f"{signal_x}_causes_{signal_y}",
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -306,7 +306,7 @@ def compute_granger_with_derivation(
     deriv.add_step(
         title="Input Signal Topology",
         equation="X = {x₁, ..., xₙ}, Y = {y₁, ..., yₙ}",
-        calculation=f"X ({indicator_x}): n={len(x)}, mean={np.mean(x):.4f}, std={np.std(x):.4f}\nY ({indicator_y}): n={len(y)}, mean={np.mean(y):.4f}, std={np.std(y):.4f}\n\nQuestion: Does X Granger-cause Y?\n(Do past values of X help predict Y beyond Y's own history?)",
+        calculation=f"X ({signal_x}): n={len(x)}, mean={np.mean(x):.4f}, std={np.std(x):.4f}\nY ({signal_y}): n={len(y)}, mean={np.mean(y):.4f}, std={np.std(y):.4f}\n\nQuestion: Does X Granger-cause Y?\n(Do past values of X help predict Y beyond Y's own history?)",
         result=n,
         result_name="n",
         notes="Granger causality ≠ true causality, but tests predictive relationship"
@@ -441,15 +441,15 @@ def compute_granger_with_derivation(
 
     # Interpretation
     if best_p < 0.01:
-        interp = f"**Strong evidence** that {indicator_x} Granger-causes {indicator_y} (p={best_p:.4f} < 0.01)."
-        interp += f" Past values of {indicator_x} significantly improve predictions of {indicator_y}."
+        interp = f"**Strong evidence** that {signal_x} Granger-causes {signal_y} (p={best_p:.4f} < 0.01)."
+        interp += f" Past values of {signal_x} significantly improve predictions of {signal_y}."
     elif best_p < 0.05:
-        interp = f"**Moderate evidence** that {indicator_x} Granger-causes {indicator_y} (p={best_p:.4f} < 0.05)."
+        interp = f"**Moderate evidence** that {signal_x} Granger-causes {signal_y} (p={best_p:.4f} < 0.05)."
     elif best_p < 0.10:
         interp = f"**Weak evidence** of Granger causality (p={best_p:.4f}). Marginally significant at 10% level."
     else:
-        interp = f"**No significant evidence** that {indicator_x} Granger-causes {indicator_y} (p={best_p:.4f})."
-        interp += f" Past values of {indicator_x} do not improve Y predictions beyond Y's own history."
+        interp = f"**No significant evidence** that {signal_x} Granger-causes {signal_y} (p={best_p:.4f})."
+        interp += f" Past values of {signal_x} do not improve Y predictions beyond Y's own history."
 
     interp += f" Optimal lag = {best_lag} periods."
 

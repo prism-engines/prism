@@ -244,19 +244,19 @@ PRISM successfully distinguishes cardiac rhythm regimes:
 data/physionet_mitdb/
 ├── raw/
 │   ├── observations.parquet   # ECG signal topology (432,000 points)
-│   └── indicators.parquet     # Segment metadata
+│   └── signals.parquet     # Segment metadata
 ├── config/
 │   ├── cohorts.parquet
 │   └── cohort_members.parquet
 └── vector/
-    └── indicator.parquet      # PRISM metrics
+    └── signal.parquet      # PRISM metrics
 ```
 
-### Indicator Schema
+### Signal Schema
 
 | Column | Description |
 |--------|-------------|
-| indicator_id | mitdb_{record}\_seg{segment} |
+| signal_id | mitdb_{record}\_seg{segment} |
 | record | MIT-BIH record number (100-234) |
 | segment | 30-second segment index |
 | regime | normal, mild_arrhythmia, severe_arrhythmia |

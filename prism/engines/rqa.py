@@ -184,7 +184,7 @@ def _vertical_lines(R: np.ndarray, min_length: int = 2) -> np.ndarray:
 def compute_rqa(values: np.ndarray, embedding_dim: int = 3, time_delay: int = 1,
                 threshold_percentile: float = 10.0) -> dict:
     """
-    Compute RQA metrics for a single indicator.
+    Compute RQA metrics for a single signal.
 
     Args:
         values: Array of observed values
@@ -255,7 +255,7 @@ def compute_rqa(values: np.ndarray, embedding_dim: int = 3, time_delay: int = 1,
 
 def compute_rqa_with_derivation(
     values: np.ndarray,
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -274,7 +274,7 @@ def compute_rqa_with_derivation(
     deriv = Derivation(
         engine_name="rqa",
         method_name="Recurrence Quantification Analysis",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -531,7 +531,7 @@ class RQAEngine(BaseEngine):
     capturing determinism, laminarity, and complexity.
 
     Outputs:
-        - results.rqa_metrics: Per-indicator RQA metrics
+        - results.rqa_metrics: Per-signal RQA metrics
     """
 
     name = "rqa"
@@ -556,7 +556,7 @@ class RQAEngine(BaseEngine):
         Run RQA analysis.
 
         Args:
-            df: Normalized indicator data
+            df: Normalized signal data
             run_id: Unique run identifier
             embedding_dim: Embedding dimension (default 3)
             time_delay: Time delay for embedding (default 1)
@@ -567,27 +567,27 @@ class RQAEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = df_clean.columns.tolist()
-        n_indicators = len(indicators)
+        signals = df_clean.columns.tolist()
+        n_signals = len(signals)
 
         window_start = df_clean.index.min().date()
         window_end = df_clean.index.max().date()
 
-        # Compute RQA for each indicator
+        # Compute RQA for each signal
         records = []
         all_rr = []
         all_det = []
         all_lam = []
         all_entropy = []
 
-        for indicator in indicators:
-            x = df_clean[indicator].values
+        for signal in signals:
+            x = df_clean[signal].values
 
             # Embed signal topology
             embedded = _embed_signal_topology(x, embedding_dim, time_delay)
 
             if embedded.shape[0] < 10:
-                logger.warning(f"Insufficient data for RQA on {indicator}")
+                logger.warning(f"Insufficient data for RQA on {signal}")
                 continue
 
             # Determine threshold from distance distribution
@@ -622,7 +622,7 @@ class RQAEngine(BaseEngine):
             all_entropy.append(rqa["entropy"])
 
             records.append({
-                "indicator_id": indicator,
+                "signal_id": signal,
                 "window_start": window_start,
                 "window_end": window_end,
                 "recurrence_rate": rqa["recurrence_rate"],
@@ -644,7 +644,7 @@ class RQAEngine(BaseEngine):
 
         # Summary metrics
         metrics = {
-            "n_indicators": n_indicators,
+            "n_signals": n_signals,
             "n_samples": len(df_clean),
             "embedding_dim": embedding_dim,
             "time_delay": time_delay,
@@ -656,7 +656,7 @@ class RQAEngine(BaseEngine):
         }
 
         logger.info(
-            f"RQA complete: {n_indicators} indicators, "
+            f"RQA complete: {n_signals} signals, "
             f"avg_det={metrics['avg_determinism']:.4f}, "
             f"avg_lam={metrics['avg_laminarity']:.4f}"
         )

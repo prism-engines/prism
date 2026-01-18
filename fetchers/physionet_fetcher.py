@@ -144,7 +144,7 @@ def fetch_mitdb(output_dir: Path, n_records: int = 10, segment_seconds: int = 30
                     else:
                         regime = "severe_arrhythmia"
 
-                indicator_id = f"mitdb_{record_name}_seg{seg_idx}"
+                signal_id = f"mitdb_{record_name}_seg{seg_idx}"
 
                 # Downsample signal for PRISM (every 10th sample)
                 downsampled = segment[::10]
@@ -152,14 +152,14 @@ def fetch_mitdb(output_dir: Path, n_records: int = 10, segment_seconds: int = 30
                 # Create observations
                 for t, value in enumerate(downsampled):
                     obs_rows.append({
-                        "indicator_id": indicator_id,
+                        "signal_id": signal_id,
                         "obs_date": base_date + timedelta(seconds=t * 10 / fs),
                         "value": float(value),
                     })
 
-                # Create indicator metadata
+                # Create signal metadata
                 ind_rows.append({
-                    "indicator_id": indicator_id,
+                    "signal_id": signal_id,
                     "record": record_name,
                     "segment": seg_idx,
                     "regime": regime,
@@ -183,7 +183,7 @@ def fetch_mitdb(output_dir: Path, n_records: int = 10, segment_seconds: int = 30
     ind_df = pl.DataFrame(ind_rows)
 
     obs_df.write_parquet(output_dir / "raw" / "observations.parquet")
-    ind_df.write_parquet(output_dir / "raw" / "indicators.parquet")
+    ind_df.write_parquet(output_dir / "raw" / "signals.parquet")
 
     # Create cohorts
     cohorts = pl.DataFrame([{
@@ -194,8 +194,8 @@ def fetch_mitdb(output_dir: Path, n_records: int = 10, segment_seconds: int = 30
     cohorts.write_parquet(output_dir / "config" / "cohorts.parquet")
 
     cohort_members = pl.DataFrame([
-        {"cohort_id": "physionet_mitdb", "indicator_id": ind_id}
-        for ind_id in ind_df["indicator_id"].to_list()
+        {"cohort_id": "physionet_mitdb", "signal_id": ind_id}
+        for ind_id in ind_df["signal_id"].to_list()
     ])
     cohort_members.write_parquet(output_dir / "config" / "cohort_members.parquet")
 
@@ -204,15 +204,15 @@ def fetch_mitdb(output_dir: Path, n_records: int = 10, segment_seconds: int = 30
     print("Download complete!")
     print("=" * 60)
     print(f"Observations: {len(obs_df)}")
-    print(f"Indicators: {len(ind_df)}")
+    print(f"Signals: {len(ind_df)}")
     print()
 
     print("Regime summary:")
     print(ind_df.group_by("regime").len())
     print()
 
-    print("Sample indicators:")
-    print(ind_df.select(["indicator_id", "regime", "arrhythmia_ratio", "n_points"]).head(10))
+    print("Sample signals:")
+    print(ind_df.select(["signal_id", "regime", "arrhythmia_ratio", "n_points"]).head(10))
 
 
 def main():

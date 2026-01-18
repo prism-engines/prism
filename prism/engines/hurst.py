@@ -56,7 +56,7 @@ METADATA = EngineMetadata(
 
 def compute_hurst(values: np.ndarray) -> dict:
     """
-    Measure Hurst exponent of a single indicator.
+    Measure Hurst exponent of a single signal.
 
     Args:
         values: Array of observed values (native sampling)
@@ -81,7 +81,7 @@ def compute_hurst(values: np.ndarray) -> dict:
 
 def compute_hurst_with_derivation(
     values: np.ndarray,
-    indicator_id: str = "unknown",
+    signal_id: str = "unknown",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -97,7 +97,7 @@ def compute_hurst_with_derivation(
     deriv = Derivation(
         engine_name="hurst_exponent",
         method_name="Rescaled Range (R/S) Analysis",
-        indicator_id=indicator_id,
+        signal_id=signal_id,
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -375,7 +375,7 @@ class HurstEngine(BaseEngine):
     Computes Hurst exponent using R/S (rescaled range) analysis.
 
     Outputs:
-        - results.geometry_fingerprints: Hurst values per indicator
+        - results.geometry_fingerprints: Hurst values per signal
     """
 
     name = "hurst"
@@ -398,7 +398,7 @@ class HurstEngine(BaseEngine):
         Run Hurst exponent analysis.
         
         Args:
-            df: Indicator data (levels, not returns)
+            df: Signal data (levels, not returns)
             run_id: Unique run identifier
             min_window: Minimum window for R/S analysis
             max_window: Maximum window (default: len/4)
@@ -407,7 +407,7 @@ class HurstEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = list(df_clean.columns)
+        signals = list(df_clean.columns)
         
         window_start = df_clean.index.min().date()
         window_end = df_clean.index.max().date()
@@ -415,11 +415,11 @@ class HurstEngine(BaseEngine):
         if max_window is None:
             max_window = len(df_clean) // 4
         
-        # Compute Hurst for each indicator
+        # Compute Hurst for each signal
         hurst_results = []
         
-        for indicator in indicators:
-            series = df_clean[indicator].values
+        for signal in signals:
+            series = df_clean[signal].values
             
             try:
                 h = self._compute_hurst_rs(series, min_window, max_window)
@@ -433,15 +433,15 @@ class HurstEngine(BaseEngine):
                     behavior = "random_walk"
                 
                 hurst_results.append({
-                    "indicator_id": indicator,
+                    "signal_id": signal,
                     "hurst": float(h),
                     "behavior": behavior,
                 })
                 
             except Exception as e:
-                logger.warning(f"Hurst calculation failed for {indicator}: {e}")
+                logger.warning(f"Hurst calculation failed for {signal}: {e}")
                 hurst_results.append({
-                    "indicator_id": indicator,
+                    "signal_id": signal,
                     "hurst": np.nan,
                     "behavior": "unknown",
                 })
@@ -456,7 +456,7 @@ class HurstEngine(BaseEngine):
             behaviors = [r["behavior"] for r in valid_results]
             
             metrics = {
-                "n_indicators": len(indicators),
+                "n_signals": len(signals),
                 "avg_hurst": float(np.mean(hurst_values)),
                 "std_hurst": float(np.std(hurst_values)),
                 "trending_count": behaviors.count("trending"),
@@ -466,7 +466,7 @@ class HurstEngine(BaseEngine):
                 "max_hurst": float(np.max(hurst_values)),
             }
         else:
-            metrics = {"n_indicators": len(indicators), "error": "all calculations failed"}
+            metrics = {"n_signals": len(signals), "error": "all calculations failed"}
         
         logger.info(
             f"Hurst analysis complete: avg H={metrics.get('avg_hurst', 'N/A'):.3f}"
@@ -556,7 +556,7 @@ class HurstEngine(BaseEngine):
         records = []
         for r in results:
             records.append({
-                "indicator_id": r["indicator_id"],
+                "signal_id": r["signal_id"],
                 "window_start": window_start,
                 "window_end": window_end,
                 "dimension": "hurst",
@@ -564,7 +564,7 @@ class HurstEngine(BaseEngine):
                 "run_id": run_id,
             })
             records.append({
-                "indicator_id": r["indicator_id"],
+                "signal_id": r["signal_id"],
                 "window_start": window_start,
                 "window_end": window_end,
                 "dimension": "persistence_class",

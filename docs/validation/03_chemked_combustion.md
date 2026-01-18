@@ -61,12 +61,12 @@ This means log(τ) vs 1/T should be linear. The R² of this linear fit indicates
 |--------|-------|
 | Total YAML files | 351 |
 | Total datapoints | 1,684 |
-| Valid indicators (≥10 points) | 33 |
+| Valid signals (≥10 points) | 33 |
 | Total observations | 1,529 |
 
 ### Fuels Included
 
-| Fuel | Indicators | Mean Arrhenius R² |
+| Fuel | Signals | Mean Arrhenius R² |
 |------|------------|-------------------|
 | n-heptane (nC7H16) | 7 | 0.69 |
 | toluene | 4 | 0.70 |
@@ -175,19 +175,19 @@ data/chemked/                    # Raw ChemKED repository
 data/chemked_prism/
 ├── raw/
 │   ├── observations.parquet     # 1,529 ignition delay measurements
-│   └── indicators.parquet       # 47 fuel/condition combinations
+│   └── signals.parquet       # 47 fuel/condition combinations
 ├── config/
 │   ├── cohorts.parquet
 │   └── cohort_members.parquet
 └── vector/
-    └── indicator.parquet        # PRISM metrics
+    └── signal.parquet        # PRISM metrics
 ```
 
-### Indicator Schema
+### Signal Schema
 
 | Column | Description |
 |--------|-------------|
-| indicator_id | Unique ID (fuel_phi) |
+| signal_id | Unique ID (fuel_phi) |
 | fuel | Fuel name |
 | equivalence_ratio | Fuel/air ratio (φ) |
 | n_points | Number of datapoints |

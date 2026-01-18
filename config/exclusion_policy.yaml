@@ -2,7 +2,7 @@
 exclusion_policy:
   mode: observe  # observe | warn | exclude
   failure_threshold: 0.50
-  min_indicators_required: 5
+  min_signals_required: 5
   strictness_profile: balanced  # permissive | balanced | strict
 
 # Audit settings

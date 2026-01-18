@@ -15,7 +15,7 @@ When anchors move, it's a regime shift.
 When only scouts move, it's noise.
 
 Output Tables:
-    geometry.indicators   - Per indicator: barycenter, dispersion, alignment
+    geometry.signals   - Per signal: barycenter, dispersion, alignment
     geometry.pairs        - Per pair: weighted distance, correlation
     geometry.structure    - Per snapshot: PCA, clusters, system dispersion
     geometry.displacement - Per transition: kinetic energy, conviction
@@ -78,8 +78,8 @@ class GeometryEngine:
         self.feature_cols = None
 
         # Paths to parquet files
-        self._vectors_path = get_parquet_path('vector', 'indicators')
-        self._geometry_indicators_path = get_parquet_path('geometry', 'indicators')
+        self._vectors_path = get_parquet_path('vector', 'signals')
+        self._geometry_signals_path = get_parquet_path('geometry', 'signals')
         self._geometry_pairs_path = get_parquet_path('geometry', 'pairs')
         self._geometry_structure_path = get_parquet_path('geometry', 'structure')
         self._geometry_displacement_path = get_parquet_path('geometry', 'displacement')
@@ -99,7 +99,7 @@ class GeometryEngine:
             schema = lf.schema
 
             metadata_cols = {
-                'indicator_id', 'window_days', 'window_end', 'window_start',
+                'signal_id', 'window_days', 'window_end', 'window_start',
                 'cohort', 'n_observations', 'computed_at', 'run_id',
                 'obs_date', 'target_obs', 'engine', 'metric_name', 'metric_value'
             }
@@ -122,9 +122,9 @@ class GeometryEngine:
 
     def get_vector_matrix(self, window_end: date) -> pd.DataFrame:
         """
-        Fetch behavioral vectors for all indicators at a given snapshot.
+        Fetch behavioral vectors for all signals at a given snapshot.
 
-        Returns DataFrame with columns: indicator_id, window_days, vector (np.array)
+        Returns DataFrame with columns: signal_id, window_days, vector (np.array)
         """
         feature_cols = self._discover_feature_columns()
         if not feature_cols:
@@ -147,11 +147,11 @@ class GeometryEngine:
         if not available_features:
             return pd.DataFrame()
 
-        select_cols = ['indicator_id', 'window_days'] + available_features
+        select_cols = ['signal_id', 'window_days'] + available_features
         df_pl = df_pl.select([c for c in select_cols if c in df_pl.columns])
 
-        # Sort by indicator_id and window_days
-        df_pl = df_pl.sort(['indicator_id', 'window_days'])
+        # Sort by signal_id and window_days
+        df_pl = df_pl.sort(['signal_id', 'window_days'])
 
         # Convert to pandas for scipy/sklearn compatibility
         df = df_pl.to_pandas()
@@ -164,7 +164,7 @@ class GeometryEngine:
         feature_matrix = df[available_features].fillna(0).values
         df['vector'] = [np.array(row) for row in feature_matrix]
 
-        return df[['indicator_id', 'window_days', 'vector']]
+        return df[['signal_id', 'window_days', 'vector']]
 
     def compute_barycenter(self, vectors: Dict[int, np.ndarray]) -> Tuple[Optional[np.ndarray], Optional[float], Optional[float]]:
         """
@@ -214,28 +214,28 @@ class GeometryEngine:
             logger.warning(f"No vectors found for {window_end}")
             return {'status': 'no_data'}
 
-        # Group vectors by indicator
-        indicator_groups: Dict[str, Dict[int, np.ndarray]] = {}
+        # Group vectors by signal
+        signal_groups: Dict[str, Dict[int, np.ndarray]] = {}
         for _, row in df.iterrows():
-            iid = row['indicator_id']
-            if iid not in indicator_groups:
-                indicator_groups[iid] = {}
-            indicator_groups[iid][row['window_days']] = row['vector']
+            iid = row['signal_id']
+            if iid not in signal_groups:
+                signal_groups[iid] = {}
+            signal_groups[iid][row['window_days']] = row['vector']
 
         # =====================================================================
         # PHASE 1: INDICATOR GEOMETRY
         # =====================================================================
-        indicator_data: Dict[str, Dict] = {}
+        signal_data: Dict[str, Dict] = {}
         barycenters: List[np.ndarray] = []
-        indicator_records = []
+        signal_records = []
 
-        for iid, windows in indicator_groups.items():
+        for iid, windows in signal_groups.items():
             barycenter, dispersion, alignment = self.compute_barycenter(windows)
 
             if barycenter is None:
                 continue
 
-            indicator_data[iid] = {
+            signal_data[iid] = {
                 'barycenter': barycenter,
                 'dispersion': dispersion,
                 'alignment': alignment,
@@ -248,8 +248,8 @@ class GeometryEngine:
             v126 = windows.get(126, np.zeros_like(barycenter)).tolist()
             v252 = windows.get(252, np.zeros_like(barycenter)).tolist()
 
-            indicator_records.append({
-                'indicator_id': iid,
+            signal_records.append({
+                'signal_id': iid,
                 'window_end': window_end,
                 'barycenter': barycenter.tolist(),
                 'timescale_dispersion': dispersion,
@@ -259,31 +259,31 @@ class GeometryEngine:
                 'vector_252': v252,
             })
 
-        n_indicators = len(indicator_data)
-        if n_indicators < 3:
-            logger.warning(f"Only {n_indicators} complete indicators at {window_end}")
-            return {'status': 'insufficient_data', 'n_indicators': n_indicators}
+        n_signals = len(signal_data)
+        if n_signals < 3:
+            logger.warning(f"Only {n_signals} complete signals at {window_end}")
+            return {'status': 'insufficient_data', 'n_signals': n_signals}
 
-        # Write indicator geometry to parquet
-        if indicator_records:
-            indicators_df = pl.DataFrame(indicator_records)
+        # Write signal geometry to parquet
+        if signal_records:
+            signals_df = pl.DataFrame(signal_records)
             upsert_parquet(
-                indicators_df,
-                self._geometry_indicators_path,
-                key_cols=['indicator_id', 'window_end']
+                signals_df,
+                self._geometry_signals_path,
+                key_cols=['signal_id', 'window_end']
             )
 
         # =====================================================================
         # PHASE 2: PAIRWISE GEOMETRY
         # =====================================================================
-        ids = list(indicator_data.keys())
+        ids = list(signal_data.keys())
         n_pairs = 0
         pair_records = []
 
         for i, id_a in enumerate(ids):
             for id_b in ids[i+1:]:
-                bc_a = indicator_data[id_a]['barycenter']
-                bc_b = indicator_data[id_b]['barycenter']
+                bc_a = signal_data[id_a]['barycenter']
+                bc_b = signal_data[id_b]['barycenter']
 
                 # Distance between weighted centers
                 bc_distance = euclidean(bc_a, bc_b)
@@ -296,13 +296,13 @@ class GeometryEngine:
 
                 # Co-movement: do their dispersions move together?
                 co_movement = self._compute_co_movement(
-                    indicator_data[id_a]['vectors'],
-                    indicator_data[id_b]['vectors']
+                    signal_data[id_a]['vectors'],
+                    signal_data[id_b]['vectors']
                 )
 
                 pair_records.append({
-                    'indicator_a': id_a,
-                    'indicator_b': id_b,
+                    'signal_a': id_a,
+                    'signal_b': id_b,
                     'window_end': window_end,
                     'barycenter_distance': float(bc_distance),
                     'correlation_weighted': float(corr) if not np.isnan(corr) else 0.0,
@@ -316,7 +316,7 @@ class GeometryEngine:
             upsert_parquet(
                 pairs_df,
                 self._geometry_pairs_path,
-                key_cols=['indicator_a', 'indicator_b', 'window_end']
+                key_cols=['signal_a', 'signal_b', 'window_end']
             )
 
         # =====================================================================
@@ -325,7 +325,7 @@ class GeometryEngine:
         matrix = np.array(barycenters)
 
         # PCA on weighted barycenters
-        pca = PCA(n_components=min(5, n_indicators - 1))
+        pca = PCA(n_components=min(5, n_signals - 1))
         try:
             pca.fit(matrix)
             pca_var = pca.explained_variance_ratio_
@@ -333,18 +333,18 @@ class GeometryEngine:
             pca_var = [0, 0, 0]
 
         # Clustering
-        n_clust = min(self.n_clusters, n_indicators - 1)
+        n_clust = min(self.n_clusters, n_signals - 1)
         try:
             kmeans = KMeans(n_clusters=n_clust, n_init=10, random_state=42)
             labels = kmeans.fit_predict(matrix)
             cluster_sizes = [int(np.sum(labels == i)) for i in range(n_clust)]
         except Exception:
-            cluster_sizes = [n_indicators]
+            cluster_sizes = [n_signals]
             n_clust = 1
 
         # System metrics
-        total_dispersion = float(np.mean([d['dispersion'] for d in indicator_data.values()]))
-        mean_alignment = float(np.mean([d['alignment'] for d in indicator_data.values()]))
+        total_dispersion = float(np.mean([d['dispersion'] for d in signal_data.values()]))
+        mean_alignment = float(np.mean([d['alignment'] for d in signal_data.values()]))
 
         # System coherence: inverse of average pairwise distance
         if len(barycenters) > 1:
@@ -370,7 +370,7 @@ class GeometryEngine:
 
         structure_record = {
             'window_end': window_end,
-            'n_indicators': n_indicators,
+            'n_signals': n_signals,
             'pca_variance_1': float(pca_var[0]) if len(pca_var) > 0 else 0.0,
             'pca_variance_2': float(pca_var[1]) if len(pca_var) > 1 else 0.0,
             'pca_variance_3': float(pca_var[2]) if len(pca_var) > 2 else 0.0,
@@ -393,12 +393,12 @@ class GeometryEngine:
         # =====================================================================
         # PHASE 4: DISPLACEMENT (Temporal Physics)
         # =====================================================================
-        self._compute_displacement(window_end, indicator_groups)
+        self._compute_displacement(window_end, signal_groups)
 
         return {
             'status': 'success',
             'window_end': window_end,
-            'n_indicators': n_indicators,
+            'n_signals': n_signals,
             'n_pairs': n_pairs,
             'total_dispersion': total_dispersion,
             'mean_alignment': mean_alignment,
@@ -408,7 +408,7 @@ class GeometryEngine:
     def _compute_co_movement(self, vectors_a: Dict[int, np.ndarray],
                              vectors_b: Dict[int, np.ndarray]) -> float:
         """
-        Compute co-movement between two indicators across timescales.
+        Compute co-movement between two signals across timescales.
 
         High co-movement = their window vectors move in similar patterns.
         """
@@ -435,11 +435,11 @@ class GeometryEngine:
         - anchor_ratio: Did anchors move more than scouts? (>1 = structural shift)
         - regime_conviction: High energy into tight structure = confirmed regime change
         """
-        # Find previous snapshot from geometry.indicators
-        if not self._geometry_indicators_path.exists():
+        # Find previous snapshot from geometry.signals
+        if not self._geometry_signals_path.exists():
             return
 
-        geom_df = pl.read_parquet(self._geometry_indicators_path)
+        geom_df = pl.read_parquet(self._geometry_signals_path)
         prev_dates = geom_df.filter(pl.col('window_end') < t_now).select('window_end').unique()
 
         if len(prev_dates) == 0:
@@ -459,7 +459,7 @@ class GeometryEngine:
 
         prev_vectors: Dict[str, Dict[int, np.ndarray]] = {}
         for _, row in prev_df.iterrows():
-            iid = row['indicator_id']
+            iid = row['signal_id']
             if iid not in prev_vectors:
                 prev_vectors[iid] = {}
             prev_vectors[iid][row['window_days']] = row['vector']
@@ -469,8 +469,8 @@ class GeometryEngine:
         barycenter_shifts = []
         n_processed = 0
 
-        # Read geometry indicators for barycenter lookups
-        geom_ind_df = pl.read_parquet(self._geometry_indicators_path)
+        # Read geometry signals for barycenter lookups
+        geom_ind_df = pl.read_parquet(self._geometry_signals_path)
 
         for iid, windows in current_vectors.items():
             if iid not in prev_vectors:
@@ -484,10 +484,10 @@ class GeometryEngine:
 
             # Barycenter shift
             bc_now_row = geom_ind_df.filter(
-                (pl.col('indicator_id') == iid) & (pl.col('window_end') == t_now)
+                (pl.col('signal_id') == iid) & (pl.col('window_end') == t_now)
             )
             bc_prev_row = geom_ind_df.filter(
-                (pl.col('indicator_id') == iid) & (pl.col('window_end') == t_prev)
+                (pl.col('signal_id') == iid) & (pl.col('window_end') == t_prev)
             )
 
             if len(bc_now_row) > 0 and len(bc_prev_row) > 0:
@@ -547,7 +547,7 @@ class GeometryEngine:
             'dispersion_delta': dispersion_delta,
             'dispersion_velocity': dispersion_velocity,
             'regime_conviction': regime_conviction,
-            'n_indicators': n_processed,
+            'n_signals': n_processed,
         }
 
         displacement_df = pl.DataFrame([displacement_record])
@@ -599,7 +599,7 @@ class GeometryEngine:
             if verbose and result.get('status') == 'success':
                 logger.info(
                     f"[{i+1}/{len(strided_dates)}] {snapshot_date}: "
-                    f"{result['n_indicators']} indicators, "
+                    f"{result['n_signals']} signals, "
                     f"dispersion={result['total_dispersion']:.3f}, "
                     f"alignment={result['mean_alignment']:.3f}"
                 )
@@ -636,7 +636,7 @@ class GeometryEngine:
             pl.col('regime_conviction').round(2).alias('conviction'),
             pl.col('barycenter_shift_mean').round(4).alias('shift_mean'),
             pl.col('dispersion_delta').round(4).alias('disp_delta'),
-            'n_indicators',
+            'n_signals',
         ]).sort('regime_conviction', descending=True)
 
         return result.to_pandas()

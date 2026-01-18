@@ -9,12 +9,12 @@ MEMORY OPTIMIZED: Uses Polars lazy streaming to process large datasets
 without loading all data into RAM. Processes 140M+ rows with ~2GB memory.
 
 The State Layer is the final layer of the PRISM Trilogy:
-    Layer 1 (Vector):   "How does each indicator behave?"
-    Layer 2 (Geometry): "How do indicators relate?"
+    Layer 1 (Vector):   "How does each signal behave?"
+    Layer 2 (Geometry): "How do signals relate?"
     Layer 3 (State):    "What is the system DOING?"
 
 Pipeline:
-    indicator_field.parquet -> cohort_state.parquet
+    signal_field.parquet -> cohort_state.parquet
 
 Output Schema (cohort_state.parquet):
     - domain_id: Domain identifier
@@ -26,9 +26,9 @@ Output Schema (cohort_state.parquet):
     - state_id: Current regime ID
     - state_duration: Windows since last transition
     - state_stability: Stability score (0=unstable, 1=stable)
-    - leading_indicator: Top responding indicator
+    - leading_signal: Top responding signal
     - response_order: Top 10 responders (JSON array)
-    - n_affected: Count of affected indicators
+    - n_affected: Count of affected signals
 
 Usage:
     python -m prism.entry_points.cohort_state --domain cheme
@@ -56,7 +56,7 @@ KEY_COLS = ['domain_id', 'cohort_id', 'window_end']
 # Columns needed for state computation (memory optimization)
 STATE_COLUMNS = [
     'window_end',
-    'indicator_id',
+    'signal_id',
     'divergence',
     'gradient_magnitude',
     'is_source',
@@ -85,28 +85,28 @@ def compute_system_divergence_streaming(
     Memory efficient: processes data in chunks without loading all into RAM.
 
     Args:
-        field_path: Path to indicator_field.parquet
+        field_path: Path to signal_field.parquet
         exclude_patterns: Patterns to exclude (e.g., ['FAULT'])
 
     Returns:
-        DataFrame with window_end, total_divergence, avg_gradient_mag, n_indicators
+        DataFrame with window_end, total_divergence, avg_gradient_mag, n_signals
     """
     # Build filter expression for exclusions
     filter_expr = pl.lit(True)
     if exclude_patterns:
         for pattern in exclude_patterns:
-            filter_expr = filter_expr & ~pl.col('indicator_id').str.contains(pattern)
+            filter_expr = filter_expr & ~pl.col('signal_id').str.contains(pattern)
 
     # Use lazy scan with streaming - never loads all data into RAM
     result = (
         pl.scan_parquet(field_path)
-        .select(['window_end', 'indicator_id', 'divergence', 'gradient_magnitude'])
+        .select(['window_end', 'signal_id', 'divergence', 'gradient_magnitude'])
         .filter(filter_expr)
         .group_by('window_end')
         .agg([
             pl.col('divergence').abs().sum().alias('total_divergence'),
             pl.col('gradient_magnitude').mean().alias('avg_gradient_mag'),
-            pl.col('indicator_id').n_unique().alias('n_indicators'),
+            pl.col('signal_id').n_unique().alias('n_signals'),
         ])
         .sort('window_end')
         .collect(engine='streaming')
@@ -124,7 +124,7 @@ def detect_transitions_streaming(
     Detect transitions using streaming computation.
 
     Args:
-        field_path: Path to indicator_field.parquet
+        field_path: Path to signal_field.parquet
         zscore_threshold: Z-score threshold for significance
         exclude_patterns: Patterns to exclude
 
@@ -158,17 +158,17 @@ def detect_transitions_streaming(
     return system_div, transitions
 
 
-def find_leading_indicators_streaming(
+def find_leading_signals_streaming(
     field_path: Path,
     transition_windows: List,
     exclude_patterns: Optional[List[str]] = None,
     top_n: int = 10,
 ) -> Dict[str, Dict]:
     """
-    Find leading indicators for each transition window using streaming.
+    Find leading signals for each transition window using streaming.
 
     Args:
-        field_path: Path to indicator_field.parquet
+        field_path: Path to signal_field.parquet
         transition_windows: List of window dates
         exclude_patterns: Patterns to exclude
         top_n: Number of top responders to return
@@ -183,12 +183,12 @@ def find_leading_indicators_streaming(
     filter_expr = pl.col('window_end').is_in(transition_windows)
     if exclude_patterns:
         for pattern in exclude_patterns:
-            filter_expr = filter_expr & ~pl.col('indicator_id').str.contains(pattern)
+            filter_expr = filter_expr & ~pl.col('signal_id').str.contains(pattern)
 
     # Stream through data for just transition windows
     window_data = (
         pl.scan_parquet(field_path)
-        .select(['window_end', 'indicator_id', 'gradient_magnitude', 'divergence'])
+        .select(['window_end', 'signal_id', 'gradient_magnitude', 'divergence'])
         .filter(filter_expr)
         .collect(engine='streaming')
     )
@@ -201,7 +201,7 @@ def find_leading_indicators_streaming(
 
         if len(wdata) == 0:
             results[window_str] = {
-                'leading_indicator': 'unknown',
+                'leading_signal': 'unknown',
                 'response_order': [],
                 'n_affected': 0,
             }
@@ -211,8 +211,8 @@ def find_leading_indicators_streaming(
         sorted_data = wdata.sort('gradient_magnitude', descending=True)
 
         # Get leader and response order
-        leading = sorted_data['indicator_id'][0]
-        response_order = sorted_data['indicator_id'].head(top_n).to_list()
+        leading = sorted_data['signal_id'][0]
+        response_order = sorted_data['signal_id'].head(top_n).to_list()
 
         # Count affected (above median)
         median_grad = wdata['gradient_magnitude'].median()
@@ -222,7 +222,7 @@ def find_leading_indicators_streaming(
             n_affected = len(wdata) // 2
 
         results[window_str] = {
-            'leading_indicator': leading,
+            'leading_signal': leading,
             'response_order': response_order,
             'n_affected': n_affected,
         }
@@ -245,7 +245,7 @@ def run_cohort_state(
     Args:
         domain: Domain identifier
         zscore_threshold: Z-score threshold for transitions
-        exclude_patterns: Indicator patterns to exclude
+        exclude_patterns: Signal patterns to exclude
         classify: Whether to run unsupervised classification
         verbose: Print progress
 
@@ -259,7 +259,7 @@ def run_cohort_state(
         exclude_patterns = ['FAULT']
 
     # Get field path
-    field_path = get_parquet_path('vector', 'indicator_field', domain)
+    field_path = get_parquet_path('vector', 'signal_field', domain)
     if not field_path.exists():
         raise FileNotFoundError(f"Field data not found: {field_path}")
 
@@ -297,14 +297,14 @@ def run_cohort_state(
         print(f"  Windows: {len(system_div):,}")
         print(f"  Transitions: {len(transitions_df)}")
 
-    # Step 2: Find leading indicators for transitions (streaming)
+    # Step 2: Find leading signals for transitions (streaming)
     transition_windows = transitions_df['window_end'].to_list()
 
     if verbose and transition_windows:
         print()
-        print("Step 2: Finding leading indicators (streaming)...")
+        print("Step 2: Finding leading signals (streaming)...")
 
-    leader_info = find_leading_indicators_streaming(
+    leader_info = find_leading_signals_streaming(
         field_path,
         transition_windows,
         exclude_patterns=exclude_patterns,
@@ -335,12 +335,12 @@ def run_cohort_state(
             state_id += 1
             duration = 1
             info = leader_info.get(window_str, {})
-            leading_indicator = info.get('leading_indicator')
+            leading_signal = info.get('leading_signal')
             response_order = info.get('response_order', [])
             n_affected = info.get('n_affected', 0)
         else:
             duration += 1
-            leading_indicator = None
+            leading_signal = None
             response_order = []
             n_affected = 0
 
@@ -355,11 +355,11 @@ def run_cohort_state(
             'divergence_zscore': row['divergence_zscore'],
             'total_divergence': row['total_divergence'],
             'avg_gradient_mag': row['avg_gradient_mag'],
-            'n_indicators': row['n_indicators'],
+            'n_signals': row['n_signals'],
             'state_id': state_id,
             'state_duration': duration,
             'state_stability': stability,
-            'leading_indicator': leading_indicator,
+            'leading_signal': leading_signal,
             'response_order': json.dumps(response_order) if response_order else None,
             'n_affected': n_affected,
             'computed_at': computed_at,
@@ -383,7 +383,7 @@ def run_cohort_state(
             # Load minimal data for signature extraction
             sig_data = (
                 pl.scan_parquet(field_path)
-                .select(['window_end', 'indicator_id', 'divergence', 'gradient_magnitude', 'is_source', 'is_sink'])
+                .select(['window_end', 'signal_id', 'divergence', 'gradient_magnitude', 'is_source', 'is_sink'])
                 .filter(pl.col('window_end').is_in(transition_windows))
                 .collect(engine='streaming')
             )
@@ -440,14 +440,14 @@ def run_cohort_state(
             )
             for row in trans_rows.head(10).iter_rows(named=True):
                 z = row['divergence_zscore']
-                leader = row['leading_indicator'] or 'N/A'
+                leader = row['leading_signal'] or 'N/A'
                 print(f"  {row['window_end']}: z={z:+.2f}, leader={leader}")
 
-            # Summarize leading indicators
+            # Summarize leading signals
             print()
-            print("Leading Indicator Summary:")
+            print("Leading Signal Summary:")
             print("-" * 60)
-            leaders = trans_rows['leading_indicator'].drop_nulls().to_list()
+            leaders = trans_rows['leading_signal'].drop_nulls().to_list()
             for ind, count in Counter(leaders).most_common(5):
                 pct = count / total_transitions * 100
                 print(f"  {ind}: {count} ({pct:.1f}%)")
@@ -489,7 +489,7 @@ Output:
     parser.add_argument('--zscore-threshold', type=float, default=3.0,
                         help='Z-score threshold for transition detection (default: 3.0)')
     parser.add_argument('--exclude', type=str, nargs='+', default=['FAULT'],
-                        help='Indicator patterns to exclude (default: FAULT)')
+                        help='Signal patterns to exclude (default: FAULT)')
     parser.add_argument('--classify', action='store_true',
                         help='Run unsupervised classification on transitions')
     parser.add_argument('--quiet', action='store_true',

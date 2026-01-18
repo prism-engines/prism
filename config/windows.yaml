@@ -1,6 +1,6 @@
 # WindowSuitabilityPolicy Configuration
 # Agent: agent_math_suitability.py
-# Purpose: Per-indicator-per-window eligibility thresholds
+# Purpose: Per-signal-per-window eligibility thresholds
 #
 # All values here are the EXACT defaults from the hardcoded WindowSuitabilityPolicy dataclass.
 # Changing these values WILL change agent behavior.

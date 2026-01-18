@@ -8,12 +8,12 @@
 ```
 Domain: femto
 Cohorts: 6 physical bearings (Bearing1_1, Bearing1_2, etc.)
-Indicators: 18 sensors per bearing (HORIZ_RMS, VERT_RMS, SPEED, etc.)
+Signals: 18 sensors per bearing (HORIZ_RMS, VERT_RMS, SPEED, etc.)
 ```
 
 This is the CORRECT structure for bearing prognostics:
 - Each bearing is a cohort
-- Sensors within the bearing are indicators
+- Sensors within the bearing are signals
 - Signal tracks degradation to failure
 
 ---
@@ -170,7 +170,7 @@ Higher variance in velocity = longer survival (hasn't settled into failure traje
 
 ```bash
 # 1. Compute behavioral metrics
-python -m prism.entry_points.indicator_vector --domain femto
+python -m prism.entry_points.signal_vector --domain femto
 
 # 2. Compute geometry
 python -m prism.entry_points.geometry --domain femto
@@ -186,11 +186,11 @@ python -m prism.assessments.run --domain femto
 
 ```python
 import polars as pl
-field_df = pl.read_parquet('data/femto/vector/indicator_field.parquet')
+field_df = pl.read_parquet('data/femto/vector/signal_field.parquet')
 
 # Aggregate per bearing
 field_df = field_df.with_columns([
-    pl.col('indicator_id').str.extract(r'FEMTO_(Bearing\d_\d)', 1).alias('bearing')
+    pl.col('signal_id').str.extract(r'FEMTO_(Bearing\d_\d)', 1).alias('bearing')
 ])
 
 div_stats = field_df.group_by('bearing').agg([

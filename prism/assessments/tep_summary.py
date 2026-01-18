@@ -28,10 +28,10 @@ def run_summary(domain: str):
     print()
 
     # Load vector data
-    vec_df = pl.read_parquet(get_parquet_path('vector', 'indicator', domain))
+    vec_df = pl.read_parquet(get_parquet_path('vector', 'signal', domain))
     tep_vec = vec_df.filter(
-        pl.col('indicator_id').str.starts_with('TEP_') &
-        ~pl.col('indicator_id').str.contains('FAULT')
+        pl.col('signal_id').str.starts_with('TEP_') &
+        ~pl.col('signal_id').str.contains('FAULT')
     )
 
     # =========================================================================
@@ -75,10 +75,10 @@ def run_summary(domain: str):
     print("LAYER 3: MODE (Behavioral Trajectory)")
     print("-" * 50)
 
-    modes_path = get_parquet_path('vector', 'indicator_modes', domain)
+    modes_path = get_parquet_path('vector', 'signal_modes', domain)
     if modes_path.exists():
         modes_df = pl.read_parquet(modes_path)
-        tep_modes = modes_df.filter(pl.col('indicator_id').str.starts_with('TEP_'))
+        tep_modes = modes_df.filter(pl.col('signal_id').str.starts_with('TEP_'))
 
         if 'mode_id' in tep_modes.columns:
             n_modes = tep_modes['mode_id'].n_unique()

@@ -42,9 +42,9 @@ SENSOR_MAP = {
 
 def get_existing_test_units():
     """Get test units that already have PRISM features."""
-    vec = pl.read_parquet(PRISM_DIR / 'vector' / 'indicator.parquet')
+    vec = pl.read_parquet(PRISM_DIR / 'vector' / 'signal.parquet')
     vec = vec.with_columns(
-        pl.col('indicator_id').str.extract(r'FD001_1(\d{3})_', 1).cast(pl.Int64).alias('test_unit')
+        pl.col('signal_id').str.extract(r'FD001_1(\d{3})_', 1).cast(pl.Int64).alias('test_unit')
     ).filter(pl.col('test_unit').is_not_null())
 
     return set(vec['test_unit'].unique().to_list())
@@ -92,7 +92,7 @@ def ingest_test_data():
         for s_col, sensor_name in SENSOR_MAP.items():
             if s_col in row and row[s_col] is not None:
                 observations.append({
-                    'indicator_id': f'FD001_{unit_offset:04d}_{sensor_name}',
+                    'signal_id': f'FD001_{unit_offset:04d}_{sensor_name}',
                     'obs_date': obs_date,
                     'value': float(row[s_col]),
                 })
@@ -105,7 +105,7 @@ def ingest_test_data():
     )
 
     print(f"\nCreated {len(obs_df)} observations")
-    print(f"Unique indicators: {obs_df['indicator_id'].n_unique()}")
+    print(f"Unique signals: {obs_df['signal_id'].n_unique()}")
 
     # Load existing observations
     obs_path = PRISM_DIR / 'raw' / 'observations.parquet'
@@ -115,7 +115,7 @@ def ingest_test_data():
 
         # Check if already has test data in this format
         test_in_existing = existing_obs.filter(
-            pl.col('indicator_id').str.contains(r'FD001_1\d{3}_')
+            pl.col('signal_id').str.contains(r'FD001_1\d{3}_')
         )
         print(f"Existing test observations: {len(test_in_existing)}")
 
@@ -123,7 +123,7 @@ def ingest_test_data():
         combined = pl.concat([existing_obs, obs_df])
 
         # Deduplicate
-        combined = combined.unique(['indicator_id', 'obs_date'])
+        combined = combined.unique(['signal_id', 'obs_date'])
         print(f"\nCombined (deduped): {len(combined)}")
     else:
         combined = obs_df

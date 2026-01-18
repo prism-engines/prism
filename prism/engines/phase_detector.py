@@ -110,7 +110,7 @@ class PhaseDetectorEngine:
         """
         signals = {}
 
-        # Signal 1: Anchor ratio (structural shift indicator)
+        # Signal 1: Anchor ratio (structural shift signal)
         anchor_signal = anchor_ratio > self.anchor_threshold
         signals['anchor_signal'] = anchor_signal
 

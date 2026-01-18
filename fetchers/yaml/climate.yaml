@@ -5,7 +5,7 @@
 source: climate
 domain: climate
 
-indicators:
+signals:
   # ==========================================================================
   # ATMOSPHERIC GREENHOUSE GASES (NOAA GML - Mauna Loa / Global)
   # ==========================================================================
@@ -47,7 +47,7 @@ indicators:
   - PNA_INDEX                # Pacific North American - 1950-present
   - SOI_INDEX                # Southern Oscillation Index (ENSO)
   - AAO_INDEX                # Antarctic Oscillation - 1979-present
-  - SST_NINO34               # Nino 3.4 region SST (ENSO indicator)
+  - SST_NINO34               # Nino 3.4 region SST (ENSO signal)
 
   # ==========================================================================
   # SOLAR (SILSO)

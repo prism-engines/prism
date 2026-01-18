@@ -8,7 +8,7 @@ Key insight: Modes are DISCOVERED groupings from Laplace dynamics, unlike
 cohorts which are PREDEFINED physical/logical groupings. This runner:
 
 1. Discovers modes from Laplace fingerprints (gradient/divergence patterns)
-2. Groups indicators by their discovered mode
+2. Groups signals by their discovered mode
 3. Computes geometry metrics for each mode (like we do for cohorts)
 
 Output Schema (geometry/mode.parquet):
@@ -16,8 +16,8 @@ Output Schema (geometry/mode.parquet):
     - cohort_id: Original cohort (for reference)
     - mode_id: Discovered behavioral mode
     - window_end: Window date
-    - n_indicators: Count of indicators in this mode
-    - mode_affinity_mean: Mean affinity of indicators to their mode
+    - n_signals: Count of signals in this mode
+    - mode_affinity_mean: Mean affinity of signals to their mode
     - mode_entropy_mean: Mean entropy (uncertainty) of mode assignments
     - distance_mean: Mean pairwise distance within mode
     - pca_variance_pc1: First principal component variance
@@ -61,37 +61,37 @@ logger = logging.getLogger(__name__)
 
 def get_mode_data_matrix(
     observations: pl.DataFrame,
-    indicator_ids: List[str],
+    signal_ids: List[str],
 ) -> pd.DataFrame:
     """
-    Build data matrix for a mode's indicators.
+    Build data matrix for a mode's signals.
 
     Args:
         observations: Full observations DataFrame
-        indicator_ids: Indicators in this mode
+        signal_ids: Signals in this mode
 
     Returns:
-        DataFrame (rows=time, cols=indicators)
+        DataFrame (rows=time, cols=signals)
     """
-    if len(indicator_ids) < 2:
+    if len(signal_ids) < 2:
         return pd.DataFrame()
 
-    # Filter to mode indicators
+    # Filter to mode signals
     filtered = observations.filter(
-        pl.col('indicator_id').is_in(indicator_ids)
-    ).select(['obs_date', 'indicator_id', 'value'])
+        pl.col('signal_id').is_in(signal_ids)
+    ).select(['obs_date', 'signal_id', 'value'])
 
     if filtered.is_empty():
         return pd.DataFrame()
 
     # Deduplicate
-    filtered = filtered.group_by(['indicator_id', 'obs_date']).agg(
+    filtered = filtered.group_by(['signal_id', 'obs_date']).agg(
         pl.col('value').last()
     )
 
     # Pivot to matrix
     pivoted = filtered.pivot(
-        on='indicator_id',
+        on='signal_id',
         index='obs_date',
         values='value'
     ).sort('obs_date').drop_nulls()
@@ -112,7 +112,7 @@ def compute_mode_geometry(matrix: pd.DataFrame) -> Dict[str, Any]:
     Compute geometry metrics for a mode.
 
     Args:
-        matrix: Data matrix (rows=time, cols=indicators)
+        matrix: Data matrix (rows=time, cols=signals)
 
     Returns:
         Dict of geometry metrics
@@ -178,7 +178,7 @@ def compute_mode_geometry(matrix: pd.DataFrame) -> Dict[str, Any]:
     except Exception as e:
         logger.debug(f"LOF failed: {e}")
 
-    results['n_indicators'] = matrix.shape[1]
+    results['n_signals'] = matrix.shape[1]
     results['n_observations'] = matrix.shape[0]
 
     return results
@@ -202,10 +202,10 @@ def run_mode_geometry(
     """
     ensure_directories(domain)
 
-    # Load indicator field (Laplace data)
-    field_path = get_parquet_path('vector', 'indicator_field', domain)
+    # Load signal field (Laplace data)
+    field_path = get_parquet_path('vector', 'signal_field', domain)
     if not Path(field_path).exists():
-        raise FileNotFoundError(f"Indicator field not found: {field_path}")
+        raise FileNotFoundError(f"Signal field not found: {field_path}")
 
     if verbose:
         print("=" * 80)
@@ -217,14 +217,14 @@ def run_mode_geometry(
 
     # Load field data
     if verbose:
-        print("Step 1: Loading indicator field data...")
+        print("Step 1: Loading signal field data...")
 
     field_df = pl.read_parquet(field_path)
 
-    # Get unique indicators
-    all_indicators = field_df['indicator_id'].unique().to_list()
+    # Get unique signals
+    all_signals = field_df['signal_id'].unique().to_list()
     if verbose:
-        print(f"  Found {len(all_indicators)} indicators")
+        print(f"  Found {len(all_signals)} signals")
 
     # Discover modes
     if verbose:
@@ -235,13 +235,13 @@ def run_mode_geometry(
         field_df,
         domain_id=domain,
         cohort_id='default',
-        indicators=all_indicators,
+        signals=all_signals,
         max_modes=max_modes,
     )
 
     if modes_df is None or len(modes_df) == 0:
         print("  No modes discovered (insufficient data)")
-        return {'n_modes': 0, 'n_indicators': 0}
+        return {'n_modes': 0, 'n_signals': 0}
 
     n_modes = modes_df['mode_id'].nunique()
     if verbose:
@@ -251,7 +251,7 @@ def run_mode_geometry(
         for mode_id in sorted(modes_df['mode_id'].unique()):
             count = len(modes_df[modes_df['mode_id'] == mode_id])
             mean_aff = modes_df[modes_df['mode_id'] == mode_id]['mode_affinity'].mean()
-            print(f"    Mode {mode_id}: {count} indicators (affinity={mean_aff:.3f})")
+            print(f"    Mode {mode_id}: {count} signals (affinity={mean_aff:.3f})")
 
     # Load observations for geometry computation
     if verbose:
@@ -274,13 +274,13 @@ def run_mode_geometry(
 
     for mode_id in sorted(modes_df['mode_id'].unique()):
         mode_data = modes_df[modes_df['mode_id'] == mode_id]
-        indicator_ids = mode_data['indicator_id'].tolist()
+        signal_ids = mode_data['signal_id'].tolist()
 
         if verbose:
-            print(f"  Mode {mode_id}: {len(indicator_ids)} indicators...")
+            print(f"  Mode {mode_id}: {len(signal_ids)} signals...")
 
         # Build data matrix for this mode
-        matrix = get_mode_data_matrix(observations, indicator_ids)
+        matrix = get_mode_data_matrix(observations, signal_ids)
 
         if matrix.empty or matrix.shape[1] < 2:
             if verbose:
@@ -292,7 +292,7 @@ def run_mode_geometry(
 
         # Get window range from observations
         mode_obs = observations.filter(
-            pl.col('indicator_id').is_in(indicator_ids)
+            pl.col('signal_id').is_in(signal_ids)
         )
         window_end = mode_obs['obs_date'].max()
 
@@ -305,7 +305,7 @@ def run_mode_geometry(
             'cohort_id': 'default',
             'mode_id': int(mode_id),
             'window_end': window_end,
-            'n_indicators': len(indicator_ids),
+            'n_signals': len(signal_ids),
             'mode_affinity_mean': mode_affinity_mean,
             'mode_entropy_mean': mode_entropy_mean,
             **metrics,
@@ -320,7 +320,7 @@ def run_mode_geometry(
 
     if not records:
         print("No geometry computed")
-        return {'n_modes': n_modes, 'n_indicators': len(all_indicators)}
+        return {'n_modes': n_modes, 'n_signals': len(all_signals)}
 
     # Save results
     result_df = pl.DataFrame(records, infer_schema_length=None)
@@ -339,14 +339,14 @@ def run_mode_geometry(
         print("MODE GEOMETRY COMPLETE")
         print("=" * 80)
         print(f"Modes: {n_modes}")
-        print(f"Indicators: {len(all_indicators)}")
+        print(f"Signals: {len(all_signals)}")
         print(f"Geometry records: {len(records)}")
         print(f"Output: {output_path}")
         print(f"Modes: {modes_output_path}")
 
     return {
         'n_modes': n_modes,
-        'n_indicators': len(all_indicators),
+        'n_signals': len(all_signals),
         'n_records': len(records),
         'output_path': str(output_path),
         'modes_path': str(modes_output_path),
@@ -366,7 +366,7 @@ unlike cohorts which are PREDEFINED groupings.
 
 Output:
   geometry/mode.parquet       - Geometry metrics per mode
-  vector/cohort_modes.parquet - Mode assignments for each indicator
+  vector/cohort_modes.parquet - Mode assignments for each signal
 """
     )
 

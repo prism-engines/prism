@@ -25,10 +25,10 @@ That's it. No interpretation. No state inference. No dynamics modeling.
 ```
 External APIs          Parquet Layers             Output
 
-  NASA    ───┐         ┌─ raw/observations        Per-indicator
-  USGS    ───┼─ fetch ─┼─ vector/indicator        signal topology
+  NASA    ───┐         ┌─ raw/observations        Per-signal
+  USGS    ───┼─ fetch ─┼─ vector/signal        signal topology
   NOAA    ───┤         ├─ geometry/cohort         measurements
-  TEP     ───┘         └─ state/indicator         and relationships
+  TEP     ───┘         └─ state/signal         and relationships
 ```
 
 ### Core Principles
@@ -49,7 +49,7 @@ prism-core/
 │   │   ├── sources/          # NASA, USGS, NOAA, TEP, etc.
 │   │   └── fetch_runner.py   # Orchestration
 │   │
-│   ├── vector_engines/       # Per-indicator measurements
+│   ├── vector_engines/       # Per-signal measurements
 │   │   ├── hurst.py          # Persistence/memory
 │   │   ├── entropy.py        # Complexity
 │   │   ├── garch.py          # Volatility clustering
@@ -58,7 +58,7 @@ prism-core/
 │   │   ├── lyapunov.py       # Chaos/sensitivity
 │   │   └── rqa.py            # Recurrence patterns
 │   │
-│   ├── geometry_engines/     # Cross-indicator relationships
+│   ├── geometry_engines/     # Cross-signal relationships
 │   │   ├── pca.py            # Variance structure
 │   │   ├── clustering.py     # Grouping
 │   │   ├── granger.py        # Lead-lag causality
@@ -81,7 +81,7 @@ prism-core/
 │   │   ├── open.py           # Connection management
 │   │   └── migrations/       # Schema definitions
 │   │
-│   └── registry/             # Indicator definitions
+│   └── registry/             # Signal definitions
 │       └── loader.py
 │
 ├── scripts/                  # Entry points
@@ -96,7 +96,7 @@ prism-core/
 ├── config/                   # YAML configuration
 │   ├── fetch_sources.yaml
 │   ├── geometry.yaml
-│   ├── registry_*.yaml       # Indicator registries by domain
+│   ├── registry_*.yaml       # Signal registries by domain
 │   └── ...
 │
 └── data/                     # Local database
@@ -112,8 +112,8 @@ prism-core/
 | Schema | Purpose | Mutability |
 |--------|---------|------------|
 | `raw` | Source observations | Append-only |
-| `vector` | Per-indicator measurements | Write per run |
-| `geometry` | Cross-indicator relationships | Write per run |
+| `vector` | Per-signal measurements | Write per run |
+| `geometry` | Cross-signal relationships | Write per run |
 | `results` | Immutable ledgers | Append-only |
 | `meta` | Run tracking, schema version | System-managed |
 | `audit` | Health checks, findings | Append-only |
@@ -122,8 +122,8 @@ prism-core/
 
 ```sql
 raw.observations        -- What sources provided (immutable)
-vector.measurements     -- Per-indicator engine outputs
-geometry.results        -- Cross-indicator engine outputs
+vector.measurements     -- Per-signal engine outputs
+geometry.results        -- Cross-signal engine outputs
 results.vector          -- Immutable vector ledger
 results.geometry        -- Immutable geometry ledger
 meta.schema_version     -- Schema tracking
@@ -157,7 +157,7 @@ Traffic light status: GREEN / YELLOW / RED
 | Agent | Checks |
 |-------|--------|
 | `data_integrity` | Gaps, duplicates, null values |
-| `staleness` | Data freshness per indicator |
+| `staleness` | Data freshness per signal |
 | `engine_health` | Engine failure rates |
 
 ### Measurement Agents (Analytical)
@@ -195,7 +195,7 @@ python -m prism.audit --list
 
 ## Vector Engines
 
-Per-indicator measurements. Each produces a signal topology of measurements.
+Per-signal measurements. Each produces a signal topology of measurements.
 
 | Engine | What it measures |
 |--------|------------------|
@@ -211,7 +211,7 @@ Per-indicator measurements. Each produces a signal topology of measurements.
 
 ## Geometry Engines
 
-Cross-indicator relationships. Each compares indicators to each other.
+Cross-signal relationships. Each compares signals to each other.
 
 | Engine | What it measures |
 |--------|------------------|
@@ -232,11 +232,11 @@ Cross-indicator relationships. Each compares indicators to each other.
 
 All configuration lives in `config/`.
 
-### Indicator Registries
+### Signal Registries
 
 ```yaml
 # config/registry_climate.yaml
-indicators:
+signals:
   - id: CO2_MONTHLY
     source: noaa
     name: "Monthly CO2 Mauna Loa"
@@ -330,13 +330,13 @@ Never construct paths manually. Always use `get_connection()`.
 ## Quick Queries
 
 ```sql
--- Count by indicator
-SELECT indicator_id, COUNT(*)
+-- Count by signal
+SELECT signal_id, COUNT(*)
 FROM raw.observations
 GROUP BY 1;
 
--- Date range per indicator
-SELECT indicator_id, MIN(date), MAX(date)
+-- Date range per signal
+SELECT signal_id, MIN(date), MAX(date)
 FROM raw.observations
 GROUP BY 1;
 

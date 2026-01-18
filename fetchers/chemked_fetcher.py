@@ -184,8 +184,8 @@ def convert_to_prism_format(df: pl.DataFrame, output_dir: Path):
 
     print(f"Valid datapoints after filtering: {len(df)}")
 
-    # Group by fuel and create indicators
-    # Each fuel/pressure/phi combination becomes an indicator
+    # Group by fuel and create signals
+    # Each fuel/pressure/phi combination becomes an signal
     # The "signal topology" is ignition delay vs temperature (sorted by 1/T)
 
     obs_rows = []
@@ -216,16 +216,16 @@ def convert_to_prism_format(df: pl.DataFrame, output_dir: Path):
         if len(set(temps)) < 3:  # Need at least 3 different temperatures
             continue
 
-        # Create indicator ID
+        # Create signal ID
         phi_str = f"phi{phi}" if phi else "phi_unknown"
-        indicator_id = f"chemked_{fuel}_{phi_str}"
+        signal_id = f"chemked_{fuel}_{phi_str}"
 
         # Sort by 1/T (Arrhenius plot order)
         sorted_idx = np.argsort([1/t for t in temps])
 
         for i, idx in enumerate(sorted_idx):
             obs_rows.append({
-                'indicator_id': indicator_id,
+                'signal_id': signal_id,
                 'obs_date': base_date + timedelta(seconds=i),  # Pseudo-time
                 'value': float(delays[idx]),  # Ignition delay
                 'temperature_K': float(temps[idx]),
@@ -246,7 +246,7 @@ def convert_to_prism_format(df: pl.DataFrame, output_dir: Path):
         A = np.exp(intercept)  # Pre-exponential factor
 
         ind_rows.append({
-            'indicator_id': indicator_id,
+            'signal_id': signal_id,
             'name': f"{fuel} ignition delay (φ={phi})",
             'fuel': fuel,
             'equivalence_ratio': phi,
@@ -265,10 +265,10 @@ def convert_to_prism_format(df: pl.DataFrame, output_dir: Path):
     obs_df.write_parquet(output_dir / 'raw' / 'observations.parquet')
     print(f"Wrote {len(obs_df)} observations")
 
-    # Write indicators
+    # Write signals
     ind_df = pl.DataFrame(ind_rows)
-    ind_df.write_parquet(output_dir / 'raw' / 'indicators.parquet')
-    print(f"Wrote {len(ind_df)} indicators")
+    ind_df.write_parquet(output_dir / 'raw' / 'signals.parquet')
+    print(f"Wrote {len(ind_df)} signals")
 
     # Write cohort config
     pl.DataFrame([
@@ -276,7 +276,7 @@ def convert_to_prism_format(df: pl.DataFrame, output_dir: Path):
     ]).write_parquet(output_dir / 'config' / 'cohorts.parquet')
 
     pl.DataFrame([
-        {'cohort_id': 'chemked_ignition', 'indicator_id': r['indicator_id']}
+        {'cohort_id': 'chemked_ignition', 'signal_id': r['signal_id']}
         for r in ind_rows
     ]).write_parquet(output_dir / 'config' / 'cohort_members.parquet')
 
@@ -284,11 +284,11 @@ def convert_to_prism_format(df: pl.DataFrame, output_dir: Path):
     print("\n" + "="*60)
     print("ChemKED Data Summary")
     print("="*60)
-    print(f"Total indicators: {len(ind_df)}")
+    print(f"Total signals: {len(ind_df)}")
     print(f"Total observations: {len(obs_df)}")
     print(f"\nFuels: {ind_df['fuel'].unique().to_list()}")
     print(f"\nArrhenius fit quality (R²):")
-    print(ind_df.select(['indicator_id', 'arrhenius_r_squared']).sort('arrhenius_r_squared', descending=True))
+    print(ind_df.select(['signal_id', 'arrhenius_r_squared']).sort('arrhenius_r_squared', descending=True))
 
     return obs_df, ind_df
 

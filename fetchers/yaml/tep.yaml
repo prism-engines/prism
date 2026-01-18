@@ -25,7 +25,7 @@ dataset: 1year
 # Include manipulated variables (control valve positions)
 include_xmv: true
 
-# Include fault code as indicator (useful for validation)
+# Include fault code as signal (useful for validation)
 include_fault: true
 
 # Sample rate - use 1 for all data, higher values subsample

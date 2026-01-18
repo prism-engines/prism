@@ -210,7 +210,7 @@ class CointegrationEngine(BaseEngine):
         Run cointegration analysis.
 
         Args:
-            df: Indicator data (levels, not returns)
+            df: Signal data (levels, not returns)
             run_id: Unique run identifier
             significance: Significance level for cointegration test
 
@@ -218,8 +218,8 @@ class CointegrationEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = df_clean.columns.tolist()
-        n_indicators = len(indicators)
+        signals = df_clean.columns.tolist()
+        n_signals = len(signals)
 
         window_start, window_end = get_window_dates(df_clean)
 
@@ -228,8 +228,8 @@ class CointegrationEngine(BaseEngine):
         n_cointegrated = 0
         all_half_lives = []
 
-        for i in range(n_indicators):
-            for j in range(i + 1, n_indicators):
+        for i in range(n_signals):
+            for j in range(i + 1, n_signals):
                 y = df_clean.iloc[:, i].values
                 x = df_clean.iloc[:, j].values
 
@@ -242,8 +242,8 @@ class CointegrationEngine(BaseEngine):
                             all_half_lives.append(result["half_life"])
 
                     records.append({
-                        "indicator_1": indicators[i],
-                        "indicator_2": indicators[j],
+                        "signal_1": signals[i],
+                        "signal_2": signals[j],
                         "window_start": window_start,
                         "window_end": window_end,
                         "adf_stat": result["adf_stat"],
@@ -257,7 +257,7 @@ class CointegrationEngine(BaseEngine):
                     })
 
                 except Exception as e:
-                    logger.warning(f"Cointegration test failed for {indicators[i]}-{indicators[j]}: {e}")
+                    logger.warning(f"Cointegration test failed for {signals[i]}-{signals[j]}: {e}")
                     continue
 
         if records:
@@ -268,7 +268,7 @@ class CointegrationEngine(BaseEngine):
         n_pairs = len(records)
 
         metrics = {
-            "n_indicators": n_indicators,
+            "n_signals": n_signals,
             "n_pairs": n_pairs,
             "n_samples": len(df_clean),
             "n_cointegrated": n_cointegrated,
@@ -278,7 +278,7 @@ class CointegrationEngine(BaseEngine):
         }
 
         logger.info(
-            f"Cointegration complete: {n_indicators} indicators, "
+            f"Cointegration complete: {n_signals} signals, "
             f"{n_cointegrated}/{n_pairs} cointegrated pairs"
         )
 
@@ -292,8 +292,8 @@ class CointegrationEngine(BaseEngine):
 def compute_cointegration_with_derivation(
     y: np.ndarray,
     x: np.ndarray,
-    indicator_y: str = "Y",
-    indicator_x: str = "X",
+    signal_y: str = "Y",
+    signal_x: str = "X",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -304,8 +304,8 @@ def compute_cointegration_with_derivation(
     Args:
         y: Dependent series (levels, not returns)
         x: Independent series (levels, not returns)
-        indicator_y: Name of Y indicator
-        indicator_x: Name of X indicator
+        signal_y: Name of Y signal
+        signal_x: Name of X signal
         window_id: Window identifier
         window_start, window_end: Date range
 
@@ -319,7 +319,7 @@ def compute_cointegration_with_derivation(
     deriv = Derivation(
         engine_name="cointegration",
         method_name="Engle-Granger Two-Step Cointegration Test",
-        indicator_id=f"{indicator_y}_vs_{indicator_x}",
+        signal_id=f"{signal_y}_vs_{signal_x}",
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -331,7 +331,7 @@ def compute_cointegration_with_derivation(
     deriv.add_step(
         title="Cointegration Hypothesis",
         equation="H₀: y and x are NOT cointegrated (residuals non-stationary)",
-        calculation=f"Testing if {indicator_y} and {indicator_x} share a long-run equilibrium\n"
+        calculation=f"Testing if {signal_y} and {signal_x} share a long-run equilibrium\n"
                     f"n = {n} observations\n\n"
                     f"Cointegration means: y_t = α + β·x_t + ε_t where ε_t is I(0) stationary",
         result=n,
@@ -348,11 +348,11 @@ def compute_cointegration_with_derivation(
     deriv.add_step(
         title="Step 1: OLS Cointegrating Regression",
         equation="y_t = α + β·x_t + ε_t (estimate by OLS)",
-        calculation=f"Regress {indicator_y} on {indicator_x}:\n"
+        calculation=f"Regress {signal_y} on {signal_x}:\n"
                     f"  α (intercept) = {alpha:.6f}\n"
                     f"  β (hedge ratio) = {hedge_ratio:.6f}\n\n"
                     f"Cointegrating relationship:\n"
-                    f"  {indicator_y} = {alpha:.4f} + {hedge_ratio:.4f}·{indicator_x} + ε",
+                    f"  {signal_y} = {alpha:.4f} + {hedge_ratio:.4f}·{signal_x} + ε",
         result=hedge_ratio,
         result_name="β",
         notes="β is the hedge ratio: how much X to hold per unit of Y"
@@ -408,7 +408,7 @@ def compute_cointegration_with_derivation(
                     f"  ADF = {adf_stat:.4f}\n"
                     f"  Critical (10%) = -2.57\n"
                     f"  {'REJECT H₀' if is_cointegrated else 'FAIL TO REJECT H₀'}\n\n"
-                    f"Conclusion: {indicator_y} and {indicator_x} "
+                    f"Conclusion: {signal_y} and {signal_x} "
                     f"{'ARE' if is_cointegrated else 'are NOT'} cointegrated",
         result=p_value,
         result_name="p",
@@ -458,7 +458,7 @@ def compute_cointegration_with_derivation(
 
     # Interpretation
     if is_cointegrated:
-        interp = f"**Cointegrated** (p={p_value:.3f}): {indicator_y} and {indicator_x} share long-run equilibrium."
+        interp = f"**Cointegrated** (p={p_value:.3f}): {signal_y} and {signal_x} share long-run equilibrium."
         interp += f" Hedge ratio β={hedge_ratio:.3f}."
         if not np.isnan(half_life):
             interp += f" Deviations revert with half-life ~{half_life:.1f} periods."

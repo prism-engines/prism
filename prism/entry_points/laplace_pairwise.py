@@ -29,12 +29,12 @@ DEFAULT_TIERS = ['anchor', 'bridge']
 DRILLDOWN_TIERS = ['scout', 'micro']
 
 
-def extract_cohort_from_indicator(indicator_id: str) -> str:
-    """Extract cohort from indicator_id (e.g., CMAPSS_BPR_FD001_U001 -> FD001_U001)."""
-    parts = indicator_id.split('_')
+def extract_cohort_from_signal(signal_id: str) -> str:
+    """Extract cohort from signal_id (e.g., CMAPSS_BPR_FD001_U001 -> FD001_U001)."""
+    parts = signal_id.split('_')
     if len(parts) >= 4:
         return '_'.join(parts[-2:])
-    return indicator_id
+    return signal_id
 
 
 def run_laplace_pairwise_vectorized(
@@ -50,7 +50,7 @@ def run_laplace_pairwise_vectorized(
     ensure_directories()
 
     # Load Laplace field data
-    path = get_parquet_path('vector', 'indicator_field')
+    path = get_parquet_path('vector', 'signal_field')
     if not Path(path).exists():
         raise FileNotFoundError(f"Run laplace.py first: {path}")
 
@@ -65,9 +65,9 @@ def run_laplace_pairwise_vectorized(
         laplace = pl.read_parquet(path)
     logger.info(f"Loaded {len(laplace):,} rows")
 
-    # Add cohort column derived from indicator_id
+    # Add cohort column derived from signal_id
     laplace = laplace.with_columns(
-        pl.col('indicator_id').map_elements(extract_cohort_from_indicator, return_dtype=pl.Utf8).alias('cohort')
+        pl.col('signal_id').map_elements(extract_cohort_from_signal, return_dtype=pl.Utf8).alias('cohort')
     )
 
     # Filter cohort if specified
@@ -88,10 +88,10 @@ def run_laplace_pairwise_vectorized(
         # Filter to this cohort
         cohort_data = laplace.filter(pl.col('cohort') == cohort)
 
-        # Aggregate to indicator-level (mean across windows and engines)
-        indicator_agg = (
+        # Aggregate to signal-level (mean across windows and engines)
+        signal_agg = (
             cohort_data
-            .group_by('indicator_id')
+            .group_by('signal_id')
             .agg([
                 pl.col('gradient_mean').mean().alias('gradient'),
                 pl.col('laplacian_mean').mean().alias('laplacian'),
@@ -101,18 +101,18 @@ def run_laplace_pairwise_vectorized(
             ])
         )
 
-        n_indicators = len(indicator_agg)
-        n_pairs = n_indicators * (n_indicators - 1) // 2
-        logger.info(f"[{cohort}] {n_indicators} indicators → {n_pairs:,} pairs")
+        n_signals = len(signal_agg)
+        n_pairs = n_signals * (n_signals - 1) // 2
+        logger.info(f"[{cohort}] {n_signals} signals → {n_pairs:,} pairs")
 
-        if n_indicators < 2:
+        if n_signals < 2:
             continue
 
         # Self-join for all pairs
         pairwise = (
-            indicator_agg
-            .join(indicator_agg, how='cross', suffix='_b')
-            .filter(pl.col('indicator_id') < pl.col('indicator_id_b'))
+            signal_agg
+            .join(signal_agg, how='cross', suffix='_b')
+            .filter(pl.col('signal_id') < pl.col('signal_id_b'))
             .with_columns([
                 # Euclidean distance in field space
                 (
@@ -146,8 +146,8 @@ def run_laplace_pairwise_vectorized(
                 ).alias('laplacian_magnitude_similarity'),
             ])
             .select([
-                'indicator_id',
-                pl.col('indicator_id_b').alias('indicator_b'),
+                'signal_id',
+                pl.col('signal_id_b').alias('signal_b'),
                 'cohort',
                 'field_distance',
                 'divergence_distance',
@@ -194,7 +194,7 @@ def run_laplace_pairwise_windowed(
 
     ensure_directories()
 
-    path = get_parquet_path('vector', 'indicator_field')
+    path = get_parquet_path('vector', 'signal_field')
 
     # Use lazy scan for large files (> 500 MB)
     file_size_mb = get_file_size_mb(path)
@@ -207,20 +207,20 @@ def run_laplace_pairwise_windowed(
         laplace = pl.read_parquet(path)
     logger.info(f"Loaded {len(laplace):,} rows")
 
-    # Add cohort column derived from indicator_id
+    # Add cohort column derived from signal_id
     laplace = laplace.with_columns(
-        pl.col('indicator_id').map_elements(extract_cohort_from_indicator, return_dtype=pl.Utf8).alias('cohort')
+        pl.col('signal_id').map_elements(extract_cohort_from_signal, return_dtype=pl.Utf8).alias('cohort')
     )
 
     if cohort_filter:
         laplace = laplace.filter(pl.col('cohort') == cohort_filter)
         logger.info(f"Filtered to {cohort_filter}: {len(laplace):,} rows")
 
-    # Step 1: Aggregate to (cohort, window_end, indicator_id) level
-    logger.info("Aggregating to indicator-window level...")
+    # Step 1: Aggregate to (cohort, window_end, signal_id) level
+    logger.info("Aggregating to signal-window level...")
     agg = (
         laplace
-        .group_by(['cohort', 'window_end', 'indicator_id'])
+        .group_by(['cohort', 'window_end', 'signal_id'])
         .agg([
             pl.col('gradient_mean').mean().alias('gradient'),
             pl.col('laplacian_mean').mean().alias('laplacian'),
@@ -228,7 +228,7 @@ def run_laplace_pairwise_windowed(
             pl.col('field_potential').mean(),
         ])
     )
-    logger.info(f"Aggregated to {len(agg):,} indicator-windows")
+    logger.info(f"Aggregated to {len(agg):,} signal-windows")
 
     # Step 2: Self-join on (cohort, window_end) to get all pairs
     logger.info("Computing pairwise (cross-join)...")
@@ -240,7 +240,7 @@ def run_laplace_pairwise_windowed(
             how='inner',
             suffix='_b'
         )
-        .filter(pl.col('indicator_id') < pl.col('indicator_id_b'))
+        .filter(pl.col('signal_id') < pl.col('signal_id_b'))
         .with_columns([
             # Field distance in 4D Laplace space
             (
@@ -270,8 +270,8 @@ def run_laplace_pairwise_windowed(
             ).alias('laplacian_magnitude_similarity'),
         ])
         .select([
-            'indicator_id',
-            pl.col('indicator_id_b').alias('indicator_b'),
+            'signal_id',
+            pl.col('signal_id_b').alias('signal_b'),
             'cohort',
             'window_end',
             'field_distance',

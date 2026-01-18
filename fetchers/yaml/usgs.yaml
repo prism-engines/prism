@@ -4,7 +4,7 @@
 source: usgs
 domain: seismic
 
-indicators:
+signals:
   # San Andreas (California)
   - SAN_ANDREAS_COUNT
   - SAN_ANDREAS_ENERGY

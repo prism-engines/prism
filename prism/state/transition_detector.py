@@ -6,14 +6,14 @@ Detects regime boundaries using Laplace field divergence spikes.
 A transition is a statistically significant change in system dynamics.
 
 Key insight: Transitions manifest as divergence singularities in the field.
-When a regime change occurs, the total system divergence spikes as indicators
+When a regime change occurs, the total system divergence spikes as signals
 collectively respond to the structural shift.
 
 Usage:
-    from prism.state import detect_transitions, find_leading_indicators
+    from prism.state import detect_transitions, find_leading_signals
 
     system_div, transitions = detect_transitions(field_df, zscore_threshold=3.0)
-    leaders = find_leading_indicators(field_df, [t.window_end for t in transitions])
+    leaders = find_leading_signals(field_df, [t.window_end for t in transitions])
 """
 
 import polars as pl
@@ -31,20 +31,20 @@ class Transition:
         window_start: Start of transition window
         window_end: End of transition window (detection point)
         divergence_zscore: Z-score of total divergence (significance measure)
-        total_divergence: Sum of absolute indicator divergences
-        avg_gradient_magnitude: Mean gradient magnitude across indicators
-        leading_indicator: Indicator with highest gradient response
-        response_order: Top 10 indicators by response magnitude
-        n_affected_indicators: Count of indicators with above-median response
+        total_divergence: Sum of absolute signal divergences
+        avg_gradient_magnitude: Mean gradient magnitude across signals
+        leading_signal: Signal with highest gradient response
+        response_order: Top 10 signals by response magnitude
+        n_affected_signals: Count of signals with above-median response
     """
     window_start: str
     window_end: str
     divergence_zscore: float
     total_divergence: float
     avg_gradient_magnitude: float
-    leading_indicator: str
+    leading_signal: str
     response_order: List[str]
-    n_affected_indicators: int
+    n_affected_signals: int
 
     def __eq__(self, other):
         if not isinstance(other, Transition):
@@ -57,49 +57,49 @@ class Transition:
 
 def compute_system_divergence(
     field_df: pl.DataFrame,
-    exclude_indicators: Optional[List[str]] = None,
+    exclude_signals: Optional[List[str]] = None,
 ) -> pl.DataFrame:
     """
     Compute total system divergence per window.
 
-    System divergence = sum of absolute indicator divergences.
+    System divergence = sum of absolute signal divergences.
     High values indicate regime change (field singularity).
 
     Args:
-        field_df: Indicator field data with columns:
+        field_df: Signal field data with columns:
             - window_end: Date of window end
-            - indicator_id: Indicator identifier
+            - signal_id: Signal identifier
             - divergence: Laplace field divergence
             - gradient_magnitude: Magnitude of gradient vector
-        exclude_indicators: List of indicator IDs to exclude (e.g., fault labels)
+        exclude_signals: List of signal IDs to exclude (e.g., fault labels)
 
     Returns:
         DataFrame with columns:
             - window_end: Date
-            - total_divergence: Sum of |divergence| across indicators
+            - total_divergence: Sum of |divergence| across signals
             - avg_gradient_mag: Mean gradient magnitude
-            - n_indicators: Count of indicators in window
+            - n_signals: Count of signals in window
     """
-    if exclude_indicators is None:
-        exclude_indicators = []
+    if exclude_signals is None:
+        exclude_signals = []
 
     filtered = field_df
-    if exclude_indicators:
+    if exclude_signals:
         filtered = field_df.filter(
-            ~pl.col('indicator_id').is_in(exclude_indicators)
+            ~pl.col('signal_id').is_in(exclude_signals)
         )
 
     return filtered.group_by('window_end').agg([
         pl.col('divergence').abs().sum().alias('total_divergence'),
         pl.col('gradient_magnitude').mean().alias('avg_gradient_mag'),
-        pl.col('indicator_id').n_unique().alias('n_indicators'),
+        pl.col('signal_id').n_unique().alias('n_signals'),
     ]).sort('window_end')
 
 
 def detect_transitions(
     field_df: pl.DataFrame,
     zscore_threshold: float = 3.0,
-    exclude_indicators: Optional[List[str]] = None,
+    exclude_signals: Optional[List[str]] = None,
 ) -> Tuple[pl.DataFrame, List[Transition]]:
     """
     Detect regime transitions using divergence z-scores.
@@ -111,10 +111,10 @@ def detect_transitions(
     of total divergence across all windows.
 
     Args:
-        field_df: indicator_field.parquet data with columns:
-            - window_end, indicator_id, divergence, gradient_magnitude
+        field_df: signal_field.parquet data with columns:
+            - window_end, signal_id, divergence, gradient_magnitude
         zscore_threshold: Standard deviations for significance (default 3.0)
-        exclude_indicators: Indicators to exclude (e.g., ['TEP_FAULT'])
+        exclude_signals: Signals to exclude (e.g., ['TEP_FAULT'])
 
     Returns:
         Tuple of:
@@ -125,10 +125,10 @@ def detect_transitions(
         >>> system_div, transitions = detect_transitions(field_df, zscore_threshold=3.0)
         >>> print(f"Found {len(transitions)} transitions")
         >>> for t in transitions[:5]:
-        ...     print(f"  {t.window_end}: z={t.divergence_zscore:.2f}, leader={t.leading_indicator}")
+        ...     print(f"  {t.window_end}: z={t.divergence_zscore:.2f}, leader={t.leading_signal}")
     """
     # Compute system divergence
-    system_div = compute_system_divergence(field_df, exclude_indicators)
+    system_div = compute_system_divergence(field_df, exclude_signals)
 
     if len(system_div) == 0:
         return system_div, []
@@ -158,24 +158,24 @@ def detect_transitions(
     for row in transition_windows.iter_rows(named=True):
         window_end = row['window_end']
 
-        # Find leading indicators for this window
+        # Find leading signals for this window
         window_data = field_df.filter(
             pl.col('window_end') == window_end
         )
 
-        # Exclude specified indicators from leadership analysis
-        if exclude_indicators:
+        # Exclude specified signals from leadership analysis
+        if exclude_signals:
             window_data = window_data.filter(
-                ~pl.col('indicator_id').is_in(exclude_indicators)
+                ~pl.col('signal_id').is_in(exclude_signals)
             )
 
         window_data = window_data.sort('gradient_magnitude', descending=True)
 
         if len(window_data) > 0:
-            leading = window_data['indicator_id'].head(1)[0]
-            response_order = window_data['indicator_id'].head(10).to_list()
+            leading = window_data['signal_id'].head(1)[0]
+            response_order = window_data['signal_id'].head(10).to_list()
 
-            # Count affected indicators (above median gradient)
+            # Count affected signals (above median gradient)
             median_grad = window_data['gradient_magnitude'].median()
             if median_grad is not None:
                 n_affected = len(window_data.filter(
@@ -194,43 +194,43 @@ def detect_transitions(
             divergence_zscore=row['divergence_zscore'],
             total_divergence=row['total_divergence'],
             avg_gradient_magnitude=row['avg_gradient_mag'],
-            leading_indicator=leading,
+            leading_signal=leading,
             response_order=response_order,
-            n_affected_indicators=n_affected,
+            n_affected_signals=n_affected,
         ))
 
     return system_div, transitions
 
 
-def find_leading_indicators(
+def find_leading_signals(
     field_df: pl.DataFrame,
     transition_windows: List,
     top_n: int = 5,
-    exclude_indicators: Optional[List[str]] = None,
+    exclude_signals: Optional[List[str]] = None,
 ) -> pl.DataFrame:
     """
-    For each transition window, identify which indicators responded first/strongest.
+    For each transition window, identify which signals responded first/strongest.
 
     Args:
-        field_df: Indicator field data
+        field_df: Signal field data
         transition_windows: List of window_end dates (str or date objects)
         top_n: Number of top responders per window (default 5)
-        exclude_indicators: Indicators to exclude from analysis
+        exclude_signals: Signals to exclude from analysis
 
     Returns:
         DataFrame with columns:
             - window_end: Transition window date
             - rank: Response rank (1 = strongest)
-            - indicator_id: Indicator identifier
+            - signal_id: Signal identifier
             - gradient_magnitude: Response magnitude
-            - divergence: Indicator divergence at transition
+            - divergence: Signal divergence at transition
 
     Example:
-        >>> leaders = find_leading_indicators(field_df, ['2000-07-28', '2000-02-27'])
+        >>> leaders = find_leading_signals(field_df, ['2000-07-28', '2000-02-27'])
         >>> print(leaders.filter(pl.col('rank') == 1))  # Show only top responders
     """
-    if exclude_indicators is None:
-        exclude_indicators = []
+    if exclude_signals is None:
+        exclude_signals = []
 
     results = []
 
@@ -242,9 +242,9 @@ def find_leading_indicators(
             pl.col('window_end').cast(pl.Utf8) == window_str
         )
 
-        if exclude_indicators:
+        if exclude_signals:
             window_data = window_data.filter(
-                ~pl.col('indicator_id').is_in(exclude_indicators)
+                ~pl.col('signal_id').is_in(exclude_signals)
             )
 
         window_data = window_data.sort('gradient_magnitude', descending=True).head(top_n)
@@ -253,7 +253,7 @@ def find_leading_indicators(
             results.append({
                 'window_end': window_str,
                 'rank': rank,
-                'indicator_id': row['indicator_id'],
+                'signal_id': row['signal_id'],
                 'gradient_magnitude': row['gradient_magnitude'],
                 'divergence': row['divergence'],
             })
@@ -262,7 +262,7 @@ def find_leading_indicators(
         return pl.DataFrame({
             'window_end': [],
             'rank': [],
-            'indicator_id': [],
+            'signal_id': [],
             'gradient_magnitude': [],
             'divergence': [],
         })
@@ -270,57 +270,57 @@ def find_leading_indicators(
     return pl.DataFrame(results)
 
 
-def summarize_leading_indicators(
+def summarize_leading_signals(
     transitions: List[Transition],
 ) -> pl.DataFrame:
     """
-    Summarize which indicators lead transitions most frequently.
+    Summarize which signals lead transitions most frequently.
 
     Args:
         transitions: List of detected Transition objects
 
     Returns:
         DataFrame with columns:
-            - indicator_id: Indicator identifier
-            - lead_count: Number of times this indicator led a transition
+            - signal_id: Signal identifier
+            - lead_count: Number of times this signal led a transition
             - lead_ratio: Proportion of transitions led
             - avg_zscore: Average z-score when leading
 
     Example:
         >>> _, transitions = detect_transitions(field_df)
-        >>> summary = summarize_leading_indicators(transitions)
-        >>> print(summary.head(5))  # Top 5 leading indicators
+        >>> summary = summarize_leading_signals(transitions)
+        >>> print(summary.head(5))  # Top 5 leading signals
     """
     from collections import Counter
 
     if not transitions:
         return pl.DataFrame({
-            'indicator_id': [],
+            'signal_id': [],
             'lead_count': [],
             'lead_ratio': [],
             'avg_zscore': [],
         })
 
     # Count leadership frequency
-    leaders = [t.leading_indicator for t in transitions]
+    leaders = [t.leading_signal for t in transitions]
     counts = Counter(leaders)
 
     # Compute average z-score when leading
     leader_zscores = {}
     for t in transitions:
-        leader = t.leading_indicator
+        leader = t.leading_signal
         if leader not in leader_zscores:
             leader_zscores[leader] = []
         leader_zscores[leader].append(abs(t.divergence_zscore))
 
     records = []
     total = len(transitions)
-    for indicator, count in counts.most_common():
+    for signal, count in counts.most_common():
         records.append({
-            'indicator_id': indicator,
+            'signal_id': signal,
             'lead_count': count,
             'lead_ratio': count / total,
-            'avg_zscore': np.mean(leader_zscores[indicator]),
+            'avg_zscore': np.mean(leader_zscores[signal]),
         })
 
     return pl.DataFrame(records)

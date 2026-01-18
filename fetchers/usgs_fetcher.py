@@ -18,7 +18,7 @@ Usage:
     from fetchers.usgs_fetcher import fetch
 
     config = {
-        "indicators": ["SAN_ANDREAS_COUNT", "JAPAN_ENERGY"],
+        "signals": ["SAN_ANDREAS_COUNT", "JAPAN_ENERGY"],
         "start_date": "2020-01-01",  # optional
     }
     observations = fetch(config)
@@ -138,13 +138,13 @@ def magnitude_to_energy(magnitude: float) -> float:
     return 10 ** (1.5 * magnitude + 4.8)
 
 
-def parse_indicator_id(indicator_id: str) -> Tuple[str, str]:
-    """Parse indicator ID into (region, type)."""
+def parse_signal_id(signal_id: str) -> Tuple[str, str]:
+    """Parse signal ID into (region, type)."""
     for type_suffix in INDICATOR_TYPES:
-        if indicator_id.endswith(f"_{type_suffix}"):
-            region = indicator_id[:-len(type_suffix)-1]
+        if signal_id.endswith(f"_{type_suffix}"):
+            region = signal_id[:-len(type_suffix)-1]
             return region, type_suffix
-    raise ValueError(f"Unknown indicator format: {indicator_id}")
+    raise ValueError(f"Unknown signal format: {signal_id}")
 
 
 # =============================================================================
@@ -219,14 +219,14 @@ def fetch_region_range(
 
 def aggregate_to_daily(
     earthquakes: pd.DataFrame,
-    indicator_type: str,
+    signal_type: str,
     start_date: date,
     end_date: date,
 ) -> pd.DataFrame:
     """Aggregate earthquake events to daily signal topology."""
     if earthquakes.empty:
         dates = pd.date_range(start_date, end_date, freq="D")
-        if indicator_type == "COUNT":
+        if signal_type == "COUNT":
             return pd.DataFrame({"date": dates, "value": 0})
         else:
             return pd.DataFrame({"date": dates, "value": np.nan})
@@ -237,27 +237,27 @@ def aggregate_to_daily(
     all_dates = pd.date_range(start_date, end_date, freq="D")
     date_df = pd.DataFrame({"date": all_dates.date})
 
-    if indicator_type == "COUNT":
+    if signal_type == "COUNT":
         daily = eq.groupby("date").size().reset_index(name="value")
-    elif indicator_type == "ENERGY":
+    elif signal_type == "ENERGY":
         eq["energy"] = eq["mag"].apply(magnitude_to_energy)
         daily = eq.groupby("date")["energy"].sum().reset_index(name="value")
         daily["value"] = np.log10(daily["value"])
-    elif indicator_type == "MAXMAG":
+    elif signal_type == "MAXMAG":
         daily = eq.groupby("date")["mag"].max().reset_index(name="value")
-    elif indicator_type == "MEANMAG":
+    elif signal_type == "MEANMAG":
         daily = eq.groupby("date")["mag"].mean().reset_index(name="value")
-    elif indicator_type == "DEPTH":
+    elif signal_type == "DEPTH":
         daily = eq.groupby("date")["depth"].mean().reset_index(name="value")
     else:
-        raise ValueError(f"Unknown indicator type: {indicator_type}")
+        raise ValueError(f"Unknown signal type: {signal_type}")
 
     daily["date"] = pd.to_datetime(daily["date"])
     date_df["date"] = pd.to_datetime(date_df["date"])
 
     result = date_df.merge(daily, on="date", how="left")
 
-    if indicator_type == "COUNT":
+    if signal_type == "COUNT":
         result["value"] = result["value"].fillna(0).astype(int)
 
     return result[["date", "value"]]
@@ -269,21 +269,21 @@ def aggregate_to_daily(
 
 def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
-    Fetch observations for indicators specified in config.
+    Fetch observations for signals specified in config.
 
     Args:
         config: Dict with keys:
-            - indicators: list of indicator IDs like "SAN_ANDREAS_COUNT"
+            - signals: list of signal IDs like "SAN_ANDREAS_COUNT"
             - start_date: optional start date string (YYYY-MM-DD)
             - end_date: optional end date string (YYYY-MM-DD)
 
     Returns:
         List of observation dicts with keys:
-            indicator_id, observed_at, value, source
+            signal_id, observed_at, value, source
     """
-    indicators = config.get("indicators", [])
-    if not indicators:
-        raise ValueError("Config must contain 'indicators' list")
+    signals = config.get("signals", [])
+    if not signals:
+        raise ValueError("Config must contain 'signals' list")
 
     # Parse dates
     end_date = date.today() - timedelta(days=1)
@@ -298,15 +298,15 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     region_cache: Dict[str, pd.DataFrame] = {}
     all_observations = []
 
-    for indicator_id in indicators:
+    for signal_id in signals:
         try:
-            region_name, indicator_type = parse_indicator_id(indicator_id)
+            region_name, signal_type = parse_signal_id(signal_id)
         except ValueError as e:
-            print(f"  {indicator_id}: FAILED - {e}")
+            print(f"  {signal_id}: FAILED - {e}")
             continue
 
         if region_name not in REGIONS:
-            print(f"  {indicator_id}: FAILED - Unknown region: {region_name}")
+            print(f"  {signal_id}: FAILED - Unknown region: {region_name}")
             continue
 
         region = REGIONS[region_name]
@@ -321,26 +321,26 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
         earthquakes = region_cache[cache_key]
 
         # Aggregate to daily
-        df = aggregate_to_daily(earthquakes, indicator_type, start_date, end_date)
+        df = aggregate_to_daily(earthquakes, signal_type, start_date, end_date)
 
         # Convert to observation dicts
         for _, row in df.iterrows():
             if pd.notna(row["value"]):
                 all_observations.append({
-                    "indicator_id": indicator_id,
+                    "signal_id": signal_id,
                     "observed_at": row["date"],
                     "value": row["value"],
                     "source": SOURCE,
                 })
 
-        print(f"  {indicator_id}: {len(df)} days")
+        print(f"  {signal_id}: {len(df)} days")
 
     return all_observations
 
 
 if __name__ == "__main__":
     config = {
-        "indicators": ["SAN_ANDREAS_COUNT", "SAN_ANDREAS_MAXMAG"],
+        "signals": ["SAN_ANDREAS_COUNT", "SAN_ANDREAS_MAXMAG"],
         "start_date": "2023-01-01",
     }
     results = fetch(config)

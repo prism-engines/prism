@@ -86,14 +86,14 @@ python -m prism.entry_points.fetch --hydraulic
 
 ### Vector Computation
 ```bash
-# Run vector engines on all indicators
-python -m prism.entry_points.indicator_vector
+# Run vector engines on all signals
+python -m prism.entry_points.signal_vector
 
 # Specific domain
-python -m prism.entry_points.indicator_vector --domain cmapss
+python -m prism.entry_points.signal_vector --domain cmapss
 
 # Parallel execution
-python -m prism.entry_points.indicator_vector --workers 4
+python -m prism.entry_points.signal_vector --workers 4
 ```
 
 ### Geometry & State
@@ -122,11 +122,11 @@ Layer 0: OBSERVATIONS
          Output: data/raw/observations.parquet
 
 Layer 1: INDICATOR VECTOR
-         Raw observations → 51 behavioral metrics per indicator
-         Output: data/vector/indicator.parquet
+         Raw observations → 51 behavioral metrics per signal
+         Output: data/vector/signal.parquet
 
 Layer 2: COHORT GEOMETRY
-         Indicator vectors → pairwise relationships + cohort structure
+         Signal vectors → pairwise relationships + cohort structure
          Output: data/geometry/cohort.parquet
 
 Layer 3: STATE
@@ -155,7 +155,7 @@ import polars as pl
 from prism.db.parquet_store import get_parquet_path
 
 observations = pl.read_parquet(get_parquet_path('raw', 'observations'))
-filtered = observations.filter(pl.col('indicator_id') == 'sensor_1')
+filtered = observations.filter(pl.col('signal_id') == 'sensor_1')
 ```
 
 ### Writing Data
@@ -163,7 +163,7 @@ filtered = observations.filter(pl.col('indicator_id') == 'sensor_1')
 from prism.db.polars_io import upsert_parquet, write_parquet_atomic
 
 # Upsert (preserves existing rows, updates by key)
-upsert_parquet(df, target_path, key_cols=['indicator_id', 'obs_date'])
+upsert_parquet(df, target_path, key_cols=['signal_id', 'obs_date'])
 
 # Atomic write (replaces entire file)
 write_parquet_atomic(df, target_path)

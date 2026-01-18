@@ -217,7 +217,7 @@ class MemoryTracker:
     Context manager to track memory usage in a block.
 
     Usage:
-        with MemoryTracker("Processing indicators") as tracker:
+        with MemoryTracker("Processing signals") as tracker:
             do_stuff()
         print(f"Used {tracker.delta_mb:.1f} MB")
     """

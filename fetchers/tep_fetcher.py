@@ -23,7 +23,7 @@ Usage:
     observations = fetch(config)
 
 Returns:
-    list[dict] with keys: indicator_id, observed_at, value, source
+    list[dict] with keys: signal_id, observed_at, value, source
 """
 
 import os
@@ -222,13 +222,13 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
         config: Dict with keys:
             - dataset: "1year" or "3years" (default: "1year")
             - include_xmv: Include manipulated variables (default: True)
-            - include_fault: Include fault code as indicator (default: True)
+            - include_fault: Include fault code as signal (default: True)
             - sample_rate: Sample every N rows (default: 1, no subsampling)
             - cache_dir: Directory for cached downloads
 
     Returns:
         List of observation dicts with keys:
-            indicator_id, observed_at, value, source
+            signal_id, observed_at, value, source
     """
     dataset = config.get("dataset", "1year")
     include_xmv = config.get("include_xmv", True)
@@ -276,7 +276,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
             value = row[col]
             if pd.notna(value):
                 all_observations.append({
-                    "indicator_id": f"TEP_{col}",
+                    "signal_id": f"TEP_{col}",
                     "observed_at": obs_date,
                     "value": float(value),
                     "source": SOURCE,
@@ -288,7 +288,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
                 value = row[col]
                 if pd.notna(value):
                     all_observations.append({
-                        "indicator_id": f"TEP_{col}",
+                        "signal_id": f"TEP_{col}",
                         "observed_at": obs_date,
                         "value": float(value),
                         "source": SOURCE,
@@ -299,7 +299,7 @@ def fetch(config: Dict[str, Any]) -> List[Dict[str, Any]]:
             fault = row.get('fault_code')
             if pd.notna(fault):
                 all_observations.append({
-                    "indicator_id": "TEP_FAULT",
+                    "signal_id": "TEP_FAULT",
                     "observed_at": obs_date,
                     "value": float(fault),
                     "source": SOURCE,
@@ -326,9 +326,9 @@ if __name__ == "__main__":
         print("\nSample observations:")
         print(df)
 
-    # Show unique indicators
+    # Show unique signals
     if results:
-        indicators = set(r['indicator_id'] for r in results)
-        print(f"\nUnique indicators: {len(indicators)}")
-        for ind in sorted(indicators)[:10]:
+        signals = set(r['signal_id'] for r in results)
+        print(f"\nUnique signals: {len(signals)}")
+        for ind in sorted(signals)[:10]:
             print(f"  - {ind}")

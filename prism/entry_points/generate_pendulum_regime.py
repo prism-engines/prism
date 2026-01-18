@@ -16,7 +16,7 @@ Usage:
     python -m prism.entry_points.generate_pendulum_regime
 
 Then run:
-    python -m prism.entry_points.indicator_vector --indicator --domain pendulum_regime --force --report indicator
+    python -m prism.entry_points.signal_vector --signal --domain pendulum_regime --force --report signal
 """
 
 import numpy as np
@@ -132,10 +132,10 @@ def generate_pendulum_regime():
     rows = []
     for i in range(len(t_full)):
         obs_date = base_date + timedelta(days=i)
-        rows.append({'indicator_id': 'pend_theta1', 'obs_date': obs_date, 'value': float(theta1[i])})
-        rows.append({'indicator_id': 'pend_omega1', 'obs_date': obs_date, 'value': float(omega1[i])})
-        rows.append({'indicator_id': 'pend_theta2', 'obs_date': obs_date, 'value': float(theta2[i])})
-        rows.append({'indicator_id': 'pend_omega2', 'obs_date': obs_date, 'value': float(omega2[i])})
+        rows.append({'signal_id': 'pend_theta1', 'obs_date': obs_date, 'value': float(theta1[i])})
+        rows.append({'signal_id': 'pend_omega1', 'obs_date': obs_date, 'value': float(omega1[i])})
+        rows.append({'signal_id': 'pend_theta2', 'obs_date': obs_date, 'value': float(theta2[i])})
+        rows.append({'signal_id': 'pend_omega2', 'obs_date': obs_date, 'value': float(omega2[i])})
 
     obs_df = pl.DataFrame(rows)
 
@@ -183,7 +183,7 @@ def generate_pendulum_regime():
     print("\n" + "=" * 70)
     print("RUN PRISM")
     print("=" * 70)
-    print("  python -m prism.entry_points.indicator_vector --indicator --domain pendulum_regime --force --report indicator")
+    print("  python -m prism.entry_points.signal_vector --signal --domain pendulum_regime --force --report signal")
 
     return {
         'domain': domain,

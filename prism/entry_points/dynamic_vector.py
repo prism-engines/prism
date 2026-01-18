@@ -8,9 +8,9 @@ THIS IS AN ORCHESTRATOR - NO COMPUTATION LOGIC HERE.
 All math is delegated to canonical PRISM engines.
 
 Layers:
-    1. Observation  → Raw indicator data
-    2. Vector       → Behavioral metrics per indicator (entropy, hurst, etc.)
-    3. Geometry     → Pairwise coupling space (N indicators → N*(N-1)/2 dimensions)
+    1. Observation  → Raw signal data
+    2. Vector       → Behavioral metrics per signal (entropy, hurst, etc.)
+    3. Geometry     → Pairwise coupling space (N signals → N*(N-1)/2 dimensions)
                       Engines: correlation, transfer_entropy, cointegration
     4. Dynamic State → Position in coupling space per window
     5. Dynamic Vector → Velocity/direction through coupling space
@@ -76,8 +76,8 @@ def compute_pairwise_geometry(
         - cointegration: Long-run equilibrium test
 
     Args:
-        series_a: Signal for indicator A
-        series_b: Signal for indicator B
+        series_a: Signal for signal A
+        series_b: Signal for signal B
         pair_name: Name for this pair (e.g., "HR_BP")
 
     Returns:
@@ -115,21 +115,21 @@ def compute_pairwise_geometry(
 
 def compute_geometry_for_window(
     window_data: Dict[str, np.ndarray],
-    indicators: List[str],
+    signals: List[str],
 ) -> Dict[str, float]:
     """
     Compute full pairwise geometry for a single window.
 
-    Calls compute_pairwise_geometry for each indicator pair.
+    Calls compute_pairwise_geometry for each signal pair.
 
     Args:
-        window_data: Dict mapping indicator_id -> numpy array of values
-        indicators: List of indicator IDs to compare
+        window_data: Dict mapping signal_id -> numpy array of values
+        signals: List of signal IDs to compare
 
     Returns:
         Dict with all pairwise metrics for this window
     """
-    pairs = list(combinations(indicators, 2))
+    pairs = list(combinations(signals, 2))
     results = {}
 
     for ind_a, ind_b in pairs:
@@ -158,7 +158,7 @@ def compute_geometry_for_window(
 def compute_rolling_geometry(
     df: pl.DataFrame,
     entity_col: str,
-    indicator_col: str,
+    signal_col: str,
     window_col: str,
     value_col: str,
     rolling_windows: int = 6,
@@ -168,17 +168,17 @@ def compute_rolling_geometry(
 
     This is the ORCHESTRATOR - it prepares data and calls engines.
     """
-    indicators = sorted(df[indicator_col].unique().to_list())
-    n_pairs = len(list(combinations(indicators, 2)))
+    signals = sorted(df[signal_col].unique().to_list())
+    n_pairs = len(list(combinations(signals, 2)))
 
-    print(f"  Indicators: {len(indicators)} → {n_pairs} pairs")
+    print(f"  Signals: {len(signals)} → {n_pairs} pairs")
     print(f"  Engines: correlation={HAS_CORR}, transfer_entropy={HAS_TE}, cointegration={HAS_COINT}")
     print(f"  Rolling window: {rolling_windows}")
 
     # Pivot to wide
     wide = df.pivot(
         index=[entity_col, window_col],
-        on=indicator_col,
+        on=signal_col,
         values=value_col,
         aggregate_function="mean"
     ).sort([entity_col, window_col])
@@ -199,14 +199,14 @@ def compute_rolling_geometry(
 
             # Build window_data dict for engine calls
             window_data = {}
-            for ind in indicators:
+            for ind in signals:
                 if ind in window_slice.columns:
                     vals = window_slice[ind].drop_nulls().to_numpy()
                     if len(vals) >= 3:
                         window_data[ind] = vals
 
             # Call engines via orchestrator
-            geometry_metrics = compute_geometry_for_window(window_data, indicators)
+            geometry_metrics = compute_geometry_for_window(window_data, signals)
 
             # Build result row
             row = {
@@ -492,7 +492,7 @@ def run_pipeline(
     output_path: Path,
     domain: str,
     entity_col: str = "entity_id",
-    indicator_col: str = "indicator_id",
+    signal_col: str = "signal_id",
     window_col: str = "window_end",
     value_col: str = "value",
     rolling_window: int = 6,
@@ -524,26 +524,26 @@ def run_pipeline(
                 entity_col = candidate
                 break
 
-    if indicator_col not in df.columns:
-        for candidate in ["vital", "sensor", "indicator", "variable"]:
+    if signal_col not in df.columns:
+        for candidate in ["vital", "sensor", "signal", "variable"]:
             if candidate in df.columns:
-                indicator_col = candidate
+                signal_col = candidate
                 break
 
     print(f"  Entity column: {entity_col}")
-    print(f"  Indicator column: {indicator_col}")
+    print(f"  Signal column: {signal_col}")
     print(f"  Window column: {window_col}")
     print(f"  Value column: {value_col}")
 
     entities = df[entity_col].unique()
-    indicators = df[indicator_col].unique()
+    signals = df[signal_col].unique()
     print(f"  Entities: {len(entities)}")
-    print(f"  Indicators: {len(indicators)} → {indicators.to_list()}")
+    print(f"  Signals: {len(signals)} → {signals.to_list()}")
 
     # Layer 3: Geometry (CALLS ENGINES)
     print(f"\n[2/5] Computing Geometry (calling engines: corr, TE, coint)")
     geometry_df = compute_rolling_geometry(
-        df, entity_col, indicator_col, window_col, value_col, rolling_window
+        df, entity_col, signal_col, window_col, value_col, rolling_window
     )
     print(f"  Geometry rows: {len(geometry_df):,}")
 
@@ -594,15 +594,15 @@ def main():
 Examples:
     python dynamic_vector.py --domain mimic --input vitals.parquet
     python dynamic_vector.py --domain turbofan --input sensors.parquet
-    python dynamic_vector.py --domain cmapss --input indicators.parquet --wide
+    python dynamic_vector.py --domain cmapss --input signals.parquet --wide
         """
     )
 
     parser.add_argument("--domain", required=True, help="Domain name (mimic, turbofan, cmapss)")
-    parser.add_argument("--input", required=True, help="Input parquet with indicator vectors")
+    parser.add_argument("--input", required=True, help="Input parquet with signal vectors")
     parser.add_argument("--output", help="Output parquet path (default: dynamic_vectors.parquet)")
     parser.add_argument("--entity-col", default="entity_id", help="Entity column name")
-    parser.add_argument("--indicator-col", default="indicator_id", help="Indicator column name")
+    parser.add_argument("--signal-col", default="signal_id", help="Signal column name")
     parser.add_argument("--window-col", default="window_end", help="Window column name")
     parser.add_argument("--value-col", default="value", help="Value column name")
     parser.add_argument("--rolling-window", type=int, default=6, help="Rolling window size for correlation")
@@ -622,7 +622,7 @@ Examples:
         output_path=output_path,
         domain=args.domain,
         entity_col=args.entity_col,
-        indicator_col=args.indicator_col,
+        signal_col=args.signal_col,
         window_col=args.window_col,
         value_col=args.value_col,
         rolling_window=args.rolling_window,

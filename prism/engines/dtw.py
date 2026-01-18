@@ -128,7 +128,7 @@ class DTWEngine(BaseEngine):
         Run DTW analysis.
 
         Args:
-            df: Normalized indicator data
+            df: Normalized signal data
             run_id: Unique run identifier
             window_constraint: Sakoe-Chiba band width (None = no constraint)
 
@@ -136,16 +136,16 @@ class DTWEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = df_clean.columns.tolist()
-        n_indicators = len(indicators)
+        signals = df_clean.columns.tolist()
+        n_signals = len(signals)
 
         window_start, window_end = get_window_dates(df_clean)
 
         # Compute pairwise DTW distances
-        distances = np.zeros((n_indicators, n_indicators))
+        distances = np.zeros((n_signals, n_signals))
 
-        for i in range(n_indicators):
-            for j in range(i + 1, n_indicators):
+        for i in range(n_signals):
+            for j in range(i + 1, n_signals):
                 x = df_clean.iloc[:, i].values
                 y = df_clean.iloc[:, j].values
 
@@ -159,12 +159,12 @@ class DTWEngine(BaseEngine):
 
         # Store distance matrix
         records = []
-        for i, ind_i in enumerate(indicators):
-            for j, ind_j in enumerate(indicators):
+        for i, ind_i in enumerate(signals):
+            for j, ind_j in enumerate(signals):
                 if i < j:
                     records.append({
-                        "indicator_1": ind_i,
-                        "indicator_2": ind_j,
+                        "signal_1": ind_i,
+                        "signal_2": ind_j,
                         "window_start": window_start,
                         "window_end": window_end,
                         "dtw_distance": float(distances[i, j]),
@@ -177,22 +177,22 @@ class DTWEngine(BaseEngine):
             ##self.store_results("dtw_distances", df_results, run_id)
 
         # Summary metrics
-        n_pairs = n_indicators * (n_indicators - 1) // 2
+        n_pairs = n_signals * (n_signals - 1) // 2
         condensed = squareform(distances)
 
         metrics = {
-            "n_indicators": n_indicators,
+            "n_signals": n_signals,
             "n_pairs": n_pairs,
             "n_samples": len(df_clean),
             "avg_dtw_distance": float(np.mean(condensed)) if len(condensed) > 0 else 0.0,
             "max_dtw_distance": float(np.max(condensed)) if len(condensed) > 0 else 0.0,
             "min_dtw_distance": float(np.min(condensed)) if len(condensed) > 0 else 0.0,
-            "avg_similarity": float(np.mean(similarity[np.triu_indices(n_indicators, k=1)])) if n_pairs > 0 else 0.0,
+            "avg_similarity": float(np.mean(similarity[np.triu_indices(n_signals, k=1)])) if n_pairs > 0 else 0.0,
             "window_constraint": window_constraint,
         }
 
         logger.info(
-            f"DTW complete: {n_indicators} indicators, "
+            f"DTW complete: {n_signals} signals, "
             f"avg_dist={metrics['avg_dtw_distance']:.4f}"
         )
 
@@ -206,8 +206,8 @@ class DTWEngine(BaseEngine):
 def compute_dtw_with_derivation(
     x: np.ndarray,
     y: np.ndarray,
-    indicator_x: str = "X",
-    indicator_y: str = "Y",
+    signal_x: str = "X",
+    signal_y: str = "Y",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -219,8 +219,8 @@ def compute_dtw_with_derivation(
     Args:
         x: First signal topology
         y: Second signal topology
-        indicator_x: Name of X indicator
-        indicator_y: Name of Y indicator
+        signal_x: Name of X signal
+        signal_y: Name of Y signal
         window_id: Window identifier
         window_start, window_end: Date range
         window_constraint: Sakoe-Chiba band width (None = no constraint)
@@ -235,7 +235,7 @@ def compute_dtw_with_derivation(
     deriv = Derivation(
         engine_name="dtw",
         method_name="Dynamic Time Warping",
-        indicator_id=f"{indicator_x}_vs_{indicator_y}",
+        signal_id=f"{signal_x}_vs_{signal_y}",
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -247,10 +247,10 @@ def compute_dtw_with_derivation(
     deriv.add_step(
         title="Input Signal Topology",
         equation="x ∈ ℝⁿ, y ∈ ℝᵐ",
-        calculation=f"Series {indicator_x}:\n"
+        calculation=f"Series {signal_x}:\n"
                     f"  length n = {n}\n"
                     f"  range: [{np.min(x):.4f}, {np.max(x):.4f}]\n\n"
-                    f"Series {indicator_y}:\n"
+                    f"Series {signal_y}:\n"
                     f"  length m = {m}\n"
                     f"  range: [{np.min(y):.4f}, {np.max(y):.4f}]\n\n"
                     f"DTW allows temporal alignment (warping) to compare shapes",
@@ -398,11 +398,11 @@ def compute_dtw_with_derivation(
 
     # Interpretation
     if similarity > 0.8:
-        interp = f"**Highly similar** shapes: {indicator_x} and {indicator_y} (sim={similarity:.3f})."
+        interp = f"**Highly similar** shapes: {signal_x} and {signal_y} (sim={similarity:.3f})."
     elif similarity > 0.5:
-        interp = f"**Moderately similar** shapes: {indicator_x} and {indicator_y} (sim={similarity:.3f})."
+        interp = f"**Moderately similar** shapes: {signal_x} and {signal_y} (sim={similarity:.3f})."
     else:
-        interp = f"**Different** shapes: {indicator_x} and {indicator_y} (sim={similarity:.3f})."
+        interp = f"**Different** shapes: {signal_x} and {signal_y} (sim={similarity:.3f})."
 
     interp += f" DTW distance = {dtw_dist:.4f}."
     if dtw_dist < euclidean_dist * 0.9:

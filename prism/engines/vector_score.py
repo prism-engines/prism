@@ -2,12 +2,12 @@
 Vector Score - Normalized 0-1 activity scoring for vector layer
 
 Computes a composite "activity" score from multiple engine outputs.
-Score of 0 = indicator behaving calmly/normally
-Score of 1 = indicator behaving at maximum activity/unusualness
+Score of 0 = signal behaving calmly/normally
+Score of 1 = signal behaving at maximum activity/unusualness
 
 Usage:
-    Called by indicator_vector.py runner after engine computations.
-    Stores results alongside vector metrics in vector/indicator parquet.
+    Called by signal_vector.py runner after engine computations.
+    Stores results alongside vector metrics in vector/signal parquet.
 """
 
 import numpy as np
@@ -266,29 +266,29 @@ def compute_vector_score(
 
 def compute_baselines_from_history(
     df: pl.DataFrame,
-    indicator_id: str
+    signal_id: str
 ) -> Dict[str, Baselines]:
     """
     Compute baselines for all metrics from historical data.
 
     Args:
-        df: Vector metrics DataFrame with indicator_id, metric_name, metric_value
-        indicator_id: Which indicator to compute baselines for
+        df: Vector metrics DataFrame with signal_id, metric_name, metric_value
+        signal_id: Which signal to compute baselines for
 
     Returns:
         {metric_name: Baselines}
     """
     baselines = {}
 
-    # Filter to this indicator
-    indicator_df = df.filter(pl.col("indicator_id") == indicator_id)
+    # Filter to this signal
+    signal_df = df.filter(pl.col("signal_id") == signal_id)
 
-    if len(indicator_df) == 0:
+    if len(signal_df) == 0:
         return baselines
 
     # Get unique metrics that have configs
     for metric_name in ENGINE_CONFIGS.keys():
-        metric_df = indicator_df.filter(pl.col("metric_name") == metric_name)
+        metric_df = signal_df.filter(pl.col("metric_name") == metric_name)
 
         if len(metric_df) < 10:
             continue
@@ -311,7 +311,7 @@ def compute_score_for_window(
 
     Args:
         metrics: {metric_name: metric_value} from engine outputs
-        baselines: Pre-computed baselines for this indicator
+        baselines: Pre-computed baselines for this signal
 
     Returns:
         Score dict ready to store

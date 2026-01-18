@@ -128,7 +128,7 @@
       "Bash(# Check for more cleanup candidates echo \"\"=== Stray files in prism/ ===\"\" find prism -name \"\"*.log\"\" -o -name \"\"*_old.py\"\" -o -name \"\"*_test.py\"\" -o -name \"\"*_backup*\"\" echo -e \"\"\\\\n=== Stray files in data/ ===\"\" ls -la data/*.duckdb data/*.log echo -e \"\"\\\\n=== Stray files in root ===\"\" ls *.log *.bak || echo \"\"\\(none\\)\"\" echo -e \"\"\\\\n=== __pycache__ directories ===\"\" find . -name \"\"__pycache__\"\" -type d)",
       "Bash(__NEW_LINE_869dba37a83aeac8__ echo -e \"\\\\n=== Data directory ===\")",
       "Bash(__NEW_LINE_869dba37a83aeac8__ echo -e \"\\\\n=== Git status ===\")",
-      "Bash(__NEW_LINE_b7c225c9e29abf37__ echo -e \"\\\\n=== Running risk \\(8 indicators\\) ===\")",
+      "Bash(__NEW_LINE_b7c225c9e29abf37__ echo -e \"\\\\n=== Running risk \\(8 signals\\) ===\")",
       "Bash(__NEW_LINE_591d9bb624f61e59__ git log --oneline -1)",
       "Bash(source:*)",
       "Bash(pip show:*)",

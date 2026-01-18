@@ -4,7 +4,7 @@ PRISM C-MAPSS Physics Validation
 ================================
 Translates SQL validation queries to Polars for Parquet-based PRISM v2.0
 
-Run after: characterize -> indicator_vector -> laplace
+Run after: characterize -> signal_vector -> laplace
 """
 
 import polars as pl
@@ -15,60 +15,60 @@ warnings.filterwarnings('ignore')
 DATA_DIR = Path("data/C_MAPSS_v2")
 
 
-def parse_indicator_id(indicator_id: str) -> dict:
+def parse_signal_id(signal_id: str) -> dict:
     """Parse CMAPSS_sensor_dataset_Uunit format."""
-    parts = indicator_id.split("_")
+    parts = signal_id.split("_")
     if len(parts) >= 4 and parts[0] == "CMAPSS":
         sensor = parts[1]
         dataset = parts[2]
         unit = parts[3].replace("U", "") if parts[3].startswith("U") else parts[3]
         return {"sensor": sensor, "dataset": dataset, "unit": unit}
-    return {"sensor": indicator_id, "dataset": "unknown", "unit": "0"}
+    return {"sensor": signal_id, "dataset": "unknown", "unit": "0"}
 
 
 def load_data():
     """Load all required parquet files."""
     print("Loading data...")
 
-    indicator = pl.read_parquet(DATA_DIR / "vector/indicator.parquet")
-    field = pl.read_parquet(DATA_DIR / "vector/indicator_field.parquet")
+    signal = pl.read_parquet(DATA_DIR / "vector/signal.parquet")
+    field = pl.read_parquet(DATA_DIR / "vector/signal_field.parquet")
     char = pl.read_parquet(DATA_DIR / "raw/characterization.parquet")
     obs = pl.read_parquet(DATA_DIR / "raw/observations.parquet")
 
-    # Parse indicator_id components
-    indicator = indicator.with_columns([
-        pl.col("indicator_id").map_elements(
-            lambda x: parse_indicator_id(x)["sensor"], return_dtype=pl.Utf8
+    # Parse signal_id components
+    signal = signal.with_columns([
+        pl.col("signal_id").map_elements(
+            lambda x: parse_signal_id(x)["sensor"], return_dtype=pl.Utf8
         ).alias("sensor"),
-        pl.col("indicator_id").map_elements(
-            lambda x: parse_indicator_id(x)["dataset"], return_dtype=pl.Utf8
+        pl.col("signal_id").map_elements(
+            lambda x: parse_signal_id(x)["dataset"], return_dtype=pl.Utf8
         ).alias("dataset"),
-        pl.col("indicator_id").map_elements(
-            lambda x: parse_indicator_id(x)["unit"], return_dtype=pl.Utf8
+        pl.col("signal_id").map_elements(
+            lambda x: parse_signal_id(x)["unit"], return_dtype=pl.Utf8
         ).alias("unit"),
     ])
 
     field = field.with_columns([
-        pl.col("indicator_id").map_elements(
-            lambda x: parse_indicator_id(x)["sensor"], return_dtype=pl.Utf8
+        pl.col("signal_id").map_elements(
+            lambda x: parse_signal_id(x)["sensor"], return_dtype=pl.Utf8
         ).alias("sensor"),
-        pl.col("indicator_id").map_elements(
-            lambda x: parse_indicator_id(x)["dataset"], return_dtype=pl.Utf8
+        pl.col("signal_id").map_elements(
+            lambda x: parse_signal_id(x)["dataset"], return_dtype=pl.Utf8
         ).alias("dataset"),
-        pl.col("indicator_id").map_elements(
-            lambda x: parse_indicator_id(x)["unit"], return_dtype=pl.Utf8
+        pl.col("signal_id").map_elements(
+            lambda x: parse_signal_id(x)["unit"], return_dtype=pl.Utf8
         ).alias("unit"),
     ])
 
-    print(f"  indicator: {indicator.shape[0]:,} rows")
+    print(f"  signal: {signal.shape[0]:,} rows")
     print(f"  field: {field.shape[0]:,} rows")
     print(f"  characterization: {char.shape[0]:,} rows")
     print(f"  observations: {obs.shape[0]:,} rows")
 
-    return indicator, field, char, obs
+    return signal, field, char, obs
 
 
-def query_1_leading_indicators(indicator: pl.DataFrame) -> pl.DataFrame:
+def query_1_leading_signals(signal: pl.DataFrame) -> pl.DataFrame:
     """
     LEADING INDICATORS: Which sensors show behavioral shifts first?
 
@@ -83,14 +83,14 @@ def query_1_leading_indicators(indicator: pl.DataFrame) -> pl.DataFrame:
     key_metrics = ["hurst_exponent", "permutation_entropy", "sample_entropy"]
 
     # Get windowed metrics
-    df = indicator.filter(pl.col("metric_name").is_in(key_metrics))
+    df = signal.filter(pl.col("metric_name").is_in(key_metrics))
 
     # Calculate shift detection per unit
     shifts = (
-        df.sort(["indicator_id", "metric_name", "obs_date"])
+        df.sort(["signal_id", "metric_name", "obs_date"])
         .with_columns([
-            pl.col("metric_value").shift(1).over(["indicator_id", "metric_name"]).alias("prev_value"),
-            pl.col("metric_value").std().over(["indicator_id", "metric_name"]).alias("metric_std"),
+            pl.col("metric_value").shift(1).over(["signal_id", "metric_name"]).alias("prev_value"),
+            pl.col("metric_value").std().over(["signal_id", "metric_name"]).alias("metric_std"),
         ])
         .with_columns([
             ((pl.col("metric_value") - pl.col("prev_value")).abs() /
@@ -106,7 +106,7 @@ def query_1_leading_indicators(indicator: pl.DataFrame) -> pl.DataFrame:
 
     # Get failure dates (max obs_date per unit)
     failure_dates = (
-        indicator
+        signal
         .group_by(["dataset", "unit"])
         .agg(pl.col("obs_date").max().alias("failure_date"))
     )
@@ -135,7 +135,7 @@ def query_1_leading_indicators(indicator: pl.DataFrame) -> pl.DataFrame:
     return result
 
 
-def query_5_degradation_signature(indicator: pl.DataFrame, obs: pl.DataFrame) -> pl.DataFrame:
+def query_5_degradation_signature(signal: pl.DataFrame, obs: pl.DataFrame) -> pl.DataFrame:
     """
     DEGRADATION SIGNATURE: Metric profiles across RUL phases.
 
@@ -147,17 +147,17 @@ def query_5_degradation_signature(indicator: pl.DataFrame, obs: pl.DataFrame) ->
     print("="*70)
 
     # Get RUL observations
-    rul_obs = obs.filter(pl.col("indicator_id").str.contains("RUL"))
+    rul_obs = obs.filter(pl.col("signal_id").str.contains("RUL"))
 
-    # Parse RUL indicator_ids to get dataset/unit
+    # Parse RUL signal_ids to get dataset/unit
     rul_parsed = (
         rul_obs
         .with_columns([
-            pl.col("indicator_id").map_elements(
-                lambda x: parse_indicator_id(x)["dataset"], return_dtype=pl.Utf8
+            pl.col("signal_id").map_elements(
+                lambda x: parse_signal_id(x)["dataset"], return_dtype=pl.Utf8
             ).alias("dataset"),
-            pl.col("indicator_id").map_elements(
-                lambda x: parse_indicator_id(x)["unit"], return_dtype=pl.Utf8
+            pl.col("signal_id").map_elements(
+                lambda x: parse_signal_id(x)["unit"], return_dtype=pl.Utf8
             ).alias("unit"),
             pl.col("value").alias("rul")
         ])
@@ -173,9 +173,9 @@ def query_5_degradation_signature(indicator: pl.DataFrame, obs: pl.DataFrame) ->
         .alias("phase")
     ])
 
-    # Join indicator metrics with RUL phases
+    # Join signal metrics with RUL phases
     metrics_with_rul = (
-        indicator
+        signal
         .join(
             rul_phases.select(["dataset", "unit", "obs_date", "phase"]),
             on=["dataset", "unit", "obs_date"],
@@ -217,7 +217,7 @@ def query_6_stress_accumulation(field: pl.DataFrame) -> pl.DataFrame:
     """
     STRESS ACCUMULATION: Gradient magnitude and source/sink evolution.
 
-    Tracks cumulative stress indicators over time.
+    Tracks cumulative stress signals over time.
     """
     print("\n" + "="*70)
     print("QUERY 6: STRESS ACCUMULATION")
@@ -283,13 +283,13 @@ def query_7_sensor_importance(char: pl.DataFrame) -> pl.DataFrame:
     print("Ranking by characterization axes")
     print("="*70)
 
-    # Parse sensor from indicator_id
+    # Parse sensor from signal_id
     char_parsed = char.with_columns([
-        pl.col("indicator_id").map_elements(
-            lambda x: parse_indicator_id(x)["sensor"], return_dtype=pl.Utf8
+        pl.col("signal_id").map_elements(
+            lambda x: parse_signal_id(x)["sensor"], return_dtype=pl.Utf8
         ).alias("sensor"),
-        pl.col("indicator_id").map_elements(
-            lambda x: parse_indicator_id(x)["dataset"], return_dtype=pl.Utf8
+        pl.col("signal_id").map_elements(
+            lambda x: parse_signal_id(x)["dataset"], return_dtype=pl.Utf8
         ).alias("dataset"),
     ])
 
@@ -376,11 +376,11 @@ def main():
     print("="*70)
 
     # Load data
-    indicator, field, char, obs = load_data()
+    signal, field, char, obs = load_data()
 
     # Run queries
-    q1 = query_1_leading_indicators(indicator)
-    q5 = query_5_degradation_signature(indicator, obs)
+    q1 = query_1_leading_signals(signal)
+    q5 = query_5_degradation_signature(signal, obs)
     q6 = query_6_stress_accumulation(field)
     q7 = query_7_sensor_importance(char)
     dyn = query_dynamical_class_distribution(char)
@@ -390,8 +390,8 @@ def main():
     print("PIPELINE STATUS")
     print("="*70)
     print("""
-✓ Query 1: Leading Indicators (from indicator_vector)
-✓ Query 5: Degradation Signature (from indicator_vector + RUL)
+✓ Query 1: Leading Signals (from signal_vector)
+✓ Query 5: Degradation Signature (from signal_vector + RUL)
 ✓ Query 6: Stress Accumulation (from laplace field)
 ✓ Query 7: Sensor Importance (from characterization)
 

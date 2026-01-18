@@ -5,7 +5,7 @@ Principal Component Analysis for structure analysis.
 
 Measures:
 - Variance explained by each component
-- Loading matrix (indicator weights)
+- Loading matrix (signal weights)
 - Effective dimensionality
 
 Phase: Unbound
@@ -42,7 +42,7 @@ class PCAEngine(BaseEngine):
     Principal Component Analysis engine.
 
     Outputs:
-        - results.pca_loadings: Indicator loadings per component
+        - results.pca_loadings: Signal loadings per component
         - results.pca_variance: Variance explained per component
     """
 
@@ -65,7 +65,7 @@ class PCAEngine(BaseEngine):
         Run PCA analysis.
         
         Args:
-            df: Normalized indicator data (rows=dates, cols=indicators)
+            df: Normalized signal data (rows=dates, cols=signals)
             run_id: Unique run identifier
             n_components: Number of components (default: all)
         
@@ -77,7 +77,7 @@ class PCAEngine(BaseEngine):
         
         if len(df_clean) < 3 * len(df_clean.columns):
             logger.warning(
-                f"Limited samples ({len(df_clean)}) for {len(df_clean.columns)} indicators. "
+                f"Limited samples ({len(df_clean)}) for {len(df_clean.columns)} signals. "
                 f"Recommended: {3 * len(df_clean.columns)}+"
             )
         
@@ -111,7 +111,7 @@ class PCAEngine(BaseEngine):
         ) + 1
         
         metrics = {
-            "n_indicators": len(df_clean.columns),
+            "n_signals": len(df_clean.columns),
             "n_samples": len(df_clean),
             "n_components": n_comp,
             "variance_pc1": float(pca.explained_variance_ratio_[0]),
@@ -137,16 +137,16 @@ class PCAEngine(BaseEngine):
         run_id: str,
     ):
         """Store loadings to results.pca_loadings."""
-        # Reshape: one row per (indicator, component)
+        # Reshape: one row per (signal, component)
         records = []
-        for indicator_id in loadings.index:
+        for signal_id in loadings.index:
             for i, col in enumerate(loadings.columns):
                 records.append({
-                    "indicator_id": indicator_id,
+                    "signal_id": signal_id,
                     "window_start": window_start,
                     "window_end": window_end,
                     "component": i + 1,
-                    "loading": float(loadings.loc[indicator_id, col]),
+                    "loading": float(loadings.loc[signal_id, col]),
                     "run_id": run_id,
                 })
         
@@ -181,7 +181,7 @@ class PCAEngine(BaseEngine):
 
 def compute_pca_with_derivation(
     data: np.ndarray,
-    indicator_ids: list = None,
+    signal_ids: list = None,
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -191,8 +191,8 @@ def compute_pca_with_derivation(
     Compute PCA with full mathematical derivation.
 
     Args:
-        data: Matrix of shape (n_samples, n_features) - rows=time, cols=indicators
-        indicator_ids: List of indicator names
+        data: Matrix of shape (n_samples, n_features) - rows=time, cols=signals
+        signal_ids: List of signal names
         window_id: Window identifier
         window_start, window_end: Date range
         n_components: Number of components (default: all)
@@ -203,13 +203,13 @@ def compute_pca_with_derivation(
     from prism.derivations.base import Derivation
 
     n_samples, n_features = data.shape
-    if indicator_ids is None:
-        indicator_ids = [f"X{i}" for i in range(n_features)]
+    if signal_ids is None:
+        signal_ids = [f"X{i}" for i in range(n_features)]
 
     deriv = Derivation(
         engine_name="pca",
         method_name="Principal Component Analysis",
-        indicator_id=f"cohort_{n_features}_indicators",
+        signal_id=f"cohort_{n_features}_signals",
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -221,10 +221,10 @@ def compute_pca_with_derivation(
     deriv.add_step(
         title="Input Data Matrix",
         equation="X ∈ ℝⁿˣᵖ where n=samples, p=features",
-        calculation=f"X shape: {data.shape}\nn = {n_samples} time points\np = {n_features} indicators\n\nIndicators: {indicator_ids[:5]}{'...' if len(indicator_ids) > 5 else ''}",
+        calculation=f"X shape: {data.shape}\nn = {n_samples} time points\np = {n_features} signals\n\nSignals: {signal_ids[:5]}{'...' if len(signal_ids) > 5 else ''}",
         result=n_features,
         result_name="p",
-        notes="Each column is an indicator, each row is a time point"
+        notes="Each column is an signal, each row is a time point"
     )
 
     # Step 2: Center the data
@@ -235,7 +235,7 @@ def compute_pca_with_derivation(
         title="Center the Data (Remove Mean)",
         equation="X̃ = X - μ  where μⱼ = (1/n) Σᵢ Xᵢⱼ",
         calculation=f"Column means:\n" + "\n".join([
-            f"  μ({indicator_ids[i]}) = {means[i]:.4f}" for i in range(min(5, n_features))
+            f"  μ({signal_ids[i]}) = {means[i]:.4f}" for i in range(min(5, n_features))
         ]) + ("\n  ..." if n_features > 5 else ""),
         result=means[:5].tolist(),
         result_name="μ",
@@ -248,10 +248,10 @@ def compute_pca_with_derivation(
     deriv.add_step(
         title="Compute Covariance Matrix",
         equation="Σ = (1/(n-1)) X̃ᵀX̃",
-        calculation=f"Covariance matrix Σ ∈ ℝᵖˣᵖ = {cov_matrix.shape}\n\nSample entries:\n  Σ[0,0] = Var({indicator_ids[0]}) = {cov_matrix[0,0]:.4f}\n  Σ[0,1] = Cov({indicator_ids[0]},{indicator_ids[1] if n_features > 1 else 'X1'}) = {cov_matrix[0,1] if n_features > 1 else 0:.4f}",
+        calculation=f"Covariance matrix Σ ∈ ℝᵖˣᵖ = {cov_matrix.shape}\n\nSample entries:\n  Σ[0,0] = Var({signal_ids[0]}) = {cov_matrix[0,0]:.4f}\n  Σ[0,1] = Cov({signal_ids[0]},{signal_ids[1] if n_features > 1 else 'X1'}) = {cov_matrix[0,1] if n_features > 1 else 0:.4f}",
         result=cov_matrix[0, 0],
         result_name="Σ",
-        notes="Covariance matrix captures linear relationships between all indicator pairs"
+        notes="Covariance matrix captures linear relationships between all signal pairs"
     )
 
     # Step 4: Eigendecomposition
@@ -288,14 +288,14 @@ def compute_pca_with_derivation(
     pc1_loadings = eigenvectors[:, 0]
 
     deriv.add_step(
-        title="PC1 Loadings (Indicator Weights)",
+        title="PC1 Loadings (Signal Weights)",
         equation="PC1 = Σⱼ wⱼXⱼ  where wⱼ = eigenvector₁[j]",
         calculation=f"PC1 loadings:\n" + "\n".join([
-            f"  w({indicator_ids[i]}) = {pc1_loadings[i]:.4f}" for i in range(min(5, n_features))
+            f"  w({signal_ids[i]}) = {pc1_loadings[i]:.4f}" for i in range(min(5, n_features))
         ]) + ("\n  ..." if n_features > 5 else ""),
         result=pc1_loadings[:5].tolist(),
         result_name="w₁",
-        notes="Loadings show each indicator's contribution to PC1"
+        notes="Loadings show each signal's contribution to PC1"
     )
 
     # Step 7: Effective dimensionality

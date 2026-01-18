@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 class PRISMFeatureConfig:
     """Configuration for PRISM feature extraction."""
 
-    # Laplace field features (per indicator)
+    # Laplace field features (per signal)
     field_features: List[str] = None
 
     # Cohort geometry features (per entity)
@@ -92,12 +92,12 @@ class PRISMFeatureConfig:
 # FEATURE EXTRACTION
 # =============================================================================
 
-def extract_cohort_from_indicator(indicator_id: str) -> str:
-    """Extract cohort from indicator_id (e.g., CMAPSS_BPR_FD001_U001 -> FD001_U001)."""
-    parts = indicator_id.split('_')
+def extract_cohort_from_signal(signal_id: str) -> str:
+    """Extract cohort from signal_id (e.g., CMAPSS_BPR_FD001_U001 -> FD001_U001)."""
+    parts = signal_id.split('_')
     if len(parts) >= 4:
         return '_'.join(parts[-2:])
-    return indicator_id
+    return signal_id
 
 
 def extract_prism_features(
@@ -120,8 +120,8 @@ def extract_prism_features(
     # Load PRISM outputs
     # -------------------------------------------------------------------------
 
-    # Laplace field (indicator-level)
-    field_path = get_parquet_path('vector', 'indicator_field', domain=domain)
+    # Laplace field (signal-level)
+    field_path = get_parquet_path('vector', 'signal_field', domain=domain)
     if not field_path.exists():
         raise FileNotFoundError(f"Run laplace.py first: {field_path}")
     field_df = pl.read_parquet(field_path)
@@ -130,8 +130,8 @@ def extract_prism_features(
     # Add cohort column
     if 'cohort' not in field_df.columns:
         field_df = field_df.with_columns([
-            pl.col('indicator_id').map_elements(
-                extract_cohort_from_indicator, return_dtype=pl.Utf8
+            pl.col('signal_id').map_elements(
+                extract_cohort_from_signal, return_dtype=pl.Utf8
             ).alias('cohort')
         ])
 
@@ -240,12 +240,12 @@ def extract_prism_features(
     # -------------------------------------------------------------------------
 
     # Get RUL observations
-    rul_obs = obs_df.filter(pl.col('indicator_id').str.contains('RUL'))
+    rul_obs = obs_df.filter(pl.col('signal_id').str.contains('RUL'))
 
     if len(rul_obs) > 0:
         rul_obs = rul_obs.with_columns([
-            pl.col('indicator_id').map_elements(
-                extract_cohort_from_indicator, return_dtype=pl.Utf8
+            pl.col('signal_id').map_elements(
+                extract_cohort_from_signal, return_dtype=pl.Utf8
             ).alias('entity_id')
         ])
 
@@ -293,18 +293,18 @@ def extract_baseline_features(domain: str) -> Tuple[pl.DataFrame, List[str]]:
     obs_path = get_parquet_path('raw', 'observations', domain=domain)
     obs_df = pl.read_parquet(obs_path)
 
-    # Extract entity and sensor from indicator_id
+    # Extract entity and sensor from signal_id
     obs_df = obs_df.with_columns([
-        pl.col('indicator_id').map_elements(
-            extract_cohort_from_indicator, return_dtype=pl.Utf8
+        pl.col('signal_id').map_elements(
+            extract_cohort_from_signal, return_dtype=pl.Utf8
         ).alias('entity_id'),
-        pl.col('indicator_id').str.extract(r'CMAPSS_([^_]+)_').alias('sensor'),
+        pl.col('signal_id').str.extract(r'CMAPSS_([^_]+)_').alias('sensor'),
     ])
 
     # Basic stats per sensor per entity
     baseline = (
         obs_df
-        .filter(~pl.col('indicator_id').str.contains('RUL'))
+        .filter(~pl.col('signal_id').str.contains('RUL'))
         .group_by(['entity_id', 'sensor'])
         .agg([
             pl.col('value').mean().alias('mean'),
@@ -324,7 +324,7 @@ def extract_baseline_features(domain: str) -> Tuple[pl.DataFrame, List[str]]:
     # Get RUL target
     targets = (
         obs_df
-        .filter(pl.col('indicator_id').str.contains('RUL'))
+        .filter(pl.col('signal_id').str.contains('RUL'))
         .group_by('entity_id')
         .agg([
             pl.col('value').max().alias('initial_rul'),

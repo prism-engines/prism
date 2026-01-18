@@ -15,10 +15,10 @@ Usage:
     python scripts/dynamical_systems.py
 
 Then run PRISM pipelines:
-    python -m prism.entry_points.indicator_vector --indicator --domain lorenz --report indicator
-    python -m prism.entry_points.indicator_vector --indicator --domain rossler --report indicator
-    python -m prism.entry_points.indicator_vector --indicator --domain pendulum --report indicator
-    python -m prism.entry_points.indicator_vector --indicator --domain lotka_volterra --report indicator
+    python -m prism.entry_points.signal_vector --signal --domain lorenz --report signal
+    python -m prism.entry_points.signal_vector --signal --domain rossler --report signal
+    python -m prism.entry_points.signal_vector --signal --domain pendulum --report signal
+    python -m prism.entry_points.signal_vector --signal --domain lotka_volterra --report signal
 """
 
 import numpy as np
@@ -31,7 +31,7 @@ from prism.db.parquet_store import get_data_root
 from prism.db.polars_io import write_parquet_atomic
 
 
-def create_observations(df: pl.DataFrame, indicators: list, domain: str) -> pl.DataFrame:
+def create_observations(df: pl.DataFrame, signals: list, domain: str) -> pl.DataFrame:
     """Convert trajectory to PRISM observations format."""
     base_date = date(2020, 1, 1)
     n_points = len(df)
@@ -39,9 +39,9 @@ def create_observations(df: pl.DataFrame, indicators: list, domain: str) -> pl.D
     rows = []
     for i in range(n_points):
         obs_date = base_date + timedelta(days=i)
-        for ind in indicators:
+        for ind in signals:
             rows.append({
-                'indicator_id': f'{domain}_{ind}',
+                'signal_id': f'{domain}_{ind}',
                 'obs_date': obs_date,
                 'value': float(df[ind][i])
             })
@@ -239,7 +239,7 @@ def main():
     print("\nRun PRISM pipelines:")
     for r in results:
         domain = r['domain']
-        print(f"  python -m prism.entry_points.indicator_vector --indicator --domain {domain} --force --report indicator")
+        print(f"  python -m prism.entry_points.signal_vector --signal --domain {domain} --force --report signal")
 
 
 if __name__ == '__main__':

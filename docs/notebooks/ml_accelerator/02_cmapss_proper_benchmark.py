@@ -42,11 +42,11 @@ def load_official_data():
     return train_df, test_df, rul_df
 
 
-def extract_unit_from_indicator(df: pl.DataFrame) -> pl.DataFrame:
-    """Extract unit number from indicator_id."""
+def extract_unit_from_signal(df: pl.DataFrame) -> pl.DataFrame:
+    """Extract unit number from signal_id."""
     return df.with_columns(
-        pl.when(pl.col('indicator_id').str.contains(r'FD001_(\d+)_'))
-        .then(pl.col('indicator_id').str.extract(r'FD001_(\d+)_', 1).cast(pl.Int64))
+        pl.when(pl.col('signal_id').str.contains(r'FD001_(\d+)_'))
+        .then(pl.col('signal_id').str.extract(r'FD001_(\d+)_', 1).cast(pl.Int64))
         .otherwise(None)
         .alias('unit')
     )
@@ -70,12 +70,12 @@ def compute_train_rul(train_df: pl.DataFrame) -> pl.DataFrame:
 
 def load_prism_vector_features():
     """Load PRISM vector features with window dates."""
-    vec_path = PRISM_DIR / 'vector' / 'indicator.parquet'
+    vec_path = PRISM_DIR / 'vector' / 'signal.parquet'
     if not vec_path.exists():
         return pl.DataFrame()
 
     vec = pl.read_parquet(vec_path)
-    vec = extract_unit_from_indicator(vec)
+    vec = extract_unit_from_signal(vec)
 
     # Map test units (1001-1100 -> 1-100) and add split column
     vec = vec.with_columns(
@@ -101,12 +101,12 @@ def load_prism_vector_features():
 
 def load_prism_laplace_features():
     """Load PRISM Laplace field features."""
-    field_path = PRISM_DIR / 'vector' / 'indicator_field.parquet'
+    field_path = PRISM_DIR / 'vector' / 'signal_field.parquet'
     if not field_path.exists():
         return pl.DataFrame()
 
     field = pl.read_parquet(field_path)
-    field = extract_unit_from_indicator(field)
+    field = extract_unit_from_signal(field)
 
     # Map test units
     field = field.with_columns(

@@ -40,7 +40,7 @@ from .config import (
     get_what_features,
     get_when_features,
     get_mode_features,
-    get_indicator_patterns,
+    get_signal_patterns,
     get_precursor_mode,
 )
 from .run import run_assessment

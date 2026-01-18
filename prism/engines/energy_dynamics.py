@@ -46,7 +46,7 @@ class EnergyDynamicsEngine:
     Compute temporal dynamics of system energy.
 
     Energy is derived from geometry.displacement.energy_total which measures
-    the weighted movement of indicators between snapshots.
+    the weighted movement of signals between snapshots.
 
     High energy = system is changing rapidly
     Low energy = system is stable

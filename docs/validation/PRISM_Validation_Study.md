@@ -206,7 +206,7 @@ The R² of log(τ) vs 1/T linear regression indicates how well the data follows 
 |--------|-------|
 | YAML files | 351 |
 | Total datapoints | 1,684 |
-| Valid indicators (≥10 points) | 33 |
+| Valid signals (≥10 points) | 33 |
 | Fuels | 11 (n-heptane, toluene, butanol isomers, etc.) |
 
 ### 2.5 Statistical Analysis
@@ -305,7 +305,7 @@ All first-order reactions at different temperatures (300K-500K) produced identic
 
 #### 3.3.1 Correlation with Arrhenius Fit Quality
 
-**Table 4: PRISM metrics vs Arrhenius R² (n=33 indicators)**
+**Table 4: PRISM metrics vs Arrhenius R² (n=33 signals)**
 
 | Metric | Correlation with R² | Direction | p-value |
 |--------|---------------------|-----------|---------|
@@ -382,7 +382,7 @@ The positive correlation between Hurst and Arrhenius R² suggests PRISM can iden
 
 ### 4.3 Limitations
 
-1. **Sample Size:** ChemKED validation limited by number of indicators with sufficient points
+1. **Sample Size:** ChemKED validation limited by number of signals with sufficient points
 2. **Noise Sensitivity:** Lyapunov estimation requires clean data; entropy more robust
 3. **Parameter Selection:** Entropy metrics depend on embedding dimension and tolerance
 4. **Timescale:** PRISM requires sufficient observations (≥100 recommended)

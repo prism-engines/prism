@@ -1,7 +1,7 @@
 """
 PRISM Transfer Entropy Engine
 
-Measures directional information flow between indicators.
+Measures directional information flow between signals.
 
 Measures:
 - Transfer entropy (bits) from X to Y
@@ -69,7 +69,7 @@ class TransferEntropyEngine(BaseEngine):
         Run transfer entropy analysis.
         
         Args:
-            df: Indicator data
+            df: Signal data
             run_id: Unique run identifier
             n_bins: Number of bins for discretization
             lag: Lag for transfer entropy (default 1)
@@ -79,8 +79,8 @@ class TransferEntropyEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = list(df_clean.columns)
-        n = len(indicators)
+        signals = list(df_clean.columns)
+        n = len(signals)
         
         if len(df_clean) < 500:
             logger.warning(
@@ -96,8 +96,8 @@ class TransferEntropyEngine(BaseEngine):
         # Compute pairwise TE
         results = []
         
-        for i, ind1 in enumerate(indicators):
-            for j, ind2 in enumerate(indicators):
+        for i, ind1 in enumerate(signals):
+            for j, ind2 in enumerate(signals):
                 if i == j:
                     continue
                 
@@ -110,8 +110,8 @@ class TransferEntropyEngine(BaseEngine):
                 )
                 
                 results.append({
-                    "indicator_from": ind1,
-                    "indicator_to": ind2,
+                    "signal_from": ind1,
+                    "signal_to": ind2,
                     "window_start": window_start,
                     "window_end": window_end,
                     "transfer_entropy": float(te),
@@ -131,16 +131,16 @@ class TransferEntropyEngine(BaseEngine):
         
         # Net flow analysis
         net_flows = {}
-        for ind in indicators:
-            outflow = df_results[df_results["indicator_from"] == ind]["effective_te"].sum()
-            inflow = df_results[df_results["indicator_to"] == ind]["effective_te"].sum()
+        for ind in signals:
+            outflow = df_results[df_results["signal_from"] == ind]["effective_te"].sum()
+            inflow = df_results[df_results["signal_to"] == ind]["effective_te"].sum()
             net_flows[ind] = outflow - inflow
         
         # Most influential (net positive flow)
         top_influencer = max(net_flows, key=net_flows.get) if net_flows else None
         
         metrics = {
-            "n_indicators": n,
+            "n_signals": n,
             "n_pairs": len(results),
             "avg_te": float(df_results["transfer_entropy"].mean()),
             "max_te": float(df_results["transfer_entropy"].max()),
@@ -250,8 +250,8 @@ class TransferEntropyEngine(BaseEngine):
 def compute_transfer_entropy_with_derivation(
     x: np.ndarray,
     y: np.ndarray,
-    indicator_x: str = "X",
-    indicator_y: str = "Y",
+    signal_x: str = "X",
+    signal_y: str = "Y",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -265,8 +265,8 @@ def compute_transfer_entropy_with_derivation(
     Args:
         x: Source series (information flows FROM x)
         y: Target series (information flows TO y)
-        indicator_x: Name of X indicator
-        indicator_y: Name of Y indicator
+        signal_x: Name of X signal
+        signal_y: Name of Y signal
         window_id: Window identifier
         window_start, window_end: Date range
         n_bins: Number of bins for discretization
@@ -283,7 +283,7 @@ def compute_transfer_entropy_with_derivation(
     deriv = Derivation(
         engine_name="transfer_entropy",
         method_name="Transfer Entropy (Information Flow)",
-        indicator_id=f"{indicator_x}_to_{indicator_y}",
+        signal_id=f"{signal_x}_to_{signal_y}",
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -295,7 +295,7 @@ def compute_transfer_entropy_with_derivation(
     deriv.add_step(
         title="Transfer Entropy Definition",
         equation="TE(X→Y) = H(Yₜ | Yₜ₋₁) - H(Yₜ | Yₜ₋₁, Xₜ₋₁)",
-        calculation=f"Measures information flow from {indicator_x} to {indicator_y}\n"
+        calculation=f"Measures information flow from {signal_x} to {signal_y}\n"
                     f"n = {n} observations\n"
                     f"lag = {lag}\n\n"
                     f"TE quantifies: How much does knowing X's past reduce\n"
@@ -319,9 +319,9 @@ def compute_transfer_entropy_with_derivation(
         title="Discretization (Quantile Binning)",
         equation="xᵈ = floor(rank(x) / n × B) where B = number of bins",
         calculation=f"B = {n_bins} bins (equiprobable)\n\n"
-                    f"Original {indicator_x}: range [{np.min(x):.4f}, {np.max(x):.4f}]\n"
+                    f"Original {signal_x}: range [{np.min(x):.4f}, {np.max(x):.4f}]\n"
                     f"Discretized: {n_bins} states {{0, 1, ..., {n_bins-1}}}\n\n"
-                    f"Original {indicator_y}: range [{np.min(y):.4f}, {np.max(y):.4f}]\n"
+                    f"Original {signal_y}: range [{np.min(y):.4f}, {np.max(y):.4f}]\n"
                     f"Discretized: {n_bins} states {{0, 1, ..., {n_bins-1}}}",
         result=n_bins,
         result_name="B",
@@ -387,10 +387,10 @@ def compute_transfer_entropy_with_derivation(
         title="Transfer Entropy Calculation",
         equation="TE = Σ P(Yₜ,Yₜ₋₁,Xₜ₋₁) · log₂[P(Yₜ,Yₜ₋₁,Xₜ₋₁)·P(Yₜ₋₁) / P(Yₜ₋₁,Xₜ₋₁)·P(Yₜ,Yₜ₋₁)]",
         calculation=f"Summing over all observed triplets:\n\n"
-                    f"  TE({indicator_x} → {indicator_y}) = {te:.6f} bits\n\n"
+                    f"  TE({signal_x} → {signal_y}) = {te:.6f} bits\n\n"
                     f"Interpretation:\n"
                     f"  TE = 0: No information flow\n"
-                    f"  TE > 0: {indicator_x}'s past provides information about {indicator_y}'s future\n"
+                    f"  TE > 0: {signal_x}'s past provides information about {signal_y}'s future\n"
                     f"  TE ≈ log₂(B) = {np.log2(n_bins):.2f} bits: Maximum possible",
         result=te,
         result_name="TE",
@@ -444,11 +444,11 @@ def compute_transfer_entropy_with_derivation(
     deriv.add_step(
         title="Information Flow Direction",
         equation="Net flow = TE(X→Y) - TE(Y→X)",
-        calculation=f"TE({indicator_x} → {indicator_y}) = {te:.4f} bits\n"
+        calculation=f"TE({signal_x} → {signal_y}) = {te:.4f} bits\n"
                     f"Effective TE = {te_effective:.4f} bits\n"
                     f"Significant: {'Yes' if is_significant else 'No'}\n\n"
                     f"To determine dominant flow direction,\n"
-                    f"compare with TE({indicator_y} → {indicator_x})",
+                    f"compare with TE({signal_y} → {signal_x})",
         result=te_effective,
         result_name="TE_eff",
         notes="Positive effective TE indicates genuine information flow"
@@ -470,11 +470,11 @@ def compute_transfer_entropy_with_derivation(
 
     # Interpretation
     if is_significant and te_effective > 0.1:
-        interp = f"**Strong information flow** from {indicator_x} to {indicator_y} (TE_eff={te_effective:.3f} bits)."
+        interp = f"**Strong information flow** from {signal_x} to {signal_y} (TE_eff={te_effective:.3f} bits)."
     elif is_significant:
-        interp = f"**Weak but significant** information flow from {indicator_x} to {indicator_y} (TE_eff={te_effective:.3f} bits)."
+        interp = f"**Weak but significant** information flow from {signal_x} to {signal_y} (TE_eff={te_effective:.3f} bits)."
     else:
-        interp = f"**No significant** information flow from {indicator_x} to {indicator_y} (p={p_value:.3f})."
+        interp = f"**No significant** information flow from {signal_x} to {signal_y} (p={p_value:.3f})."
 
     deriv.interpretation = interp
 

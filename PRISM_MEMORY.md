@@ -25,8 +25,8 @@ Observation → Vector → Geometry → Mode → State → Dynamic Vector
 
 | Layer | Question | Output |
 |-------|----------|--------|
-| **Vector** | "How does each indicator behave?" | 51 behavioral metrics per indicator (Hurst, entropy, Lyapunov, etc.) |
-| **Geometry** | "How do indicators relate?" | Pairwise coupling, Laplace field (gradient, divergence, potential) |
+| **Vector** | "How does each signal behave?" | 51 behavioral metrics per signal (Hurst, entropy, Lyapunov, etc.) |
+| **Geometry** | "How do signals relate?" | Pairwise coupling, Laplace field (gradient, divergence, potential) |
 | **Mode** | "What regime is it in?" | Clustering, PC1 variance, mode entropy |
 | **State** | "Is it transitioning?" | Transition detection, regime tracking |
 | **Dynamic Vector** | "How fast is it moving toward failure?" | Velocity, acceleration through coupling space |
@@ -35,7 +35,7 @@ Observation → Vector → Geometry → Mode → State → Dynamic Vector
 
 ## Key Insight: The Laplace Transform
 
-**Avery's contribution:** Use Laplace transforms to enable cross-indicator comparison at native sampling frequencies without forced alignment or normalization.
+**Avery's contribution:** Use Laplace transforms to enable cross-signal comparison at native sampling frequencies without forced alignment or normalization.
 
 Traditional preprocessing destroys information. PRISM preserves native sampling and treats timing relationships as primary data.
 
@@ -73,7 +73,7 @@ Traditional preprocessing destroys information. PRISM preserves native sampling 
 - Divergence ranking: EPS1 (-9944) > PS4 (-493) > COOLER (-426) > VALVE (-200)
 
 ### Blind Validation: CWRU Emergent Structure (2026-01-17)
-- **43 unlabeled indicators** analyzed
+- **43 unlabeled signals** analyzed
 - **PRISM discovered sensor locations** (FE vs DE) from Laplace similarity
 - **PRISM discovered cohorts** from co-change windows
 - FE_MEAN ↔ FE_STD ↔ FE_CREST_FACTOR clustered (same physical location)
@@ -152,7 +152,7 @@ Raw Data
 PRISM (geometry, modes, events)
     ↓
 ML-ready features:
-├── Divergence trajectory (per indicator)
+├── Divergence trajectory (per signal)
 ├── Mode membership (categorical)
 ├── Coupling graph (adjacency matrix)
 ├── Event flags (binary)
@@ -248,8 +248,8 @@ Response: {
 
 | Discovery | Method |
 |-----------|--------|
-| Sensor types | Indicators cluster in Laplace space |
-| Cohorts (physical units) | Cross-type indicators fail together |
+| Sensor types | Signals cluster in Laplace space |
+| Cohorts (physical units) | Cross-type signals fail together |
 | Subsystems | Cohorts that couple form subsystems |
 | System topology | Subsystem relationships |
 
@@ -263,7 +263,7 @@ Response: {
 SELECT * FROM events WHERE z_score > 3 ORDER BY window;
 
 -- What's stressed?
-SELECT indicator, divergence FROM sources_sinks
+SELECT signal, divergence FROM sources_sinks
 WHERE divergence < -50 ORDER BY divergence;
 
 -- What's changing?

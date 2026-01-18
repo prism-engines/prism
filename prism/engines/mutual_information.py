@@ -1,7 +1,7 @@
 """
 PRISM Mutual Information Engine
 
-Measures non-linear dependence between indicators.
+Measures non-linear dependence between signals.
 
 Measures:
 - Mutual information (bits)
@@ -68,7 +68,7 @@ class MutualInformationEngine(BaseEngine):
         Run mutual information analysis.
         
         Args:
-            df: Indicator data
+            df: Signal data
             run_id: Unique run identifier
             n_bins: Number of bins for discretization
             method: 'binned' or 'knn' (k-nearest neighbors)
@@ -77,8 +77,8 @@ class MutualInformationEngine(BaseEngine):
             Dict with summary metrics
         """
         df_clean = df
-        indicators = list(df_clean.columns)
-        n = len(indicators)
+        signals = list(df_clean.columns)
+        n = len(signals)
         
         window_start, window_end = get_window_dates(df_clean)
         
@@ -90,8 +90,8 @@ class MutualInformationEngine(BaseEngine):
         results = []
         mi_matrix = np.zeros((n, n))
         
-        for i, ind1 in enumerate(indicators):
-            for j, ind2 in enumerate(indicators):
+        for i, ind1 in enumerate(signals):
+            for j, ind2 in enumerate(signals):
                 if i > j:
                     continue
                 
@@ -111,8 +111,8 @@ class MutualInformationEngine(BaseEngine):
                 
                 if i != j:
                     results.append({
-                        "indicator_id_1": ind1,
-                        "indicator_id_2": ind2,
+                        "signal_id_1": ind1,
+                        "signal_id_2": ind2,
                         "window_start": window_start,
                         "window_end": window_end,
                         "mutual_information": float(mi),
@@ -138,7 +138,7 @@ class MutualInformationEngine(BaseEngine):
             nonlinear_excess = 0
         
         metrics = {
-            "n_indicators": n,
+            "n_signals": n,
             "n_pairs": len(results),
             "avg_mi": float(np.mean(mi_values)) if len(mi_values) > 0 else 0,
             "max_mi": float(np.max(mi_values)) if len(mi_values) > 0 else 0,
@@ -189,8 +189,8 @@ class MutualInformationEngine(BaseEngine):
 def compute_mutual_information_with_derivation(
     x: np.ndarray,
     y: np.ndarray,
-    indicator_x: str = "X",
-    indicator_y: str = "Y",
+    signal_x: str = "X",
+    signal_y: str = "Y",
     window_id: str = "0",
     window_start: str = None,
     window_end: str = None,
@@ -202,8 +202,8 @@ def compute_mutual_information_with_derivation(
     Args:
         x: First signal topology
         y: Second signal topology
-        indicator_x: Name of X indicator
-        indicator_y: Name of Y indicator
+        signal_x: Name of X signal
+        signal_y: Name of Y signal
         window_id: Window identifier
         window_start, window_end: Date range
         n_bins: Number of bins for discretization
@@ -218,7 +218,7 @@ def compute_mutual_information_with_derivation(
     deriv = Derivation(
         engine_name="mutual_information",
         method_name="Mutual Information (Non-linear Dependence)",
-        indicator_id=f"{indicator_x}_vs_{indicator_y}",
+        signal_id=f"{signal_x}_vs_{signal_y}",
         window_id=window_id,
         window_start=window_start,
         window_end=window_end,
@@ -230,7 +230,7 @@ def compute_mutual_information_with_derivation(
     deriv.add_step(
         title="Mutual Information Definition",
         equation="I(X;Y) = H(X) + H(Y) - H(X,Y) = H(X) - H(X|Y)",
-        calculation=f"Measures shared information between {indicator_x} and {indicator_y}\n"
+        calculation=f"Measures shared information between {signal_x} and {signal_y}\n"
                     f"n = {n} observations\n\n"
                     f"MI captures ALL dependencies (linear AND non-linear)\n"
                     f"Unlike correlation which only captures linear relationships",
@@ -253,10 +253,10 @@ def compute_mutual_information_with_derivation(
         title="Discretization (Quantile Binning)",
         equation="xᵈ = floor(rank(x) / n × B)",
         calculation=f"B = {n_bins} bins (equiprobable quantiles)\n\n"
-                    f"{indicator_x}:\n"
+                    f"{signal_x}:\n"
                     f"  Original range: [{np.min(x):.4f}, {np.max(x):.4f}]\n"
                     f"  Discrete states: {{0, 1, ..., {n_bins-1}}}\n\n"
-                    f"{indicator_y}:\n"
+                    f"{signal_y}:\n"
                     f"  Original range: [{np.min(y):.4f}, {np.max(y):.4f}]\n"
                     f"  Discrete states: {{0, 1, ..., {n_bins-1}}}",
         result=n_bins,
@@ -284,12 +284,12 @@ def compute_mutual_information_with_derivation(
     deriv.add_step(
         title="Marginal Entropies",
         equation="H(X) = -Σᵢ P(xᵢ) log₂ P(xᵢ)",
-        calculation=f"Entropy of {indicator_x}:\n"
-                    f"  H({indicator_x}) = {h_x:.6f} bits\n"
+        calculation=f"Entropy of {signal_x}:\n"
+                    f"  H({signal_x}) = {h_x:.6f} bits\n"
                     f"  Max possible: log₂({n_bins}) = {np.log2(n_bins):.4f} bits\n"
                     f"  Efficiency: {h_x / np.log2(n_bins) * 100:.1f}%\n\n"
-                    f"Entropy of {indicator_y}:\n"
-                    f"  H({indicator_y}) = {h_y:.6f} bits\n"
+                    f"Entropy of {signal_y}:\n"
+                    f"  H({signal_y}) = {h_y:.6f} bits\n"
                     f"  Max possible: log₂({n_bins}) = {np.log2(n_bins):.4f} bits\n"
                     f"  Efficiency: {h_y / np.log2(n_bins) * 100:.1f}%",
         result=h_x,
@@ -308,7 +308,7 @@ def compute_mutual_information_with_derivation(
                     f"  {len(pxy)} unique (x,y) pairs observed\n"
                     f"  Max possible: {n_bins}² = {n_bins**2}\n\n"
                     f"Joint entropy:\n"
-                    f"  H({indicator_x},{indicator_y}) = {h_xy:.6f} bits\n"
+                    f"  H({signal_x},{signal_y}) = {h_xy:.6f} bits\n"
                     f"  Max possible: 2·log₂({n_bins}) = {2*np.log2(n_bins):.4f} bits\n\n"
                     f"If independent: H(X,Y) = H(X) + H(Y) = {h_x + h_y:.4f} bits",
         result=h_xy,
@@ -323,9 +323,9 @@ def compute_mutual_information_with_derivation(
         title="Mutual Information Calculation",
         equation="I(X;Y) = H(X) + H(Y) - H(X,Y)",
         calculation=f"Mutual Information:\n"
-                    f"  I({indicator_x};{indicator_y}) = {h_x:.4f} + {h_y:.4f} - {h_xy:.4f}\n"
-                    f"  I({indicator_x};{indicator_y}) = {mi:.6f} bits\n\n"
-                    f"Information shared between {indicator_x} and {indicator_y}:\n"
+                    f"  I({signal_x};{signal_y}) = {h_x:.4f} + {h_y:.4f} - {h_xy:.4f}\n"
+                    f"  I({signal_x};{signal_y}) = {mi:.6f} bits\n\n"
+                    f"Information shared between {signal_x} and {signal_y}:\n"
                     f"  {mi:.4f} bits out of min({h_x:.4f}, {h_y:.4f}) = {min(h_x, h_y):.4f} possible",
         result=mi,
         result_name="I",
@@ -392,11 +392,11 @@ def compute_mutual_information_with_derivation(
 
     # Interpretation
     if nmi > 0.7:
-        interp = f"**Strong dependence** between {indicator_x} and {indicator_y} (NMI={nmi:.3f})."
+        interp = f"**Strong dependence** between {signal_x} and {signal_y} (NMI={nmi:.3f})."
     elif nmi > 0.3:
-        interp = f"**Moderate dependence** between {indicator_x} and {indicator_y} (NMI={nmi:.3f})."
+        interp = f"**Moderate dependence** between {signal_x} and {signal_y} (NMI={nmi:.3f})."
     else:
-        interp = f"**Weak dependence** between {indicator_x} and {indicator_y} (NMI={nmi:.3f})."
+        interp = f"**Weak dependence** between {signal_x} and {signal_y} (NMI={nmi:.3f})."
 
     if mi > mi_gaussian * 1.2 and not np.isinf(mi_gaussian):
         interp += f" **Non-linear** component detected (MI exceeds Gaussian by {(mi/mi_gaussian - 1)*100:.0f}%)."

@@ -5,8 +5,8 @@ PRISM Derivation Generator
 CLI tool to generate mathematical derivation documents with actual data values.
 
 Usage:
-    python -m prism.derivations.generator --engine hurst --indicator lorenz_x --window 47
-    python -m prism.derivations.generator --all-engines --indicator lorenz_x --window 47
+    python -m prism.derivations.generator --engine hurst --signal lorenz_x --window 47
+    python -m prism.derivations.generator --all-engines --signal lorenz_x --window 47
 """
 
 import argparse
@@ -33,9 +33,9 @@ DERIVABLE_ENGINES = {
 }
 
 
-def get_indicator_data(indicator_id: str, window_idx: int = None) -> tuple:
+def get_signal_data(signal_id: str, window_idx: int = None) -> tuple:
     """
-    Load indicator data from observations parquet.
+    Load signal data from observations parquet.
 
     Returns:
         tuple: (values array, window_start, window_end, window_id)
@@ -47,11 +47,11 @@ def get_indicator_data(indicator_id: str, window_idx: int = None) -> tuple:
 
     obs = pl.read_parquet(obs_path)
 
-    # Filter to indicator
-    ind_obs = obs.filter(pl.col('indicator_id') == indicator_id).sort('obs_date')
+    # Filter to signal
+    ind_obs = obs.filter(pl.col('signal_id') == signal_id).sort('obs_date')
 
     if ind_obs.height == 0:
-        raise ValueError(f"No observations found for indicator: {indicator_id}")
+        raise ValueError(f"No observations found for signal: {signal_id}")
 
     values = ind_obs['value'].to_numpy()
     dates = ind_obs['obs_date'].to_list()
@@ -78,7 +78,7 @@ def get_indicator_data(indicator_id: str, window_idx: int = None) -> tuple:
     return values, window_start, window_end, window_id
 
 
-def generate_derivation(engine_name: str, indicator_id: str,
+def generate_derivation(engine_name: str, signal_id: str,
                         window_idx: int = None, output_dir: str = None) -> str:
     """
     Generate a derivation document for the specified engine and data.
@@ -87,11 +87,11 @@ def generate_derivation(engine_name: str, indicator_id: str,
         str: Path to generated markdown file
     """
     # Load data
-    values, window_start, window_end, window_id = get_indicator_data(
-        indicator_id, window_idx
+    values, window_start, window_end, window_id = get_signal_data(
+        signal_id, window_idx
     )
 
-    print(f"Loaded {len(values)} observations for {indicator_id}")
+    print(f"Loaded {len(values)} observations for {signal_id}")
     print(f"Window: {window_start} to {window_end}")
 
     # Get the derivation function
@@ -99,7 +99,7 @@ def generate_derivation(engine_name: str, indicator_id: str,
         from prism.engines.hurst import compute_hurst_with_derivation
         result, derivation = compute_hurst_with_derivation(
             values,
-            indicator_id=indicator_id,
+            signal_id=signal_id,
             window_id=window_id,
             window_start=window_start,
             window_end=window_end,
@@ -108,7 +108,7 @@ def generate_derivation(engine_name: str, indicator_id: str,
         from prism.engines.lyapunov import compute_lyapunov_with_derivation
         result, derivation = compute_lyapunov_with_derivation(
             values,
-            indicator_id=indicator_id,
+            signal_id=signal_id,
             window_id=window_id,
             window_start=window_start,
             window_end=window_end,
@@ -117,7 +117,7 @@ def generate_derivation(engine_name: str, indicator_id: str,
         from prism.engines.entropy import compute_sample_entropy_with_derivation
         result, derivation = compute_sample_entropy_with_derivation(
             values,
-            indicator_id=indicator_id,
+            signal_id=signal_id,
             window_id=window_id,
             window_start=window_start,
             window_end=window_end,
@@ -126,7 +126,7 @@ def generate_derivation(engine_name: str, indicator_id: str,
         from prism.engines.entropy import compute_permutation_entropy_with_derivation
         result, derivation = compute_permutation_entropy_with_derivation(
             values,
-            indicator_id=indicator_id,
+            signal_id=signal_id,
             window_id=window_id,
             window_start=window_start,
             window_end=window_end,
@@ -135,7 +135,7 @@ def generate_derivation(engine_name: str, indicator_id: str,
         from prism.engines.characterize import compute_dfa_with_derivation
         result, derivation = compute_dfa_with_derivation(
             values,
-            indicator_id=indicator_id,
+            signal_id=signal_id,
             window_id=window_id,
             window_start=window_start,
             window_end=window_end,
@@ -144,7 +144,7 @@ def generate_derivation(engine_name: str, indicator_id: str,
         from prism.engines.spectral import compute_spectral_entropy_with_derivation
         result, derivation = compute_spectral_entropy_with_derivation(
             values,
-            indicator_id=indicator_id,
+            signal_id=signal_id,
             window_id=window_id,
             window_start=window_start,
             window_end=window_end,
@@ -153,7 +153,7 @@ def generate_derivation(engine_name: str, indicator_id: str,
         from prism.engines.garch import compute_garch_with_derivation
         result, derivation = compute_garch_with_derivation(
             values,
-            indicator_id=indicator_id,
+            signal_id=signal_id,
             window_id=window_id,
             window_start=window_start,
             window_end=window_end,
@@ -175,7 +175,7 @@ def generate_derivation(engine_name: str, indicator_id: str,
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    filename = f"{engine_name}_{indicator_id}_w{window_id}.md"
+    filename = f"{engine_name}_{signal_id}_w{window_id}.md"
     output_path = output_dir / filename
 
     with open(output_path, 'w') as f:
@@ -193,21 +193,21 @@ def main():
         epilog="""
 Examples:
     # Generate Hurst derivation for lorenz_x, window 47
-    python -m prism.derivations.generator --engine hurst --indicator lorenz_x --window 47
+    python -m prism.derivations.generator --engine hurst --signal lorenz_x --window 47
 
     # Generate derivation using full data series
-    python -m prism.derivations.generator --engine hurst --indicator lorenz_x
+    python -m prism.derivations.generator --engine hurst --signal lorenz_x
 
     # Specify output directory
-    python -m prism.derivations.generator --engine hurst --indicator lorenz_x --output docs/derivations/
+    python -m prism.derivations.generator --engine hurst --signal lorenz_x --output docs/derivations/
 """
     )
 
     parser.add_argument('--engine', type=str, required=True,
                         choices=list(DERIVABLE_ENGINES.keys()),
                         help='Engine to generate derivation for')
-    parser.add_argument('--indicator', type=str, required=True,
-                        help='Indicator ID to use for derivation')
+    parser.add_argument('--signal', type=str, required=True,
+                        help='Signal ID to use for derivation')
     parser.add_argument('--window', type=int, default=None,
                         help='Window index (0-based, uses 252d window with 21d stride)')
     parser.add_argument('--output', type=str, default=None,
@@ -220,11 +220,11 @@ Examples:
     if args.all_engines:
         for engine in DERIVABLE_ENGINES.keys():
             try:
-                generate_derivation(engine, args.indicator, args.window, args.output)
+                generate_derivation(engine, args.signal, args.window, args.output)
             except NotImplementedError as e:
                 print(f"Skipping {engine}: {e}")
     else:
-        generate_derivation(args.engine, args.indicator, args.window, args.output)
+        generate_derivation(args.engine, args.signal, args.window, args.output)
 
 
 if __name__ == '__main__':
