@@ -481,7 +481,10 @@ def get_window_days(domain: str, window_name: str = 'default') -> int:
     if window is None:
         window = config.default_window
     if window is None:
-        return 252  # Fallback
+        raise RuntimeError(
+            f"No window configured for domain '{domain}'. "
+            "Configure domain-specific windows in config/domains.yaml or config/stride.yaml."
+        )
     return int(window.to_base_units('days'))
 
 

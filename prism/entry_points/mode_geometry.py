@@ -253,16 +253,22 @@ def run_mode_geometry(
             mean_aff = modes_df[modes_df['mode_id'] == mode_id]['mode_affinity'].mean()
             print(f"    Mode {mode_id}: {count} signals (affinity={mean_aff:.3f})")
 
-    # Load observations for geometry computation
+    # Load observations for geometry computation (lazy with streaming)
     if verbose:
         print()
         print("Step 3: Loading observations...")
 
     obs_path = get_parquet_path('raw', 'observations', domain)
-    observations = pl.read_parquet(obs_path)
+    # Get all signal_ids from modes for filter pushdown
+    all_mode_signals = modes_df['signal_id'].unique().tolist()
+    observations = (
+        pl.scan_parquet(obs_path)
+        .filter(pl.col('signal_id').is_in(all_mode_signals))
+        .collect()
+    )
 
     if verbose:
-        print(f"  Loaded {len(observations):,} observations")
+        print(f"  Loaded {len(observations):,} observations (filtered to mode signals)")
 
     # Compute geometry for each mode
     if verbose:

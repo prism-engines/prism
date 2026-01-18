@@ -390,22 +390,26 @@ def get_domain_window_config(domain: str) -> Optional[DomainWindowConfig]:
     )
 
 
-def get_domain_window(domain: str, fallback_window: int = 252, fallback_stride: int = 21) -> tuple:
+def get_domain_window(domain: str) -> tuple:
     """
-    Get window and stride for a domain.
+    Get window and stride for a domain. Fails if not configured.
 
     Args:
         domain: Domain name
-        fallback_window: Default window if domain not configured
-        fallback_stride: Default stride if domain not configured
 
     Returns:
         (window, stride, min_obs) tuple
+
+    Raises:
+        RuntimeError: If domain not configured in config/stride.yaml
     """
     cfg = get_domain_window_config(domain)
     if cfg:
         return (cfg.window, cfg.stride, cfg.min_obs)
-    return (fallback_window, fallback_stride, 100)
+    raise RuntimeError(
+        f"No window configuration found for domain '{domain}' in config/stride.yaml. "
+        "Configure domain-specific windows before running."
+    )
 
 
 def list_domain_windows() -> Dict[str, DomainWindowConfig]:

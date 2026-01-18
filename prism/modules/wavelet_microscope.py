@@ -477,15 +477,17 @@ KEY INSIGHT:
         logger.error("PyWavelets required. Install with: pip install PyWavelets")
         exit(1)
 
-    observations = pl.read_parquet(args.input)
+    # Use lazy scan for cohort discovery (no full file load)
+    lazy_obs = pl.scan_parquet(args.input)
 
-    # Get cohorts
+    # Get cohorts from lazy scan
     if args.all_cohorts:
-        if 'cohort_id' in observations.columns:
-            cohorts = observations['cohort_id'].unique().to_list()
+        schema = lazy_obs.collect_schema()
+        if 'cohort_id' in schema.names():
+            cohorts = lazy_obs.select('cohort_id').unique().collect()['cohort_id'].to_list()
         else:
             # Infer from signal_id pattern
-            ids = observations['signal_id'].unique().to_list()
+            ids = lazy_obs.select('signal_id').unique().collect()['signal_id'].to_list()
             cohorts = list(set(i.rsplit('_', 1)[0] for i in ids if '_' in i))
     else:
         cohorts = args.cohort or []
@@ -493,8 +495,19 @@ KEY INSIGHT:
     all_results = []
     for cohort_id in cohorts:
         logger.info(f"Processing cohort: {cohort_id}")
+
+        # Lazy load only this cohort's data (filter pushdown)
+        schema = lazy_obs.collect_schema()
+        if 'cohort_id' in schema.names():
+            cohort_obs = lazy_obs.filter(pl.col('cohort_id') == cohort_id).collect()
+        else:
+            # Filter by signal_id pattern
+            cohort_obs = lazy_obs.filter(
+                pl.col('signal_id').str.starts_with(cohort_id + '_')
+            ).collect()
+
         result = run_wavelet_microscope(
-            observations, cohort_id,
+            cohort_obs, cohort_id,
             top_n_snr_variance=args.top_n,
             window_size=args.window_size
         )

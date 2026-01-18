@@ -75,11 +75,80 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# CONFIGURATION
+# CONFIGURATION (with adaptive domain clock integration)
 # =============================================================================
 
-DEFAULT_STRIDE = 5  # Days between state computations
-LOOKBACK_WINDOW = 63  # Days of history for dynamics computation
+from prism.config.loader import load_delta_thresholds
+import json
+
+
+def load_domain_info() -> Optional[Dict[str, Any]]:
+    """
+    Load domain_info from config/domain_info.json if available.
+
+    This is saved by signal_vector when running in --adaptive mode.
+    """
+    import os
+    domain = os.environ.get('PRISM_DOMAIN')
+    if not domain:
+        return None
+    domain_info_path = get_parquet_path("config", "domain_info").with_suffix('.json')
+    if domain_info_path.exists():
+        try:
+            with open(domain_info_path) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+
+# Load delta thresholds from config/domain.yaml
+_delta_thresholds = load_delta_thresholds()
+
+# State layer thresholds (from domain.yaml or defaults)
+VELOCITY_THRESHOLD = _delta_thresholds.get('state_velocity', 0.10)
+ACCELERATION_THRESHOLD = _delta_thresholds.get('state_acceleration', 0.05)
+
+
+def get_lookback_window() -> int:
+    """
+    Get lookback window from domain_info. Fails if not configured.
+
+    Uses window_samples from DomainClock.
+    """
+    domain_info = load_domain_info()
+    if domain_info:
+        window = domain_info.get('window_samples')
+        if window:
+            return max(20, window)  # Ensure minimum for statistics
+
+    # No fallback - must be configured
+    raise RuntimeError(
+        "No domain_info.json found. "
+        "Run signal_vector with --adaptive flag first to auto-detect window parameters."
+    )
+
+
+def get_default_stride() -> int:
+    """
+    Get default stride from domain_info. Fails if not configured.
+
+    Uses stride_samples from DomainClock.
+    """
+    domain_info = load_domain_info()
+    if domain_info:
+        stride = domain_info.get('stride_samples')
+        if stride:
+            return max(1, stride)
+
+    # No fallback - must be configured
+    raise RuntimeError(
+        "No domain_info.json found. "
+        "Run signal_vector with --adaptive flag first to auto-detect stride parameters."
+    )
+
+
+# MIN_HISTORY is a statistical minimum, not domain-specific
 MIN_HISTORY = 20  # Minimum snapshots needed for dynamics
 
 # Key columns for upsert deduplication
@@ -109,13 +178,16 @@ def get_available_dates() -> List[date]:
 
 def get_geometry_history(
     end_date: date,
-    lookback: int = LOOKBACK_WINDOW
+    lookback: int = None
 ) -> pl.DataFrame:
     """
     Fetch geometry.structure history for dynamics computation.
 
     Returns DataFrame with columns from geometry.structure.
     """
+    if lookback is None:
+        lookback = get_lookback_window()
+
     structure_path = get_parquet_path('geometry', 'structure')
     if not structure_path.exists():
         return pl.DataFrame()
@@ -145,11 +217,14 @@ def get_geometry_history(
 
 def get_displacement_history(
     end_date: date,
-    lookback: int = LOOKBACK_WINDOW
+    lookback: int = None
 ) -> pl.DataFrame:
     """
     Fetch geometry.displacement history for dynamics computation.
     """
+    if lookback is None:
+        lookback = get_lookback_window()
+
     displacement_path = get_parquet_path('geometry', 'displacement')
     if not displacement_path.exists():
         return pl.DataFrame()
@@ -515,12 +590,15 @@ def run_state_snapshot(
 def run_state_range(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    stride: int = DEFAULT_STRIDE,
+    stride: int = None,
     verbose: bool = True
 ) -> Dict[str, int]:
     """
     Run state computation for a date range.
     """
+    if stride is None:
+        stride = get_default_stride()
+
     ensure_directories()
 
     # Get available dates
@@ -782,8 +860,8 @@ Storage: Parquet files (no database locks)
     parser.add_argument('--start', type=str, help='Start date (YYYY-MM-DD)')
     parser.add_argument('--end', type=str, help='End date (YYYY-MM-DD)')
     parser.add_argument('--snapshot', type=str, help='Single snapshot date')
-    parser.add_argument('--stride', type=int, default=DEFAULT_STRIDE,
-                        help=f'Days between state computations (default: {DEFAULT_STRIDE})')
+    parser.add_argument('--stride', type=int, default=None,
+                        help='Days between state computations (default: from domain_info.json)')
     parser.add_argument('--workers', type=int, default=1,
                         help='Number of parallel workers')
     parser.add_argument('--quiet', action='store_true', help='Suppress progress output')

@@ -20,23 +20,36 @@ from dataclasses import dataclass, field
 # Window Cascade Configuration
 # =============================================================================
 
-WINDOW_CASCADE = {
-    'daily': {
-        'pass_1': 252,  # ~1 year daily observations
-        'pass_2': 126,  # ~6 months
-        'pass_3': 63,   # ~3 months
-    },
-    'annual': {
-        'pass_1': 20,   # 20 years
-        'pass_2': 10,   # 10 years
-        'pass_3': 5,    # 5 years
-    },
-    'monthly': {
-        'pass_1': 60,   # 5 years
-        'pass_2': 36,   # 3 years
-        'pass_3': 12,   # 1 year
-    }
-}
+def _load_window_cascade() -> dict:
+    """Load window cascade from config/stride.yaml. Fails if not configured."""
+    try:
+        from prism.utils.stride import load_stride_config
+        config = load_stride_config()
+        if hasattr(config, 'cascades') and config.cascades:
+            return config.cascades
+        # Build from windows if cascades not defined
+        if hasattr(config, 'windows') and config.windows:
+            windows = sorted(config.windows.keys(), key=lambda x: config.windows[x].window_days, reverse=True)
+            if len(windows) >= 3:
+                cascade = {}
+                for freq in ['daily', 'annual', 'monthly', 'per_cycle']:
+                    cascade[freq] = {
+                        'pass_1': config.windows[windows[0]].window_days,
+                        'pass_2': config.windows[windows[1]].window_days if len(windows) > 1 else config.windows[windows[0]].window_days,
+                        'pass_3': config.windows[windows[2]].window_days if len(windows) > 2 else config.windows[windows[0]].window_days,
+                    }
+                return cascade
+    except Exception as e:
+        raise RuntimeError(f"Failed to load window cascade from config: {e}")
+
+    raise RuntimeError(
+        "No window cascade configured in config/stride.yaml. "
+        "Configure domain-specific window sizes before running."
+    )
+
+
+# Load at module level - will fail if not configured
+WINDOW_CASCADE = _load_window_cascade()
 
 
 # =============================================================================
@@ -108,30 +121,39 @@ class CascadeConfig:
     @classmethod
     def for_daily(cls) -> 'CascadeConfig':
         """Configuration for daily data."""
+        cascade = WINDOW_CASCADE.get('daily')
+        if not cascade:
+            raise RuntimeError("No 'daily' cascade configured in config/stride.yaml")
         return cls(
-            pass_1_window=252,
-            pass_2_window=126,
-            pass_3_window=63,
+            pass_1_window=cascade['pass_1'],
+            pass_2_window=cascade['pass_2'],
+            pass_3_window=cascade['pass_3'],
             frequency='daily',
         )
 
     @classmethod
     def for_annual(cls) -> 'CascadeConfig':
         """Configuration for annual data."""
+        cascade = WINDOW_CASCADE.get('annual')
+        if not cascade:
+            raise RuntimeError("No 'annual' cascade configured in config/stride.yaml")
         return cls(
-            pass_1_window=20,
-            pass_2_window=10,
-            pass_3_window=5,
+            pass_1_window=cascade['pass_1'],
+            pass_2_window=cascade['pass_2'],
+            pass_3_window=cascade['pass_3'],
             frequency='annual',
         )
 
     @classmethod
     def for_monthly(cls) -> 'CascadeConfig':
         """Configuration for monthly data (climate)."""
+        cascade = WINDOW_CASCADE.get('monthly')
+        if not cascade:
+            raise RuntimeError("No 'monthly' cascade configured in config/stride.yaml")
         return cls(
-            pass_1_window=60,
-            pass_2_window=36,
-            pass_3_window=12,
+            pass_1_window=cascade['pass_1'],
+            pass_2_window=cascade['pass_2'],
+            pass_3_window=cascade['pass_3'],
             frequency='monthly',
         )
 
@@ -146,26 +168,36 @@ class CascadeConfig:
 
 
 # =============================================================================
-# Domain Configuration Mapping
+# Domain Configuration Mapping (lazy-loaded)
 # =============================================================================
 
-DOMAIN_CASCADE_CONFIGS = {
-    # Regional domains (annual data)
-    'world': CascadeConfig.for_annual(),
-    'G7': CascadeConfig.for_annual(),
-    'NORDIC': CascadeConfig.for_annual(),
-    'BRICS': CascadeConfig.for_annual(),
-    'EU_CORE': CascadeConfig.for_annual(),
-    'ASEAN': CascadeConfig.for_annual(),
-    'ASIA_TIGERS': CascadeConfig.for_annual(),
-    'LATAM': CascadeConfig.for_annual(),
-    'MENA': CascadeConfig.for_annual(),
-    'SSA': CascadeConfig.for_annual(),
-    'OCEANIA': CascadeConfig.for_annual(),
+_DOMAIN_CASCADE_CONFIGS = None
 
-    # Climate domain (monthly data)
-    'climate': CascadeConfig.for_monthly(),
-}
+
+def get_domain_cascade_configs() -> dict:
+    """Get domain cascade configs. Loads from config on first access."""
+    global _DOMAIN_CASCADE_CONFIGS
+    if _DOMAIN_CASCADE_CONFIGS is None:
+        _DOMAIN_CASCADE_CONFIGS = {
+            # Regional domains (annual data)
+            'world': CascadeConfig.for_annual(),
+            'G7': CascadeConfig.for_annual(),
+            'NORDIC': CascadeConfig.for_annual(),
+            'BRICS': CascadeConfig.for_annual(),
+            'EU_CORE': CascadeConfig.for_annual(),
+            'ASEAN': CascadeConfig.for_annual(),
+            'ASIA_TIGERS': CascadeConfig.for_annual(),
+            'LATAM': CascadeConfig.for_annual(),
+            'MENA': CascadeConfig.for_annual(),
+            'SSA': CascadeConfig.for_annual(),
+            'OCEANIA': CascadeConfig.for_annual(),
+
+            # Climate domain (monthly data)
+            'climate': CascadeConfig.for_monthly(),
+        }
+    return _DOMAIN_CASCADE_CONFIGS
+
+
 
 
 # =============================================================================
@@ -202,15 +234,19 @@ def get_cascade_config(conn=None, frequency: str = 'daily', domain: str = None) 
             pass
 
     # Try domain-specific config
-    if domain and domain in DOMAIN_CASCADE_CONFIGS:
-        return DOMAIN_CASCADE_CONFIGS[domain].windows
+    domain_configs = get_domain_cascade_configs()
+    if domain and domain in domain_configs:
+        return domain_configs[domain].windows
 
     # Fall back to frequency defaults
     if frequency in WINDOW_CASCADE:
         return WINDOW_CASCADE[frequency]
 
-    # Ultimate fallback
-    return WINDOW_CASCADE['daily']
+    # No fallback - must be configured
+    raise RuntimeError(
+        f"No cascade config found for frequency '{frequency}'. "
+        "Configure domain-specific windows in config/stride.yaml."
+    )
 
 
 def get_cascade_config_for_domain(domain: str) -> CascadeConfig:
@@ -226,14 +262,15 @@ def get_cascade_config_for_domain(domain: str) -> CascadeConfig:
     Raises:
         KeyError: If domain not configured
     """
-    if domain not in DOMAIN_CASCADE_CONFIGS:
-        available = ', '.join(sorted(DOMAIN_CASCADE_CONFIGS.keys()))
+    domain_configs = get_domain_cascade_configs()
+    if domain not in domain_configs:
+        available = ', '.join(sorted(domain_configs.keys()))
         raise KeyError(
             f"No cascade config for domain '{domain}'. "
             f"Available domains: {available}. "
-            f"Add config to DOMAIN_CASCADE_CONFIGS in prism/config/cascade.py"
+            f"Configure domain in config/stride.yaml"
         )
-    return DOMAIN_CASCADE_CONFIGS[domain]
+    return domain_configs[domain]
 
 
 def get_thresholds(conn=None) -> Dict[str, float]:

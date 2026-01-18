@@ -57,22 +57,72 @@ METADATA = EngineMetadata(
 
 
 # =============================================================================
+# Configuration
+# =============================================================================
+
+def _get_scale_factor() -> int:
+    """Load scale factor from domain_info or domain.yaml. Fails if not configured."""
+    import os
+    import json
+
+    domain = os.environ.get('PRISM_DOMAIN')
+    if domain:
+        # Try domain_info.json first
+        try:
+            from prism.db.parquet_store import get_parquet_path
+            domain_info_path = get_parquet_path("config", "domain_info").with_suffix('.json')
+            if domain_info_path.exists():
+                with open(domain_info_path) as f:
+                    info = json.load(f)
+                # scale_factor = observations per year/period for volatility scaling
+                # For cycle-based data, this is 1 (no annualization)
+                sf = info.get('scale_factor')
+                if sf:
+                    return sf
+                # Infer from sampling_rate_hz if available
+                sr = info.get('sampling_rate_hz')
+                if sr:
+                    # Convert to yearly equivalent
+                    return int(sr * 3600 * 24 * 365)
+        except Exception:
+            pass
+
+        # Try domain.yaml
+        try:
+            from prism.config.loader import load_clock_config
+            config = load_clock_config(domain)
+            sf = config.get('scale_factor')
+            if sf:
+                return sf
+        except Exception:
+            pass
+
+    raise RuntimeError(
+        "No scale_factor configured for volatility calculation. "
+        "Configure 'scale_factor' in domain_info.json or config/domain.yaml. "
+        "Use 1 for per-cycle data, 365 for daily climate, etc."
+    )
+
+
+# =============================================================================
 # Vector Engine Contract: Simple function interface
 # =============================================================================
 
-def compute_realized_vol(values: np.ndarray, min_obs: int = 15, scale_factor: int = 252) -> dict:
+def compute_realized_vol(values: np.ndarray, min_obs: int = 15, scale_factor: int = None) -> dict:
     """
     Compute comprehensive short-window metrics from a value series.
 
     Args:
         values: Array of observed values (levels, measurements, readings)
         min_obs: Minimum observations required
-        scale_factor: Annualization/scaling factor (default 252 for daily data,
-                      use 1 for per-cycle sensor data, 365 for daily climate data)
+        scale_factor: Scaling factor for volatility. If None, loads from domain config.
+                      Use 1 for per-cycle sensor data, 365 for daily climate, etc.
 
     Returns:
         Dict of metric_name -> metric_value (13 metrics)
     """
+    if scale_factor is None:
+        scale_factor = _get_scale_factor()
     if len(values) < min_obs:
         return {}
 
@@ -218,7 +268,7 @@ def compute_realized_vol_with_derivation(
     window_start: str = None,
     window_end: str = None,
     min_obs: int = 15,
-    scale_factor: int = 252,
+    scale_factor: int = None,
 ) -> tuple:
     """
     Compute realized volatility with full mathematical derivation.
@@ -229,11 +279,14 @@ def compute_realized_vol_with_derivation(
         window_id: Window identifier
         window_start, window_end: Date range
         min_obs: Minimum observations required
-        scale_factor: Scaling factor for volatility (default 252)
+        scale_factor: Scaling factor for volatility. If None, loads from domain config.
 
     Returns:
         tuple: (result_dict, Derivation object)
     """
+    if scale_factor is None:
+        scale_factor = _get_scale_factor()
+
     from prism.derivations.base import Derivation
 
     n = len(values)

@@ -101,6 +101,10 @@ from prism.modules.laplace import (
     add_divergence_to_field_rows,
 )
 
+# Domain clock for adaptive windowing
+from prism.modules.domain_clock import DomainClock, DomainInfo
+from prism.config.loader import load_clock_config, load_delta_thresholds
+
 warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -140,6 +144,9 @@ def get_normalization_config(domain: str = None) -> dict:
     """
     Load domain-specific normalization parameters.
 
+    Checks domain_info.json first (from adaptive DomainClock),
+    then falls back to normalization.yaml, then hardcoded defaults.
+
     Args:
         domain: Domain name (cmapss, climate, cheme, icu, etc.)
                 Uses PRISM_DOMAIN env var if not specified.
@@ -153,23 +160,44 @@ def get_normalization_config(domain: str = None) -> dict:
     if domain is None:
         raise RuntimeError("No domain specified - set PRISM_DOMAIN or pass domain parameter")
 
-    defaults = {'window': 252, 'min_periods': 30}
+    # First check for adaptive domain_info (from DomainClock)
+    try:
+        domain_info_path = get_parquet_path("config", "domain_info").with_suffix('.json')
+        if domain_info_path.exists():
+            import json
+            with open(domain_info_path) as f:
+                domain_info = json.load(f)
+            window = domain_info.get('window_samples')
+            if window:
+                return {'window': window, 'min_periods': max(10, window // 10)}
+    except Exception:
+        pass
 
+    # Check normalization.yaml
     config_path = Path(__file__).parent.parent.parent / 'config' / 'normalization.yaml'
     if config_path.exists():
         try:
             with open(config_path) as f:
                 config = yaml.safe_load(f)
-            return config.get('domains', {}).get(domain, config.get('defaults', defaults))
+            domain_config = config.get('domains', {}).get(domain)
+            if domain_config:
+                return domain_config
+            defaults = config.get('defaults')
+            if defaults:
+                return defaults
         except Exception:
             pass
 
-    return defaults
+    # No fallback - must be configured
+    raise RuntimeError(
+        f"No normalization config found for domain '{domain}'. "
+        "Run signal_vector with --adaptive flag first, or configure config/normalization.yaml"
+    )
 
 
 def apply_regime_normalization(
     batch_rows: List[Dict],
-    window: int = 252,
+    window: int,
     min_periods: int = 30,
 ) -> pl.DataFrame:
     """
@@ -178,7 +206,7 @@ def apply_regime_normalization(
 
     Args:
         batch_rows: List of metric dicts from signal processing
-        window: Rolling window size (default 252 ~ 1 year of daily data)
+        window: Rolling window size (REQUIRED - from domain config)
         min_periods: Minimum observations before computing (default 30)
 
     Returns:
@@ -920,6 +948,8 @@ def run_window_tier(
     engine_min_obs: Optional[Dict[str, int]] = None,
     use_inline_characterization: bool = True,
     verbose: bool = True,
+    window_days_override: Optional[int] = None,
+    stride_days_override: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Run vector computation for a specific window tier.
@@ -929,18 +959,25 @@ def run_window_tier(
 
     Args:
         signals: List of signal IDs to process
-        window_name: Window tier name ('anchor', 'bridge', 'scout', 'micro')
+        window_name: Window tier name ('anchor', 'bridge', 'scout', 'micro', 'adaptive')
         engine_min_obs: Minimum observations per engine
         use_inline_characterization: If True, characterize each signal inline
         verbose: Print progress
+        window_days_override: Override window size (for adaptive mode)
+        stride_days_override: Override stride (for adaptive mode)
 
     Returns:
         Dict with processing statistics
     """
-    config = load_stride_config()
-    window = config.get_window(window_name)
-    window_days = window.window_days
-    stride_days = window.stride_days
+    # Handle adaptive mode with overrides
+    if window_days_override is not None and stride_days_override is not None:
+        window_days = window_days_override
+        stride_days = stride_days_override
+    else:
+        config = load_stride_config()
+        window = config.get_window(window_name)
+        window_days = window.window_days
+        stride_days = window.stride_days
 
     if engine_min_obs is None:
         engine_min_obs = DEFAULT_ENGINE_MIN_OBS
@@ -1020,7 +1057,7 @@ def run_window_tier(
                 norm_config = get_normalization_config()
                 df = apply_regime_normalization(
                     batch_rows,
-                    window=norm_config.get('window', 252),
+                    window=norm_config['window'],
                     min_periods=norm_config.get('min_periods', 30),
                 )
                 upsert_parquet(df, target_path, VECTOR_KEY_COLS)
@@ -1063,7 +1100,7 @@ def run_window_tier(
         norm_config = get_normalization_config()
         df = apply_regime_normalization(
             batch_rows,
-            window=norm_config.get('window', 252),
+            window=norm_config['window'],
             min_periods=norm_config.get('min_periods', 30),
         )
         upsert_parquet(df, target_path, VECTOR_KEY_COLS)
@@ -1134,6 +1171,130 @@ def get_signals(cohort: Optional[str] = None) -> List[str]:
     # All signals
     df = pl.scan_parquet(obs_path).select("signal_id").unique().collect()
     return df["signal_id"].to_list()
+
+
+def run_adaptive_vectors(
+    signals: Optional[List[str]] = None,
+    verbose: bool = True,
+    domain: str = "unknown",
+) -> Dict[str, Any]:
+    """
+    Compute sliding window vectors using adaptive (auto-detected) window size.
+
+    Uses DomainClock to analyze signal frequencies and determine optimal window.
+    The domain's clock is set by its fastest-changing signal.
+
+    Args:
+        signals: List of signal IDs to process (None = all)
+        verbose: Print progress
+        domain: Domain name for config lookup
+
+    Returns:
+        Dict with processing statistics
+    """
+    import json
+
+    # Ensure directories exist
+    ensure_directories()
+
+    # Get signals if not provided
+    if signals is None:
+        signals = get_signals()
+
+    if not signals:
+        if verbose:
+            print("No signals found")
+        return {"signals": 0, "windows": 0, "metrics": 0, "errors": 0}
+
+    # Get adaptive clock config
+    clock_config = load_clock_config(domain)
+
+    if verbose:
+        print("=" * 80)
+        print("PRISM VECTOR - ADAPTIVE WINDOWING (DomainClock)")
+        print("=" * 80)
+        print(f"Domain: {domain}")
+        print(f"Signals: {len(signals)}")
+
+    # Characterize domain frequency
+    if verbose:
+        print("\nCharacterizing domain frequency...")
+
+    clock = DomainClock(
+        min_cycles=clock_config.get('min_cycles', 3),
+        min_samples=clock_config.get('min_samples', 20),
+        max_samples=clock_config.get('max_samples', 1000),
+    )
+
+    # Sample signals for frequency estimation (use lazy scan with filter pushdown)
+    sample_size = min(100, len(signals))
+    sample_signals = signals[:sample_size]
+    obs_path = get_parquet_path("raw", "observations")
+    sample_obs = (
+        pl.scan_parquet(obs_path)
+        .filter(pl.col('signal_id').is_in(sample_signals))
+        .collect()
+    )
+
+    domain_info = clock.characterize(sample_obs)
+    window_config = clock.get_window_config()
+
+    # Save domain_info for downstream layers (laplace, geometry, state)
+    domain_info_path = get_parquet_path("config", "domain_info").with_suffix('.json')
+    domain_info_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(domain_info_path, 'w') as f:
+        json.dump(clock.to_parquet_metadata(), f, indent=2, default=str)
+    if verbose:
+        print(f"Saved domain_info to {domain_info_path}")
+
+    # Convert window_samples to window_days (for compatibility with run_window_tier)
+    # This is approximate - assumes 1 sample ≈ 1 day for date-indexed data
+    window_days = window_config['window_samples']
+    stride_days = window_config['stride_samples']
+
+    if verbose:
+        print(f"\nAdaptive window: {window_days} samples, stride {stride_days} samples")
+        print(f"Fastest signal: {window_config['fastest_signal']}")
+        print(f"Domain frequency: {window_config['domain_frequency']:.6f} Hz")
+        print()
+
+    # Process with adaptive window (single tier)
+    engine_min_obs = DEFAULT_ENGINE_MIN_OBS.copy()
+
+    result = run_window_tier(
+        signals=signals,
+        window_name="adaptive",  # Virtual tier name
+        engine_min_obs=engine_min_obs,
+        use_inline_characterization=True,
+        verbose=verbose,
+        # Override with adaptive settings
+        window_days_override=window_days,
+        stride_days_override=stride_days,
+    )
+
+    if verbose:
+        print()
+        print("=" * 80)
+        print("COMPLETE (Adaptive)")
+        print("=" * 80)
+        print(f"Signals processed: {len(signals)}")
+        print(f"Window: {window_days} samples (adaptive)")
+        print(f"Stride: {stride_days} samples")
+        print(f"Total metrics: {result.get('metrics', 0):,}")
+        print(f"Total field rows (laplace): {result.get('field_rows', 0):,}")
+        print(f"Errors: {result.get('errors', 0)}")
+
+    return {
+        "signals": len(signals),
+        "window_samples": window_days,
+        "stride_samples": stride_days,
+        "domain_frequency": window_config['domain_frequency'],
+        "fastest_signal": window_config['fastest_signal'],
+        "windows": result.get("windows", 0),
+        "metrics": result.get("metrics", 0),
+        "field_rows": result.get("field_rows", 0),
+        "errors": result.get("errors", 0),
+    }
 
 
 def run_cohort_vector_aggregation(
@@ -1261,6 +1422,7 @@ def run_cohort_vector_aggregation(
 def run_sliding_vectors(
     signals: Optional[List[str]] = None,
     verbose: bool = True,
+    adaptive: bool = False,
 ) -> Dict[str, Any]:
     """
     Compute sliding window vectors for signals.
@@ -1276,18 +1438,26 @@ def run_sliding_vectors(
     Args:
         signals: List of signal IDs to process (None = all)
         verbose: Print progress
+        adaptive: Use DomainClock to auto-detect window size from data
 
     Returns:
         Dict with processing statistics
     """
+    import os
+
     # Ensure directories exist
     ensure_directories()
 
     # Get configuration
     engine_min_obs = DEFAULT_ENGINE_MIN_OBS.copy()
     stride_config = load_stride_config()
+    domain = os.environ.get('PRISM_DOMAIN', 'unknown')
 
-    # VECTORS: use default tiers from config (anchor + bridge)
+    # ADAPTIVE MODE: Use DomainClock to detect window from data
+    if adaptive:
+        return run_adaptive_vectors(signals, verbose, domain)
+
+    # STANDARD MODE: Use default tiers from config (anchor + bridge)
     # Scout + micro are drilldown tiers - run when delta flags displacement
     window_tiers = get_default_tiers()
 
@@ -1397,6 +1567,13 @@ if __name__ == "__main__":
         help="Enable testing mode. REQUIRED to use limiting flags.",
     )
 
+    # Adaptive windowing - auto-detect window from data frequency
+    parser.add_argument(
+        "--adaptive",
+        action="store_true",
+        help="Use DomainClock to auto-detect window size from data frequency.",
+    )
+
     # Limiting flags (testing only)
     parser.add_argument("--filter", type=str, help="[TESTING] Comma-separated IDs to process")
     parser.add_argument("--filter-cohort", type=str, help="[TESTING] Filter to specific cohort")
@@ -1486,6 +1663,7 @@ if __name__ == "__main__":
         run_sliding_vectors(
             signals=items,
             verbose=True,
+            adaptive=getattr(args, 'adaptive', False),
         )
 
     else:

@@ -13,20 +13,48 @@ import logging
 
 from prism.db.parquet_store import ensure_directories, get_parquet_path
 from prism.db.polars_io import write_parquet_atomic, get_file_size_mb
+from prism.utils.stride import load_stride_config, get_default_tiers, get_drilldown_tiers
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Hardcoded window configuration (from stride.yaml)
-WINDOW_CONFIG = {
-    'anchor': {'window_days': 252, 'stride_days': 21, 'weight': 4.0},
-    'bridge': {'window_days': 126, 'stride_days': 5, 'weight': 2.0},
-    'scout':  {'window_days': 63,  'stride_days': 5, 'weight': 1.0},
-    'micro':  {'window_days': 21,  'stride_days': 1, 'weight': 0.5},
-}
 
-DEFAULT_TIERS = ['anchor', 'bridge']
-DRILLDOWN_TIERS = ['scout', 'micro']
+def get_window_config() -> dict:
+    """
+    Load window configuration from stride.yaml. Fails if not configured.
+
+    Returns dict mapping tier name to window config.
+    """
+    try:
+        config = load_stride_config()
+        result = {}
+        for tier_name in ['anchor', 'bridge', 'scout', 'micro']:
+            try:
+                window = config.get_window(tier_name)
+                result[tier_name] = {
+                    'window_days': window.window_days,
+                    'stride_days': window.stride_days,
+                    'weight': window.weight,
+                }
+            except Exception:
+                pass
+        if result:
+            return result
+    except Exception as e:
+        raise RuntimeError(f"Failed to load stride config: {e}")
+
+    # No fallback - must be configured
+    raise RuntimeError(
+        "No window tiers configured in config/stride.yaml. "
+        "Configure domain-specific window sizes before running."
+    )
+
+
+# Load window config at module level
+WINDOW_CONFIG = get_window_config()
+
+DEFAULT_TIERS = get_default_tiers()
+DRILLDOWN_TIERS = get_drilldown_tiers()
 
 
 def extract_cohort_from_signal(signal_id: str) -> str:
@@ -49,20 +77,29 @@ def run_laplace_pairwise_vectorized(
 
     ensure_directories()
 
-    # Load Laplace field data
+    # Load Laplace field data with lazy scan and filter pushdown
     path = get_parquet_path('vector', 'signal_field')
     if not Path(path).exists():
         raise FileNotFoundError(f"Run laplace.py first: {path}")
 
-    # Use lazy scan for large files (> 500 MB)
     file_size_mb = get_file_size_mb(path)
     logger.info(f"Loading {path} ({file_size_mb:.0f} MB)")
 
-    if file_size_mb > 500:
-        logger.info("  Using lazy scan (large file)")
-        laplace = pl.scan_parquet(path).collect()
-    else:
-        laplace = pl.read_parquet(path)
+    # Build lazy query with filter pushdown
+    lazy_query = pl.scan_parquet(path)
+
+    # If cohort_filter provided, filter by signal_id pattern BEFORE collecting
+    # (cohort is derived from signal_id, so we can filter on signal_id pattern)
+    if cohort_filter:
+        # cohort_filter like "FD001_U001" matches signal_id ending with "_FD001_U001"
+        lazy_query = lazy_query.filter(
+            pl.col('signal_id').str.ends_with(f'_{cohort_filter}') |
+            pl.col('signal_id').str.ends_with(cohort_filter)
+        )
+        logger.info(f"Applied cohort filter: {cohort_filter}")
+
+    # Collect with filter pushdown applied
+    laplace = lazy_query.collect()
     logger.info(f"Loaded {len(laplace):,} rows")
 
     # Add cohort column derived from signal_id
@@ -70,7 +107,7 @@ def run_laplace_pairwise_vectorized(
         pl.col('signal_id').map_elements(extract_cohort_from_signal, return_dtype=pl.Utf8).alias('cohort')
     )
 
-    # Filter cohort if specified
+    # Final filter to ensure exact match (in case pattern was too broad)
     if cohort_filter:
         laplace = laplace.filter(pl.col('cohort') == cohort_filter)
         logger.info(f"Filtered to cohort {cohort_filter}: {len(laplace):,} rows")
@@ -196,15 +233,22 @@ def run_laplace_pairwise_windowed(
 
     path = get_parquet_path('vector', 'signal_field')
 
-    # Use lazy scan for large files (> 500 MB)
     file_size_mb = get_file_size_mb(path)
     logger.info(f"Loading {path} ({file_size_mb:.0f} MB)")
 
-    if file_size_mb > 500:
-        logger.info("  Using lazy scan (large file)")
-        laplace = pl.scan_parquet(path).collect()
-    else:
-        laplace = pl.read_parquet(path)
+    # Build lazy query with filter pushdown
+    lazy_query = pl.scan_parquet(path)
+
+    # If cohort_filter provided, filter by signal_id pattern BEFORE collecting
+    if cohort_filter:
+        lazy_query = lazy_query.filter(
+            pl.col('signal_id').str.ends_with(f'_{cohort_filter}') |
+            pl.col('signal_id').str.ends_with(cohort_filter)
+        )
+        logger.info(f"Applied cohort filter: {cohort_filter}")
+
+    # Collect with filter pushdown applied
+    laplace = lazy_query.collect()
     logger.info(f"Loaded {len(laplace):,} rows")
 
     # Add cohort column derived from signal_id
@@ -212,6 +256,7 @@ def run_laplace_pairwise_windowed(
         pl.col('signal_id').map_elements(extract_cohort_from_signal, return_dtype=pl.Utf8).alias('cohort')
     )
 
+    # Final filter to ensure exact match
     if cohort_filter:
         laplace = laplace.filter(pl.col('cohort') == cohort_filter)
         logger.info(f"Filtered to {cohort_filter}: {len(laplace):,} rows")

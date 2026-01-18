@@ -58,12 +58,22 @@ def get_signal_data(signal_id: str, window_idx: int = None) -> tuple:
 
     # If window_idx specified, use windowed data
     if window_idx is not None:
-        # Default window size of 252 (like anchor tier)
-        window_size = 252
-        if window_idx * 21 + window_size > len(values):
+        # Load window size from config
+        try:
+            from prism.utils.stride import load_stride_config
+            config = load_stride_config()
+            if hasattr(config, 'windows') and 'anchor' in config.windows:
+                window_size = config.windows['anchor'].window_days
+                stride_size = config.windows['anchor'].stride_days
+            else:
+                raise RuntimeError("No anchor window configured")
+        except Exception as e:
+            raise RuntimeError(f"No window configuration found in config/stride.yaml: {e}")
+
+        if window_idx * stride_size + window_size > len(values):
             raise ValueError(f"Window {window_idx} exceeds data range")
 
-        start_idx = window_idx * 21  # 21-day stride
+        start_idx = window_idx * stride_size
         end_idx = start_idx + window_size
 
         values = values[start_idx:end_idx]

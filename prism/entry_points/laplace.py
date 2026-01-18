@@ -52,21 +52,60 @@ from prism.db.parquet_store import get_parquet_path, ensure_directories
 from prism.db.polars_io import write_parquet_atomic
 from prism.utils.stride import load_stride_config
 
+# Adaptive domain clock integration
+from prism.config.loader import load_delta_thresholds
+import json
+
 
 # =============================================================================
-# CONFIGURATION (from config/stride.yaml)
+# CONFIGURATION (from config/stride.yaml or domain_info.json)
 # =============================================================================
 
 @dataclass
 class WindowConfig:
     """Window configuration for Laplace field computation."""
-    window_days: int = 252
-    stride_days: int = 21
+    window_days: int
+    stride_days: int
     min_observations: int = 10
 
 
+def load_domain_info() -> Optional[Dict]:
+    """
+    Load domain_info from config/domain_info.json if available.
+
+    This is saved by signal_vector when running in --adaptive mode.
+    Contains auto-detected window parameters based on domain frequency.
+    """
+    import os
+    domain = os.environ.get('PRISM_DOMAIN')
+    if not domain:
+        return None
+
+    try:
+        domain_info_path = get_parquet_path("config", "domain_info").with_suffix('.json')
+        if domain_info_path.exists():
+            with open(domain_info_path) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return None
+
+
 def load_config_from_stride(tier: str = 'anchor') -> WindowConfig:
-    """Load window config from stride.yaml."""
+    """Load window config from domain_info.json or stride.yaml. Fails if not configured."""
+    # First check for adaptive domain_info (from DomainClock)
+    domain_info = load_domain_info()
+    if domain_info:
+        window_samples = domain_info.get('window_samples')
+        stride_samples = domain_info.get('stride_samples')
+        if window_samples:
+            return WindowConfig(
+                window_days=window_samples,
+                stride_days=stride_samples or max(1, window_samples // 3),
+                min_observations=10,
+            )
+
+    # Fall back to stride.yaml
     try:
         stride_config = load_stride_config()
         if stride_config and hasattr(stride_config, 'windows') and tier in stride_config.windows:
@@ -74,18 +113,24 @@ def load_config_from_stride(tier: str = 'anchor') -> WindowConfig:
             return WindowConfig(
                 window_days=tier_window.window_days,
                 stride_days=tier_window.stride_days,
-                min_observations=tier_window.min_observations,
+                min_observations=getattr(tier_window, 'min_observations', 10),
             )
     except Exception:
         pass
-    return WindowConfig()
+
+    # No fallback - must be configured
+    raise RuntimeError(
+        f"No window config found for tier '{tier}'. "
+        "Run signal_vector with --adaptive flag first, or configure config/stride.yaml"
+    )
 
 
 DEFAULT_CONFIG = load_config_from_stride('anchor')
 
-# Thresholds for classification
-SOURCE_THRESHOLD = 0.1
-SINK_THRESHOLD = -0.1
+# Thresholds for classification (from config/domain.yaml)
+_delta_thresholds = load_delta_thresholds()
+SOURCE_THRESHOLD = _delta_thresholds.get('geometry_divergence', 0.1)
+SINK_THRESHOLD = -_delta_thresholds.get('geometry_divergence', 0.1)
 
 
 # =============================================================================

@@ -326,12 +326,17 @@ Uses Laplacian on raw observations to:
     args = parser.parse_args()
     ensure_directories()
 
-    # Load observations
+    # Load observations using lazy scan (enables streaming for large files)
     obs_path = get_parquet_path('raw', 'observations')
     if not args.quiet:
         print(f"Loading: {obs_path}")
 
-    observations = pl.read_parquet(obs_path)
+    # Only load columns needed for prefilter (reduces memory)
+    observations = (
+        pl.scan_parquet(obs_path)
+        .select(['signal_id', 'obs_date', 'value'])
+        .collect()
+    )
 
     # Run smart filter
     filtered = smart_filter(

@@ -294,7 +294,9 @@ def run_modes(
         Combined DataFrame of all mode assignments
     """
     logger.info(f"Loading signal field from {input_path}")
-    field_df = pl.read_parquet(input_path)
+
+    # Use lazy scan to determine cohorts without loading full file
+    lazy_field = pl.scan_parquet(input_path)
 
     # Determine cohorts and their signals
     if cohort_members is not None:
@@ -307,25 +309,40 @@ def run_modes(
             )['signal_id'].to_list()
             for cid in cohort_ids
         }
-    elif 'cohort_id' in field_df.columns:
+    elif 'cohort_id' in lazy_field.collect_schema().names():
         if cohort_ids is None:
-            cohort_ids = field_df['cohort_id'].unique().to_list()
+            # Lazy scan for unique cohort_ids only
+            cohort_ids = (
+                lazy_field
+                .select('cohort_id')
+                .unique()
+                .collect()
+            )['cohort_id'].to_list()
 
-        cohort_signal_map = {
-            cid: field_df.filter(
-                pl.col('cohort_id') == cid
-            )['signal_id'].unique().to_list()
-            for cid in cohort_ids
-        }
+        # Build signal map from lazy scans (one per cohort)
+        cohort_signal_map = {}
+        for cid in cohort_ids:
+            cohort_signal_map[cid] = (
+                lazy_field
+                .filter(pl.col('cohort_id') == cid)
+                .select('signal_id')
+                .unique()
+                .collect()
+            )['signal_id'].to_list()
     else:
-        # Single cohort = all signals
-        all_signals = field_df['signal_id'].unique().to_list()
+        # Single cohort = all signals (lazy scan for unique signal_ids)
+        all_signals = (
+            lazy_field
+            .select('signal_id')
+            .unique()
+            .collect()
+        )['signal_id'].to_list()
         cohort_ids = ['default']
         cohort_signal_map = {'default': all_signals}
 
     logger.info(f"Processing {len(cohort_ids)} cohorts in domain {domain_id}")
 
-    # Process each cohort
+    # Process each cohort with per-cohort lazy loading
     all_modes = []
     for cohort_id in cohort_ids:
         signals = cohort_signal_map.get(cohort_id, [])
@@ -333,8 +350,23 @@ def run_modes(
         if len(signals) < 3:
             continue
 
+        # Lazy load only this cohort's data (filter pushdown)
+        if 'cohort_id' in lazy_field.collect_schema().names():
+            cohort_field_df = (
+                lazy_field
+                .filter(pl.col('cohort_id') == cohort_id)
+                .collect()
+            )
+        else:
+            # Single cohort case - filter by signals
+            cohort_field_df = (
+                lazy_field
+                .filter(pl.col('signal_id').is_in(signals))
+                .collect()
+            )
+
         modes_df = discover_modes(
-            field_df, domain_id, cohort_id, signals, max_modes
+            cohort_field_df, domain_id, cohort_id, signals, max_modes
         )
 
         if modes_df is not None and len(modes_df) > 0:

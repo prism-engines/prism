@@ -58,10 +58,28 @@ class CoupledInertiaEngine(BaseEngine):
         Initialize coupled inertia engine.
 
         Args:
-            windows: List of window sizes for rolling correlation (default: [63, 126, 252])
+            windows: List of window sizes for rolling correlation.
+                     If not provided, loads from stride.yaml config.
         """
         super().__init__()
-        self.windows = windows or [63, 126, 252]
+        if windows is None:
+            windows = self._load_windows()
+        self.windows = windows
+
+    def _load_windows(self) -> list:
+        """Load window sizes from config. Fails if not configured."""
+        try:
+            from prism.utils.stride import get_barycenter_weights
+            weights = get_barycenter_weights()
+            if weights:
+                return sorted(weights.keys())
+        except Exception as e:
+            raise RuntimeError(f"Failed to load window config: {e}")
+
+        raise RuntimeError(
+            "No window sizes configured in config/stride.yaml. "
+            "Configure domain-specific window sizes before running."
+        )
 
     def run(
         self,

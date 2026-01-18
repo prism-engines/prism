@@ -54,18 +54,55 @@ class EnergyDynamicsEngine:
     Falling energy = deceleration, stabilization
     """
 
-    def __init__(self, ma_short: int = 5, ma_long: int = 20, zscore_window: int = 63):
+    def __init__(self, ma_short: int = None, ma_long: int = None, zscore_window: int = None):
         """
         Initialize engine.
 
         Args:
-            ma_short: Short moving average window (default 5 = ~weekly)
-            ma_long: Long moving average window (default 20 = ~monthly)
-            zscore_window: Window for z-score calculation (default 63 = quarterly)
+            ma_short: Short moving average window. If None, loads from config.
+            ma_long: Long moving average window. If None, loads from config.
+            zscore_window: Window for z-score calculation. If None, loads from config.
         """
+        # Load window parameters from config if not provided
+        if ma_short is None or ma_long is None or zscore_window is None:
+            config = self._load_window_config()
+            ma_short = ma_short or config.get('ma_short', config.get('min_samples', 5))
+            ma_long = ma_long or config.get('ma_long', config.get('window_samples', 20))
+            zscore_window = zscore_window or config.get('zscore_window', config.get('window_samples', 20))
+
         self.ma_short = ma_short
         self.ma_long = ma_long
         self.zscore_window = zscore_window
+
+    def _load_window_config(self) -> dict:
+        """Load window parameters from domain_info or domain.yaml."""
+        import os
+        import json
+        from pathlib import Path
+
+        domain = os.environ.get('PRISM_DOMAIN')
+        if domain:
+            # Try domain_info.json first
+            try:
+                from prism.db.parquet_store import get_parquet_path
+                domain_info_path = get_parquet_path("config", "domain_info").with_suffix('.json')
+                if domain_info_path.exists():
+                    with open(domain_info_path) as f:
+                        return json.load(f)
+            except Exception:
+                pass
+
+        # Try domain.yaml
+        try:
+            from prism.config.loader import load_clock_config
+            return load_clock_config(domain)
+        except Exception:
+            pass
+
+        raise RuntimeError(
+            "No window configuration found. "
+            "Run signal_vector with --adaptive flag first, or configure config/domain.yaml"
+        )
 
     def run(self, energy_series: pd.Series, current_idx: int = -1) -> EnergyDynamicsResult:
         """
@@ -183,18 +220,18 @@ class EnergyDynamicsEngine:
 
 def compute_energy_dynamics(
     energy_values: np.ndarray,
-    ma_short: int = 5,
-    ma_long: int = 20,
-    zscore_window: int = 63
+    ma_short: int = None,
+    ma_long: int = None,
+    zscore_window: int = None
 ) -> Dict[str, Any]:
     """
     Functional interface for energy dynamics computation.
 
     Args:
         energy_values: Array of energy values
-        ma_short: Short MA window
-        ma_long: Long MA window
-        zscore_window: Z-score window
+        ma_short: Short MA window. If None, loads from config.
+        ma_long: Long MA window. If None, loads from config.
+        zscore_window: Z-score window. If None, loads from config.
 
     Returns:
         Dict of energy dynamics metrics

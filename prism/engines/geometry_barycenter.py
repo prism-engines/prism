@@ -59,20 +59,25 @@ class GeometryEngine:
     This is encoded directly into the geometry via weighting.
     """
 
-    def __init__(self, stride: int = 21, n_clusters: int = 5):
+    def __init__(self, stride: int = 21, n_clusters: int = 5, weights: dict = None):
         """
         Initialize the geometry engine.
 
         Args:
             stride: Days between snapshots (default 21 = monthly)
             n_clusters: Number of clusters for structural analysis
+            weights: Optional window weights dict. Loads from config if not provided.
         """
         self.stride = stride
         self.n_clusters = n_clusters
 
         # Conviction weights: longer windows = more weight
-        self.weights = {63: 1.0, 126: 2.0, 252: 4.0}
-        self.total_weight = sum(self.weights.values())  # 7.0
+        # Load from config or use provided weights
+        if weights is not None:
+            self.weights = weights
+        else:
+            self.weights = self._load_weights()
+        self.total_weight = sum(self.weights.values())
 
         # Feature columns (discovered dynamically)
         self.feature_cols = None
@@ -83,6 +88,21 @@ class GeometryEngine:
         self._geometry_pairs_path = get_parquet_path('geometry', 'pairs')
         self._geometry_structure_path = get_parquet_path('geometry', 'structure')
         self._geometry_displacement_path = get_parquet_path('geometry', 'displacement')
+
+    def _load_weights(self) -> dict:
+        """Load barycenter weights from config. Fails if not configured."""
+        try:
+            from prism.utils.stride import get_barycenter_weights
+            weights = get_barycenter_weights()
+            if weights:
+                return weights
+        except Exception as e:
+            raise RuntimeError(f"Failed to load barycenter weights: {e}")
+
+        raise RuntimeError(
+            "No barycenter weights configured in config/stride.yaml. "
+            "Configure domain-specific window weights before running."
+        )
 
     def _discover_feature_columns(self) -> List[str]:
         """Dynamically discover numeric feature columns from vectors table."""
@@ -133,11 +153,12 @@ class GeometryEngine:
         if not self._vectors_path.exists():
             return pd.DataFrame()
 
-        # Read and filter using Polars
-        df_pl = pl.read_parquet(self._vectors_path)
-
-        # Filter for the specific window_end date
-        df_pl = df_pl.filter(pl.col('window_end') == window_end)
+        # Read and filter using Polars - LAZY with pushdown filter
+        df_pl = (
+            pl.scan_parquet(self._vectors_path)
+            .filter(pl.col('window_end') == window_end)
+            .collect()
+        )
 
         if len(df_pl) == 0:
             return pd.DataFrame()
@@ -176,28 +197,40 @@ class GeometryEngine:
         Returns:
             (barycenter, dispersion, alignment)
             - barycenter: weighted center of mass
-            - dispersion: distance between 63d and 252d (tension)
-            - alignment: coherence of all three windows (1 = perfect agreement)
+            - dispersion: distance between shortest and longest window (tension)
+            - alignment: coherence of all windows (1 = perfect agreement)
         """
-        # Need all three windows
-        required = {63, 126, 252}
-        if not required.issubset(vectors.keys()):
+        # Need all configured windows
+        required = set(self.weights.keys())
+        available = set(vectors.keys()) & required
+        if len(available) < 2:
             return None, None, None
 
-        # 1. Weighted Barycenter (Center of Mass)
-        weighted_sum = np.zeros_like(vectors[63])
-        for win, vec in vectors.items():
-            if win in self.weights:
-                weighted_sum += vec * self.weights[win]
+        # Get sorted windows for consistent processing
+        sorted_windows = sorted(available)
+        first_window = sorted_windows[0]
 
-        barycenter = weighted_sum / self.total_weight
+        # 1. Weighted Barycenter (Center of Mass)
+        weighted_sum = np.zeros_like(vectors[first_window])
+        active_weight = 0.0
+        for win in sorted_windows:
+            if win in self.weights:
+                weighted_sum += vectors[win] * self.weights[win]
+                active_weight += self.weights[win]
+
+        if active_weight == 0:
+            return None, None, None
+
+        barycenter = weighted_sum / active_weight
 
         # 2. Timescale Dispersion (Tension between scouts and anchors)
-        dispersion = euclidean(vectors[63], vectors[252])
+        shortest = min(sorted_windows)
+        longest = max(sorted_windows)
+        dispersion = euclidean(vectors[shortest], vectors[longest])
 
-        # 3. Timescale Alignment (How coherent are all three windows?)
+        # 3. Timescale Alignment (How coherent are all windows?)
         # Low variance in distances to barycenter = high alignment
-        distances = [euclidean(vectors[w], barycenter) for w in [63, 126, 252]]
+        distances = [euclidean(vectors[w], barycenter) for w in sorted_windows]
         variance = np.var(distances)
         alignment = 1.0 / (1.0 + variance)
 
@@ -357,8 +390,12 @@ class GeometryEngine:
         # Query the most recent displacement ending at this window_end
         system_energy = 0.0
         if self._geometry_displacement_path.exists():
-            disp_df = pl.read_parquet(self._geometry_displacement_path)
-            disp_filtered = disp_df.filter(pl.col('window_end_to') == window_end)
+            # LAZY with pushdown filter - only load matching rows
+            disp_filtered = (
+                pl.scan_parquet(self._geometry_displacement_path)
+                .filter(pl.col('window_end_to') == window_end)
+                .collect()
+            )
             if len(disp_filtered) > 0:
                 # Get the most recent one
                 energy_row = disp_filtered.sort('window_end_to', descending=True).head(1)
@@ -439,8 +476,14 @@ class GeometryEngine:
         if not self._geometry_signals_path.exists():
             return
 
-        geom_df = pl.read_parquet(self._geometry_signals_path)
-        prev_dates = geom_df.filter(pl.col('window_end') < t_now).select('window_end').unique()
+        # LAZY - only get unique dates before t_now
+        prev_dates = (
+            pl.scan_parquet(self._geometry_signals_path)
+            .filter(pl.col('window_end') < t_now)
+            .select('window_end')
+            .unique()
+            .collect()
+        )
 
         if len(prev_dates) == 0:
             return
@@ -469,8 +512,12 @@ class GeometryEngine:
         barycenter_shifts = []
         n_processed = 0
 
-        # Read geometry signals for barycenter lookups
-        geom_ind_df = pl.read_parquet(self._geometry_signals_path)
+        # Read geometry signals for barycenter lookups (lazy with filter pushdown)
+        geom_ind_df = (
+            pl.scan_parquet(self._geometry_signals_path)
+            .filter(pl.col('window_end').is_in([t_now, t_prev]))
+            .collect()
+        )
 
         for iid, windows in current_vectors.items():
             if iid not in prev_vectors:
@@ -571,13 +618,18 @@ class GeometryEngine:
             logger.warning(f"Vectors parquet file not found at {self._vectors_path}")
             return
 
-        vectors_df = pl.read_parquet(self._vectors_path)
-
-        # Filter for date range and get unique window_end dates
-        dates_df = vectors_df.filter(
-            (pl.col('window_end') >= start_date) &
-            (pl.col('window_end') <= end_date)
-        ).select('window_end').unique().sort('window_end')
+        # Lazy scan with filter pushdown - only load dates in range
+        dates_df = (
+            pl.scan_parquet(self._vectors_path)
+            .filter(
+                (pl.col('window_end') >= start_date) &
+                (pl.col('window_end') <= end_date)
+            )
+            .select('window_end')
+            .unique()
+            .sort('window_end')
+            .collect()
+        )
 
         if len(dates_df) == 0:
             logger.warning(f"No vector data found between {start_date} and {end_date}")
@@ -621,13 +673,14 @@ class GeometryEngine:
         if not self._geometry_displacement_path.exists():
             return pd.DataFrame()
 
-        df = pl.read_parquet(self._geometry_displacement_path)
-
-        # Filter for regime shifts
-        result = df.filter(
-            (pl.col('regime_conviction') > min_conviction) &
-            (pl.col('anchor_ratio') > min_anchor_ratio)
-        ).select([
+        # Lazy scan with filter pushdown for regime shifts
+        result = (
+            pl.scan_parquet(self._geometry_displacement_path)
+            .filter(
+                (pl.col('regime_conviction') > min_conviction) &
+                (pl.col('anchor_ratio') > min_anchor_ratio)
+            )
+            .select([
             'window_end_from',
             'window_end_to',
             'days_elapsed',
@@ -637,7 +690,10 @@ class GeometryEngine:
             pl.col('barycenter_shift_mean').round(4).alias('shift_mean'),
             pl.col('dispersion_delta').round(4).alias('disp_delta'),
             'n_signals',
-        ]).sort('regime_conviction', descending=True)
+            ])
+            .sort('regime_conviction', descending=True)
+            .collect()
+        )
 
         return result.to_pandas()
 

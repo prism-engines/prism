@@ -49,13 +49,19 @@ METADATA = EngineMetadata(
 
 
 def _load_weights() -> Dict[int, float]:
-    """Load barycenter weights from config, with fallback defaults."""
+    """Load barycenter weights from config. Fails if not configured."""
     try:
         from prism.utils.stride import get_barycenter_weights
-        return get_barycenter_weights()
-    except Exception:
-        # Fallback to hardcoded defaults
-        return {21: 0.5, 63: 1.0, 126: 2.0, 252: 4.0}
+        weights = get_barycenter_weights()
+        if weights:
+            return weights
+    except Exception as e:
+        raise RuntimeError(f"Failed to load barycenter weights: {e}")
+
+    raise RuntimeError(
+        "No barycenter weights configured in config/stride.yaml. "
+        "Configure domain-specific window weights before running."
+    )
 
 
 def compute_signal_barycenter(

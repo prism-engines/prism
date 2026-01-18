@@ -108,8 +108,48 @@ from prism.utils.stride import (
 # Fast config access (Python dicts)
 from prism.config.windows import get_window_weight
 
+# Adaptive domain clock integration
+from prism.config.loader import load_delta_thresholds
+import json
+
 # Bisection analysis
 from prism.utils import bisection
+
+
+def load_domain_info() -> Optional[Dict[str, Any]]:
+    """
+    Load domain_info from config/domain_info.json if available.
+
+    This is saved by signal_vector when running in --adaptive mode.
+    Contains auto-detected window parameters based on domain frequency.
+    """
+    import os
+    domain = os.environ.get('PRISM_DOMAIN')
+    if not domain:
+        return None
+    domain_info_path = get_parquet_path("config", "domain_info").with_suffix('.json')
+    if domain_info_path.exists():
+        try:
+            with open(domain_info_path) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+
+def get_adaptive_window_config() -> Optional[Tuple[int, int]]:
+    """
+    Get adaptive window/stride from domain_info if available.
+
+    Returns (window_samples, stride_samples) or None if not available.
+    """
+    domain_info = load_domain_info()
+    if domain_info:
+        window = domain_info.get('window_samples')
+        if window:
+            stride = domain_info.get('stride_samples') or max(1, window // 3)
+            return (window, stride)
+    return None
 
 # Inline modules for mode discovery and wavelet analysis
 from prism.modules.modes import (
@@ -658,23 +698,28 @@ def compute_mode_metrics(
     """
     results = {}
 
-    # Try to load Laplace field data if not provided
+    # Get cohort signals first (needed for lazy filter)
+    signals = get_cohort_signals(cohort)
+    if len(signals) < 3:
+        return results
+
+    # Try to load Laplace field data if not provided (lazy scan with filter)
     if field_df is None:
         try:
             field_path = get_parquet_path('vector', 'signal_field')
             if Path(field_path).exists():
-                field_df = pl.read_parquet(field_path)
+                # Lazy scan with filter pushdown for cohort signals
+                field_df = (
+                    pl.scan_parquet(field_path)
+                    .filter(pl.col('signal_id').is_in(signals))
+                    .collect()
+                )
             else:
                 logger.debug(f"No Laplace field data found for mode discovery")
                 return results
         except Exception as e:
             logger.debug(f"Could not load Laplace field: {e}")
             return results
-
-    # Get cohort signals
-    signals = get_cohort_signals(cohort)
-    if len(signals) < 3:
-        return results
 
     try:
         # Discover modes using the module
@@ -718,10 +763,19 @@ def compute_wavelet_metrics(
     """
     results = {}
 
-    # Try to load observations if not provided
+    # Try to load observations if not provided (lazy scan with cohort filter)
     if observations is None:
         try:
-            observations = pl.read_parquet(get_parquet_path('raw', 'observations'))
+            # Use lazy scan with filter pushdown for cohort
+            lazy_obs = pl.scan_parquet(get_parquet_path('raw', 'observations'))
+            schema = lazy_obs.collect_schema()
+            if 'cohort_id' in schema.names():
+                observations = lazy_obs.filter(pl.col('cohort_id') == cohort).collect()
+            else:
+                # Filter by signal_id pattern if no cohort_id column
+                observations = lazy_obs.filter(
+                    pl.col('signal_id').str.starts_with(cohort + '_')
+                ).collect()
         except Exception as e:
             logger.debug(f"Could not load observations for wavelet: {e}")
             return results

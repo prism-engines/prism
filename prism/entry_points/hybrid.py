@@ -142,11 +142,16 @@ def extract_prism_features(
         geometry_df = pl.read_parquet(geom_path)
         logger.info(f"Loaded geometry data: {len(geometry_df):,} rows")
 
-    # Observations (for RUL target)
+    # Observations (only load RUL signals for target extraction)
     obs_path = get_parquet_path('raw', 'observations', domain=domain)
     if not obs_path.exists():
         raise FileNotFoundError(f"Observations not found: {obs_path}")
-    obs_df = pl.read_parquet(obs_path)
+    # Lazy scan with filter pushdown - only load RUL signals
+    obs_df = (
+        pl.scan_parquet(obs_path)
+        .filter(pl.col('signal_id').str.contains('RUL'))
+        .collect()
+    )
 
     # -------------------------------------------------------------------------
     # Extract field features per entity (cohort/engine)
@@ -239,8 +244,8 @@ def extract_prism_features(
     # Extract target (RUL) per entity
     # -------------------------------------------------------------------------
 
-    # Get RUL observations
-    rul_obs = obs_df.filter(pl.col('signal_id').str.contains('RUL'))
+    # obs_df already filtered to RUL signals during load
+    rul_obs = obs_df
 
     if len(rul_obs) > 0:
         rul_obs = rul_obs.with_columns([
@@ -291,27 +296,28 @@ def extract_baseline_features(domain: str) -> Tuple[pl.DataFrame, List[str]]:
     """
 
     obs_path = get_parquet_path('raw', 'observations', domain=domain)
-    obs_df = pl.read_parquet(obs_path)
 
-    # Extract entity and sensor from signal_id
-    obs_df = obs_df.with_columns([
-        pl.col('signal_id').map_elements(
-            extract_cohort_from_signal, return_dtype=pl.Utf8
-        ).alias('entity_id'),
-        pl.col('signal_id').str.extract(r'CMAPSS_([^_]+)_').alias('sensor'),
-    ])
+    # Use two separate lazy queries for non-RUL (baseline) and RUL (target)
+    lazy_obs = pl.scan_parquet(obs_path)
 
-    # Basic stats per sensor per entity
+    # Basic stats per sensor per entity (non-RUL signals)
     baseline = (
-        obs_df
+        lazy_obs
         .filter(~pl.col('signal_id').str.contains('RUL'))
-        .group_by(['entity_id', 'sensor'])
+        .with_columns([
+            pl.col('signal_id').str.extract(r'CMAPSS_([^_]+)_').alias('sensor'),
+        ])
+        .group_by([
+            pl.col('signal_id').map_elements(extract_cohort_from_signal, return_dtype=pl.Utf8).alias('entity_id'),
+            'sensor'
+        ])
         .agg([
             pl.col('value').mean().alias('mean'),
             pl.col('value').std().alias('std'),
             pl.col('value').min().alias('min'),
             pl.col('value').max().alias('max'),
         ])
+        .collect()
     )
 
     # Pivot to wide format
@@ -321,15 +327,19 @@ def extract_baseline_features(domain: str) -> Tuple[pl.DataFrame, List[str]]:
         values=['mean', 'std', 'min', 'max'],
     )
 
-    # Get RUL target
+    # Get RUL target (separate lazy query with filter pushdown)
     targets = (
-        obs_df
+        lazy_obs
         .filter(pl.col('signal_id').str.contains('RUL'))
+        .with_columns([
+            pl.col('signal_id').map_elements(extract_cohort_from_signal, return_dtype=pl.Utf8).alias('entity_id'),
+        ])
         .group_by('entity_id')
         .agg([
             pl.col('value').max().alias('initial_rul'),
             pl.col('value').mean().alias('mean_rul'),
         ])
+        .collect()
     )
 
     baseline_with_target = baseline_wide.join(targets, on='entity_id', how='inner')
