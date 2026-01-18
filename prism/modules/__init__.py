@@ -7,10 +7,8 @@ These are NOT standalone entry points - they're building blocks.
 
 Modules:
     characterize: Inline characterization of signals
-    laplace: Inline Laplace field computation (gradient, laplacian, divergence)
-    laplace_transform: Running Laplace transform (O(1) incremental)
+    laplace_transform: Unified Laplace module (discrete operators + running transform)
     laplace_pairwise: Pairwise Laplace geometry (vectorized)
-    laplace_compute: CLI computation utilities
     modes: Behavioral mode discovery from Laplace signatures
     wavelet_microscope: Frequency-band degradation detection
     prefilter: O(n) Laplacian pre-filter for flat/duplicate signals
@@ -21,13 +19,14 @@ from prism.modules.characterize import (
     CharacterizationResult,
 )
 
-from prism.modules.laplace import (
+from prism.modules.laplace_transform import (
+    # Discrete operators
     compute_laplace_for_series,
     compute_gradient,
     compute_laplacian,
-)
-
-from prism.modules.laplace_transform import (
+    compute_divergence_for_signal,
+    add_divergence_to_field_rows,
+    # Running Laplace transform
     RunningLaplace,
     compute_laplace_field,
     laplace_gradient,
@@ -65,10 +64,12 @@ __all__ = [
     # Characterize
     'characterize_signal',
     'CharacterizationResult',
-    # Laplace (inline)
+    # Laplace (discrete operators)
     'compute_laplace_for_series',
     'compute_gradient',
     'compute_laplacian',
+    'compute_divergence_for_signal',
+    'add_divergence_to_field_rows',
     # Laplace Transform (Running O(1))
     'RunningLaplace',
     'compute_laplace_field',

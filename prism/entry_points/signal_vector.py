@@ -95,7 +95,7 @@ from prism.modules.characterize import (
     get_engines_from_characterization,
     get_characterization_summary,
 )
-from prism.modules.laplace import (
+from prism.modules.laplace_transform import (
     compute_laplace_for_series,
     compute_divergence_for_signal,
     add_divergence_to_field_rows,

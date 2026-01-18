@@ -97,10 +97,10 @@ ENTRY_POINT_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
 
     # ==========================================================================
-    # LAPLACE (moved to prism.laplace package - internal, not user-facing)
+    # LAPLACE
     # ==========================================================================
     'laplace': {
-        'module': 'prism.laplace.compute',
+        'module': 'prism.entry_points.laplace',
         'goal': 'Compute Laplace field (internal - called by geometry)',
         'inputs': ['vector/signal.parquet'],
         'outputs': ['vector/signal_field.parquet', 'vector/laplace_field_v2.parquet'],
@@ -108,7 +108,7 @@ ENTRY_POINT_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
 
     'laplace_pairwise': {
-        'module': 'prism.laplace.pairwise',
+        'module': 'prism.modules.laplace_pairwise',
         'goal': 'Compute pairwise geometry in Laplace field space',
         'inputs': ['vector/signal_field.parquet'],
         'outputs': ['geometry/laplace_pair.parquet'],
@@ -208,6 +208,6 @@ except ImportError:
 
 try:
     from prism.modules.laplace_transform import compute_laplace_field
-    from prism.modules.laplace_compute import WindowConfig
+    from prism.entry_points.laplace import WindowConfig
 except ImportError:
     pass

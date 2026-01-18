@@ -13,8 +13,8 @@ class TestLaplaceImports:
     """Test all laplace module imports work correctly."""
 
     def test_inline_laplace_imports(self):
-        """Test prism.modules.laplace (inline helpers)."""
-        from prism.modules.laplace import (
+        """Test prism.modules.laplace_transform (discrete operators)."""
+        from prism.modules.laplace_transform import (
             compute_laplace_for_series,
             compute_gradient,
             compute_laplacian,
@@ -41,8 +41,8 @@ class TestLaplaceImports:
         assert callable(decompose_by_scale)
 
     def test_laplace_compute_imports(self):
-        """Test prism.modules.laplace_compute (CLI utilities)."""
-        from prism.modules.laplace_compute import WindowConfig
+        """Test prism.entry_points.laplace (CLI utilities)."""
+        from prism.entry_points.laplace import WindowConfig
         assert WindowConfig is not None
 
     def test_laplace_pairwise_imports(self):
@@ -68,8 +68,8 @@ class TestLaplaceImports:
         assert callable(compute_laplace_for_series)
 
     def test_entry_points_exports(self):
-        """Test prism.entry_points exports laplace functions."""
-        from prism.entry_points import compute_laplace_field, WindowConfig
+        """Test prism.entry_points.laplace exports."""
+        from prism.entry_points.laplace import WindowConfig, compute_laplace_field
         assert callable(compute_laplace_field)
         assert WindowConfig is not None
 
@@ -79,7 +79,7 @@ class TestLaplaceComputation:
 
     def test_compute_gradient(self):
         """Test gradient computation."""
-        from prism.modules.laplace import compute_gradient
+        from prism.modules.laplace_transform import compute_gradient
 
         values = np.array([1.0, 2.0, 4.0, 7.0, 11.0])
         gradient = compute_gradient(values)
@@ -91,7 +91,7 @@ class TestLaplaceComputation:
 
     def test_compute_laplacian(self):
         """Test laplacian computation."""
-        from prism.modules.laplace import compute_laplacian
+        from prism.modules.laplace_transform import compute_laplacian
 
         values = np.array([1.0, 2.0, 4.0, 7.0, 11.0])
         laplacian = compute_laplacian(values)
