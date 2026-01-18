@@ -11,7 +11,7 @@ the domain frequency is 20x/sec. The slow ball still contributes valid
 observations - it just appears "static" within fast windows.
 
 Usage:
-    from prism.modules.domain_clock import DomainClock
+    from prism.core.domain_clock import DomainClock
     
     clock = DomainClock(min_cycles=3)
     domain_info = clock.characterize(observations_df)
@@ -462,7 +462,7 @@ def integrate_with_signal_vector():
     
     # With:
     
-    from prism.modules.domain_clock import DomainClock
+    from prism.core.domain_clock import DomainClock
     
     def compute_adaptive_window_config(observations: pl.DataFrame) -> List[Dict]:
         """Auto-detect window from domain frequency."""

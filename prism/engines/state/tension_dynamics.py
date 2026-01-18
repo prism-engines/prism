@@ -20,7 +20,7 @@ Key Metrics:
     - alignment dynamics
 
 Usage:
-    from prism.engines.tension_dynamics import TensionDynamicsEngine
+    from prism.engines.state.tension_dynamics import TensionDynamicsEngine
 
     engine = TensionDynamicsEngine()
     result = engine.run(structure_df)

@@ -22,7 +22,7 @@ Key Metrics:
     - causality evidence (Granger-like, cross-correlation)
 
 Usage:
-    from prism.engines.transfer_detector import TransferDetectorEngine
+    from prism.engines.state.transfer_detector import TransferDetectorEngine
 
     engine = TransferDetectorEngine()
     result = engine.run(cohort_a_series, cohort_b_series)

@@ -57,7 +57,7 @@ from prism.config.loader import load_delta_thresholds
 import json
 
 # V2 Architecture: Running Laplace transform
-from prism.modules.laplace_transform import (
+from prism.engines.laplace.transform import (
     RunningLaplace,
     compute_laplace_field as compute_laplace_field_v2,
     laplace_gradient,
@@ -65,7 +65,7 @@ from prism.modules.laplace_transform import (
     laplace_energy,
     decompose_by_scale,
 )
-from prism.modules.signals.types import LaplaceField, DenseSignal
+from prism.core.signals.types import LaplaceField, DenseSignal
 
 
 # =============================================================================

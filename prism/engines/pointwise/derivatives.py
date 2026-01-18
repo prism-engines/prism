@@ -16,7 +16,7 @@ position, velocity, acceleration are the core state components.
 import numpy as np
 from typing import Tuple, Optional, Literal
 
-from prism.modules.signals.types import DenseSignal
+from prism.core.signals.types import DenseSignal
 
 
 # =============================================================================

@@ -17,7 +17,7 @@ Key Metrics:
     - energy_zscore: Current energy vs historical distribution
 
 Usage:
-    from prism.engines.energy_dynamics import EnergyDynamicsEngine
+    from prism.engines.state.energy_dynamics import EnergyDynamicsEngine
 
     engine = EnergyDynamicsEngine()
     result = engine.run(displacement_df)

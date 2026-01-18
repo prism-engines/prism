@@ -33,7 +33,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from prism.modules.signals.types import LaplaceField, DenseSignal
+from prism.core.signals.types import LaplaceField, DenseSignal
 
 
 # =============================================================================

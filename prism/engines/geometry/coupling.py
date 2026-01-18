@@ -9,7 +9,7 @@ Signals only compared where BOTH have meaningful content.
 import numpy as np
 from typing import Dict, List
 
-from prism.modules.signals.types import LaplaceField
+from prism.core.signals.types import LaplaceField
 
 
 def compute_coupling_matrix(

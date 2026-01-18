@@ -227,7 +227,9 @@
       "Bash(PYTHONPATH=/Users/jasonrudder/prism-mac:$PYTHONPATH python:*)",
       "Bash(PYTHONPATH=/Users/jasonrudder/prism-mac pytest:*)",
       "Bash(/Users/jasonrudder/prism-mac/venv/bin/pytest:*)",
-      "Bash(uv --version:*)"
+      "Bash(uv --version:*)",
+      "Bash(# Check if anything imports from modules/geometry/modes specifically grep -r \"\"from prism.modules.geometry.modes import\\\\|from prism\\\\.modules\\\\.geometry\\\\.modes import\"\" prism/ --include=\"\"*.py\"\")",
+      "Bash(# Check remaining modules imports \\(should only be in modules/ itself\\) grep -r \"\"from prism.modules\"\" prism/ --include=\"\"*.py\"\" -l)"
     ]
   },
   "enableAllProjectMcpServers": true,

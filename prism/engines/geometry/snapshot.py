@@ -8,10 +8,10 @@ Compute system geometry at a single timestamp from Laplace fields.
 import numpy as np
 from typing import Dict, List
 
-from prism.modules.signals.types import LaplaceField, GeometrySnapshot
-from prism.geometry.coupling import compute_coupling_matrix
-from prism.geometry.divergence import compute_divergence
-from prism.geometry.modes import discover_modes
+from prism.core.signals.types import LaplaceField, GeometrySnapshot
+from prism.engines.geometry.coupling import compute_coupling_matrix
+from prism.engines.geometry.divergence import compute_divergence
+from prism.engines.geometry.modes import discover_modes
 
 
 def compute_geometry_at_t(

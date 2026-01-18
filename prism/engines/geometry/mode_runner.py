@@ -50,7 +50,7 @@ from prism.db.parquet_store import (
 )
 from prism.db.polars_io import write_parquet_atomic
 from prism.utils.domain import require_domain
-from prism.modules.modes import (
+from prism.engines.geometry.modes import (
     discover_modes,
     extract_laplace_fingerprint,
 )

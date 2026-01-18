@@ -12,7 +12,7 @@ Divergence indicates whether the system is:
 import numpy as np
 from typing import Dict
 
-from prism.modules.signals.types import LaplaceField
+from prism.core.signals.types import LaplaceField
 
 
 def compute_divergence(

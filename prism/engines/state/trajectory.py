@@ -9,8 +9,8 @@ No windowing — pure calculus.
 import numpy as np
 from typing import List, Dict
 
-from prism.modules.signals.types import GeometrySnapshot, StateTrajectory
-from prism.geometry.snapshot import snapshot_to_vector
+from prism.core.signals.types import GeometrySnapshot, StateTrajectory
+from prism.engines.geometry.snapshot import snapshot_to_vector
 
 
 def compute_state_trajectory(

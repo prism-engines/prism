@@ -14,7 +14,7 @@ class TestLaplaceImports:
 
     def test_inline_laplace_imports(self):
         """Test prism.modules.laplace_transform (discrete operators)."""
-        from prism.modules.laplace_transform import (
+        from prism.engines.laplace.transform import (
             compute_laplace_for_series,
             compute_gradient,
             compute_laplacian,
@@ -25,7 +25,7 @@ class TestLaplaceImports:
 
     def test_laplace_transform_imports(self):
         """Test prism.modules.laplace_transform (RunningLaplace)."""
-        from prism.modules.laplace_transform import (
+        from prism.engines.laplace.transform import (
             RunningLaplace,
             compute_laplace_field,
             laplace_gradient,
@@ -47,7 +47,7 @@ class TestLaplaceImports:
 
     def test_laplace_pairwise_imports(self):
         """Test prism.modules.laplace_pairwise (vectorized pairwise)."""
-        from prism.modules.laplace_pairwise import (
+        from prism.engines.laplace.pairwise import (
             run_laplace_pairwise_vectorized,
             run_laplace_pairwise_windowed,
         )
@@ -56,7 +56,7 @@ class TestLaplaceImports:
 
     def test_modules_package_exports(self):
         """Test prism.modules package exports laplace functions."""
-        from prism.modules import (
+        from prism.engines import (
             RunningLaplace,
             compute_laplace_field,
             compute_laplace_for_series,
@@ -79,7 +79,7 @@ class TestLaplaceComputation:
 
     def test_compute_gradient(self):
         """Test gradient computation."""
-        from prism.modules.laplace_transform import compute_gradient
+        from prism.engines.laplace.transform import compute_gradient
 
         values = np.array([1.0, 2.0, 4.0, 7.0, 11.0])
         gradient = compute_gradient(values)
@@ -91,7 +91,7 @@ class TestLaplaceComputation:
 
     def test_compute_laplacian(self):
         """Test laplacian computation."""
-        from prism.modules.laplace_transform import compute_laplacian
+        from prism.engines.laplace.transform import compute_laplacian
 
         values = np.array([1.0, 2.0, 4.0, 7.0, 11.0])
         laplacian = compute_laplacian(values)
@@ -103,7 +103,7 @@ class TestLaplaceComputation:
 
     def test_running_laplace(self):
         """Test RunningLaplace incremental computation."""
-        from prism.modules.laplace_transform import RunningLaplace
+        from prism.engines.laplace.transform import RunningLaplace
 
         laplace = RunningLaplace(s_values=np.array([0.1, 1.0]))
         laplace.reset("test_signal")

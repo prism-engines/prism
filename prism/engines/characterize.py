@@ -27,7 +27,7 @@ import logging
 import numpy as np
 from scipy import stats, signal
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set, Any
 from datetime import datetime, date
 import warnings
 
@@ -1482,3 +1482,108 @@ if __name__ == '__main__':
 
         print("\n" + "=" * 60)
         print("Tests complete")
+
+
+# =============================================================================
+# CONVENIENCE FUNCTIONS
+# =============================================================================
+# These wrap the Characterizer class for inline use by entry points
+
+# Singleton characterizer instance (stateless, can be reused)
+_characterizer = None
+
+
+def _get_characterizer() -> Characterizer:
+    """Get or create singleton Characterizer instance."""
+    global _characterizer
+    if _characterizer is None:
+        _characterizer = Characterizer()
+    return _characterizer
+
+
+def characterize_signal(
+    signal_id: str,
+    values: np.ndarray,
+    dates: Optional[np.ndarray] = None,
+    window_end: Optional[date] = None,
+) -> CharacterizationResult:
+    """
+    Characterize a single signal inline.
+
+    This is the primary interface for signal_vector to characterize
+    signals as they are processed.
+
+    Args:
+        signal_id: The signal identifier
+        values: Signal values (1D array, will be cleaned of NaN)
+        dates: Optional observation dates (for frequency detection)
+        window_end: Optional window end date (defaults to today)
+
+    Returns:
+        CharacterizationResult with 6 axes and engine recommendations
+    """
+    char = _get_characterizer()
+    return char.compute(
+        values=values,
+        signal_id=signal_id,
+        window_end=window_end,
+        dates=dates,
+    )
+
+
+def get_engines_from_characterization(
+    char_result: CharacterizationResult,
+    core_engines: Set[str],
+    conditional_engines: Set[str],
+    discontinuity_engines: Set[str],
+) -> Tuple[Set[str], bool]:
+    """
+    Determine which engines to run based on characterization result.
+
+    Args:
+        char_result: Result from characterize_signal()
+        core_engines: Set of engines that always run
+        conditional_engines: Set of engines that run conditionally
+        discontinuity_engines: Set of engines for discontinuity analysis
+
+    Returns:
+        Tuple of (engines_to_run, has_discontinuities)
+    """
+    engines_to_run = core_engines.copy()
+    valid_set = set(char_result.valid_engines)
+
+    for engine in conditional_engines:
+        if engine in valid_set:
+            engines_to_run.add(engine)
+
+    has_discontinuities = char_result.has_steps or char_result.has_impulses
+
+    if has_discontinuities:
+        for engine in discontinuity_engines:
+            if engine in valid_set:
+                engines_to_run.add(engine)
+
+    return engines_to_run, has_discontinuities
+
+
+def get_characterization_summary(char_result: CharacterizationResult) -> Dict[str, Any]:
+    """
+    Get a summary dict from characterization result for logging/storage.
+    """
+    return {
+        'signal_id': char_result.signal_id,
+        'dynamical_class': char_result.dynamical_class,
+        'ax_stationarity': char_result.ax_stationarity,
+        'ax_memory': char_result.ax_memory,
+        'ax_periodicity': char_result.ax_periodicity,
+        'ax_complexity': char_result.ax_complexity,
+        'ax_determinism': char_result.ax_determinism,
+        'ax_volatility': char_result.ax_volatility,
+        'valid_engines': char_result.valid_engines,
+        'has_steps': char_result.has_steps,
+        'has_impulses': char_result.has_impulses,
+        'n_breaks': char_result.n_breaks,
+        'return_method': char_result.return_method,
+        'frequency': char_result.frequency,
+        'is_step_function': char_result.is_step_function,
+    }

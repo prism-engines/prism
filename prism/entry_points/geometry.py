@@ -7,7 +7,7 @@ Orchestrates geometry computation by calling canonical engines + inline modules.
 This runner is a PURE ORCHESTRATOR:
 - Fetches data from Parquet files
 - Calls canonical GEOMETRY engines (9 from prism.engines registry)
-- Calls inline MODULES (modes, wavelet_microscope from prism.modules)
+- Calls inline MODULES (modes, wavelet_microscope from prism.engines)
 - Iterates over date ranges at configured strides
 - Stores to Parquet
 
@@ -24,7 +24,7 @@ GEOMETRY ENGINES (9 canonical):
     - convex_hull:         Phase space volume
     - barycenter:          Conviction-weighted center of mass across timescales
 
-INLINE MODULES (from prism.modules):
+INLINE MODULES (from prism.engines):
     - modes:               Behavioral mode discovery from Laplace signatures
     - wavelet_microscope:  Frequency-band degradation detection
 
@@ -161,27 +161,27 @@ def get_adaptive_window_config() -> Optional[Tuple[int, int]]:
     return None
 
 # Inline modules for mode discovery and wavelet analysis
-from prism.modules.modes import (
+from prism.engines.geometry.modes import (
     discover_modes,
     compute_affinity_weighted_features,
 )
-from prism.modules.wavelet_microscope import (
+from prism.engines.spectral.wavelet import (
     run_wavelet_microscope,
     extract_wavelet_features,
 )
 
 # V2 Architecture: Geometry from Laplace fields
-from prism.geometry.snapshot import (
+from prism.engines.geometry.snapshot import (
     compute_geometry_at_t,
     compute_geometry_trajectory,
     snapshot_to_vector,
     get_unified_timestamps,
 )
-from prism.geometry.coupling import compute_coupling_matrix, compute_affinity_matrix
-from prism.geometry.divergence import compute_divergence, compute_divergence_trajectory
-from prism.geometry.modes import discover_modes as discover_modes_v2, track_mode_evolution
-from prism.modules.signals.types import LaplaceField, GeometrySnapshot
-from prism.modules.laplace_transform import compute_laplace_field as compute_laplace_field_v2
+from prism.engines.geometry.coupling import compute_coupling_matrix, compute_affinity_matrix
+from prism.engines.geometry.divergence import compute_divergence, compute_divergence_trajectory
+from prism.engines.geometry.modes import discover_modes as discover_modes_v2
+from prism.core.signals.types import LaplaceField, GeometrySnapshot
+from prism.engines.laplace.transform import compute_laplace_field as compute_laplace_field_v2
 
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -882,7 +882,7 @@ def make_cohort_row(
         'barycenter_mean_dispersion': metrics.get('barycenter_mean_dispersion'),
         'barycenter_mean_alignment': metrics.get('barycenter_mean_alignment'),
         'barycenter_n_computed': metrics.get('barycenter_n_computed'),
-        # Mode discovery metrics (from prism.modules.modes)
+        # Mode discovery metrics (from prism.engines.modes)
         'mode_n_discovered': metrics.get('mode_n_discovered'),
         'mode_affinity_mean': metrics.get('mode_affinity_mean'),
         'mode_affinity_std': metrics.get('mode_affinity_std'),
@@ -890,7 +890,7 @@ def make_cohort_row(
         'mode_entropy_std': metrics.get('mode_entropy_std'),
         'mode_dominant_size': metrics.get('mode_dominant_size'),
         'mode_balance': metrics.get('mode_balance'),
-        # Wavelet degradation metrics (from prism.modules.wavelet_microscope)
+        # Wavelet degradation metrics (from prism.engines.wavelet_microscope)
         'wavelet_max_degradation': metrics.get('wavelet_max_degradation'),
         'wavelet_mean_degradation': metrics.get('wavelet_mean_degradation'),
         'wavelet_n_degrading': metrics.get('wavelet_n_degrading'),

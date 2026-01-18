@@ -19,7 +19,7 @@ Input: Energy and tension dynamics
 Output: Phase labels, regime shift detection, confidence scores
 
 Usage:
-    from prism.engines.phase_detector import PhaseDetectorEngine
+    from prism.engines.state.phase_detector import PhaseDetectorEngine
 
     engine = PhaseDetectorEngine()
     result = engine.run(state_df)

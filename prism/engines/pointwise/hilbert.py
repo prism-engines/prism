@@ -17,7 +17,7 @@ import numpy as np
 from scipy.signal import hilbert
 from typing import Tuple, Optional
 
-from prism.modules.signals.types import DenseSignal
+from prism.core.signals.types import DenseSignal
 
 
 # =============================================================================

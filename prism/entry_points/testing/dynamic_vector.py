@@ -38,7 +38,7 @@ from typing import List, Tuple, Optional, Dict, Any
 # =============================================================================
 
 try:
-    from prism.engines.transfer_entropy import compute_transfer_entropy
+    from prism.engines.state.transfer_entropy import compute_transfer_entropy
     HAS_TE = True
 except ImportError:
     HAS_TE = False

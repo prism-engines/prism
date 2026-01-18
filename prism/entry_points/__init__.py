@@ -58,7 +58,7 @@ ENTRY_POINT_REGISTRY: Dict[str, Dict[str, Any]] = {
         'goal': 'Inline characterization for signals (called by signal_vector)',
         'inputs': ['signal values array'],
         'outputs': ['CharacterizationResult (in-memory)'],
-        'note': 'Module, not CLI entry point. Use from prism.modules.characterize import characterize_signal',
+        'note': 'Module, not CLI entry point. Use from prism.engines.characterize import characterize_signal',
     },
 
     'signal_vector': {
@@ -207,7 +207,7 @@ except ImportError:
     pass
 
 try:
-    from prism.modules.laplace_transform import compute_laplace_field
+    from prism.engines.laplace.transform import compute_laplace_field
     from prism.entry_points.laplace import WindowConfig
 except ImportError:
     pass

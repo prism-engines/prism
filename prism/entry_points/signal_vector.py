@@ -99,12 +99,12 @@ from prism.utils.stride import load_stride_config, get_default_tiers
 import yaml
 
 # Inline modules (characterize + laplace)
-from prism.modules.characterize import (
+from prism.engines.characterize import (
     characterize_signal,
     get_engines_from_characterization,
     get_characterization_summary,
 )
-from prism.modules.laplace_transform import (
+from prism.engines.laplace.transform import (
     compute_laplace_for_series,
     compute_divergence_for_signal,
     add_divergence_to_field_rows,
@@ -116,11 +116,11 @@ from prism.engines.pointwise import (
     DerivativesEngine,
     StatisticalEngine,
 )
-from prism.modules.signals.types import DenseSignal, SparseSignal
-from prism.modules.laplace_transform import compute_laplace_field as compute_laplace_field_v2
+from prism.core.signals.types import DenseSignal, SparseSignal
+from prism.engines.laplace.transform import compute_laplace_field as compute_laplace_field_v2
 
 # Domain clock for adaptive windowing
-from prism.modules.domain_clock import DomainClock, DomainInfo
+from prism.core.domain_clock import DomainClock, DomainInfo
 from prism.config.loader import load_clock_config, load_delta_thresholds
 
 warnings.filterwarnings("ignore")

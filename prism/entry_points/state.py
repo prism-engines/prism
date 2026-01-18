@@ -72,26 +72,26 @@ from prism.engines.utils.parallel import (
 )
 
 # Canonical temporal dynamics engines
-from prism.engines.energy_dynamics import EnergyDynamicsEngine
-from prism.engines.tension_dynamics import TensionDynamicsEngine
-from prism.engines.phase_detector import PhaseDetectorEngine
+from prism.engines.state.energy_dynamics import EnergyDynamicsEngine
+from prism.engines.state.tension_dynamics import TensionDynamicsEngine
+from prism.engines.state.phase_detector import PhaseDetectorEngine
 from prism.engines.cohort_aggregator import CohortAggregatorEngine
-from prism.engines.transfer_detector import TransferDetectorEngine
+from prism.engines.state.transfer_detector import TransferDetectorEngine
 
 # V2 Architecture: State trajectory from geometry snapshots
-from prism.state.trajectory import (
+from prism.engines.state.trajectory import (
     compute_state_trajectory,
     detect_failure_acceleration,
     compute_state_metrics,
     find_acceleration_events,
     compute_trajectory_curvature,
 )
-from prism.geometry.snapshot import (
+from prism.engines.geometry.snapshot import (
     compute_geometry_trajectory,
     snapshot_to_vector,
     get_unified_timestamps,
 )
-from prism.modules.signals.types import GeometrySnapshot, StateTrajectory, LaplaceField
+from prism.core.signals.types import GeometrySnapshot, StateTrajectory, LaplaceField
 
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

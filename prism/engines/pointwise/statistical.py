@@ -18,7 +18,7 @@ recent history - useful for detecting anomalies.
 import numpy as np
 from typing import Tuple, Optional
 
-from prism.modules.signals.types import DenseSignal
+from prism.core.signals.types import DenseSignal
 
 
 # =============================================================================
