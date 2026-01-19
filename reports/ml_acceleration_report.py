@@ -31,10 +31,10 @@ try:
 except ImportError:
     SKLEARN_AVAILABLE = False
 
-from prism.db.parquet_store import get_parquet_path
-from report_utils import (
-    ReportBuilder, 
-    load_domain_config, 
+from prism.db.parquet_store import get_path, OBSERVATIONS, VECTOR, GEOMETRY, STATE
+from reports.report_utils import (
+    ReportBuilder,
+    load_domain_config,
     translate_signal_id,
     format_number,
     format_percentage,
@@ -129,7 +129,7 @@ def generate_ml_acceleration_report(
     # ==========================================================================
     # Load Data
     # ==========================================================================
-    obs_path = get_parquet_path('raw', 'observations')
+    obs_path = get_path(OBSERVATIONS)
     if not Path(obs_path).exists():
         report.add_section("Error", f"Observations not found: {obs_path}")
         return report
@@ -189,7 +189,7 @@ def generate_ml_acceleration_report(
     results.append(result)
     
     # Stage 2: Vector metrics
-    vector_path = get_parquet_path('vector', 'signal')
+    vector_path = get_path(VECTOR)
     if Path(vector_path).exists():
         vector = pl.read_parquet(vector_path)
         if entity_col in vector.columns:
@@ -199,7 +199,7 @@ def generate_ml_acceleration_report(
             results.append(result)
     
     # Stage 3: Geometry
-    geometry_path = get_parquet_path('geometry', 'signal_pair')
+    geometry_path = get_path(GEOMETRY)
     if Path(geometry_path).exists():
         geometry = pl.read_parquet(geometry_path)
         if entity_col in geometry.columns:
@@ -216,7 +216,7 @@ def generate_ml_acceleration_report(
             results.append(result)
     
     # Stage 4: State
-    state_path = get_parquet_path('state', 'signal_pair')
+    state_path = get_path(STATE)
     if Path(state_path).exists():
         state = pl.read_parquet(state_path)
         if entity_col in state.columns:

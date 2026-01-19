@@ -20,10 +20,10 @@ from typing import Dict, Any
 
 import polars as pl
 
-from prism.db.parquet_store import get_parquet_path
-from report_utils import (
-    ReportBuilder, 
-    load_domain_config, 
+from prism.db.parquet_store import get_path, OBSERVATIONS, VECTOR, GEOMETRY, STATE
+from reports.report_utils import (
+    ReportBuilder,
+    load_domain_config,
     translate_signal_id,
     format_number,
     format_percentage,
@@ -115,18 +115,15 @@ def generate_state_report(domain: str = None) -> ReportBuilder:
     time_unit = get_time_unit(config)
     report = ReportBuilder("State Report", domain=domain)
     
-    # Load state data
-    state_path = get_parquet_path('state', 'signal_pair')
-    cohort_state_path = get_parquet_path('state', 'cohort')
-    
+    # Load state (single unified file now)
+    state_path = get_path(STATE)
+
     state = None
     cohort_state = None
-    
+
     if Path(state_path).exists():
         state = pl.read_parquet(state_path)
-    
-    if Path(cohort_state_path).exists():
-        cohort_state = pl.read_parquet(cohort_state_path)
+        cohort_state = state  # Same file now
     
     if state is None and cohort_state is None:
         report.add_section("Error", "No state data found. Run state entry point first.")

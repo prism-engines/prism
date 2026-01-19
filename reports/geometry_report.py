@@ -20,10 +20,10 @@ from typing import Dict, Any
 
 import polars as pl
 
-from prism.db.parquet_store import get_parquet_path
-from report_utils import (
-    ReportBuilder, 
-    load_domain_config, 
+from prism.db.parquet_store import get_path, OBSERVATIONS, VECTOR, GEOMETRY, STATE
+from reports.report_utils import (
+    ReportBuilder,
+    load_domain_config,
     translate_signal_id,
     format_number,
     format_percentage,
@@ -83,18 +83,15 @@ def generate_geometry_report(domain: str = None) -> ReportBuilder:
     time_unit = get_time_unit(config)
     report = ReportBuilder("Geometry Report", domain=domain)
     
-    # Try different geometry paths
-    geometry_path = get_parquet_path('geometry', 'signal_pair')
-    cohort_geometry_path = get_parquet_path('geometry', 'cohort')
-    
+    # Load geometry (single unified file now)
+    geometry_path = get_path(GEOMETRY)
+
     geometry = None
     cohort_geometry = None
-    
+
     if Path(geometry_path).exists():
         geometry = pl.read_parquet(geometry_path)
-    
-    if Path(cohort_geometry_path).exists():
-        cohort_geometry = pl.read_parquet(cohort_geometry_path)
+        cohort_geometry = geometry  # Same file now
     
     if geometry is None and cohort_geometry is None:
         report.add_section("Error", "No geometry data found. Run geometry entry point first.")
@@ -104,14 +101,13 @@ def generate_geometry_report(domain: str = None) -> ReportBuilder:
     # Key Metrics
     # ==========================================================================
     if geometry is not None:
-        n_pairs = len(geometry)
-        n_windows = geometry['window_id'].n_unique() if 'window_id' in geometry.columns else 0
-        report.add_metric("Signal Pairs", n_pairs)
-        report.add_metric("Windows Analyzed", n_windows)
-    
-    if cohort_geometry is not None:
-        n_cohorts = cohort_geometry['cohort_id'].n_unique() if 'cohort_id' in cohort_geometry.columns else 0
-        report.add_metric("Cohorts", n_cohorts)
+        n_rows = len(geometry)
+        # Use timestamp as window identifier (not window_id)
+        n_timestamps = geometry['timestamp'].n_unique() if 'timestamp' in geometry.columns else 0
+        n_entities = geometry['entity_id'].n_unique() if 'entity_id' in geometry.columns else 0
+        report.add_metric("Geometry Snapshots", n_rows)
+        report.add_metric("Timestamps", n_timestamps)
+        report.add_metric("Entities", n_entities)
     
     # ==========================================================================
     # PCA Analysis
@@ -125,25 +121,32 @@ def generate_geometry_report(domain: str = None) -> ReportBuilder:
         geometry = cohort_geometry  # Use cohort geometry for PCA
     
     if pca_cols and geometry is not None:
-        # Get latest window's PCA stats
-        if 'window_id' in geometry.columns:
-            latest = geometry.filter(pl.col('window_id') == geometry['window_id'].max())
+        # Get latest timestamp's PCA stats
+        if 'timestamp' in geometry.columns:
+            latest = geometry.filter(pl.col('timestamp') == geometry['timestamp'].max())
         else:
             latest = geometry.tail(1)
-        
-        if 'pca_variance_1' in geometry.columns:
-            pc1 = latest['pca_variance_1'].mean() if len(latest) > 0 else None
-            pc2 = latest['pca_variance_2'].mean() if 'pca_variance_2' in latest.columns and len(latest) > 0 else None
-            pc3 = latest['pca_variance_3'].mean() if 'pca_variance_3' in latest.columns and len(latest) > 0 else None
+
+        # Support both column naming conventions
+        pc1_col = 'pca_var_1' if 'pca_var_1' in geometry.columns else 'pca_variance_1'
+        pc2_col = 'pca_var_2' if 'pca_var_2' in geometry.columns else 'pca_variance_2'
+        eff_dim_col = 'pca_effective_dim' if 'pca_effective_dim' in geometry.columns else None
+
+        if pc1_col in geometry.columns:
+            pc1 = latest[pc1_col].mean() if len(latest) > 0 else None
+            pc2 = latest[pc2_col].mean() if pc2_col in latest.columns and len(latest) > 0 else None
+            eff_dim = latest[eff_dim_col].mean() if eff_dim_col and eff_dim_col in latest.columns and len(latest) > 0 else None
+            pc3 = None  # Don't use effective_dim as pc3
             
             report.add_metric("PC1 Variance", format_percentage(pc1) if pc1 else "N/A")
             report.add_metric("PC2 Variance", format_percentage(pc2) if pc2 else "N/A")
-            report.add_metric("PC3 Variance", format_percentage(pc3) if pc3 else "N/A")
-            
-            # Cumulative
-            if pc1 and pc2 and pc3:
-                cum3 = pc1 + pc2 + pc3
-                report.add_metric("Top 3 PCs (cumulative)", format_percentage(cum3))
+            if eff_dim:
+                report.add_metric("Effective Dimension", format_number(eff_dim, 1))
+
+            # Cumulative (PC1 + PC2)
+            if pc1 and pc2:
+                cum2 = pc1 + pc2
+                report.add_metric("Top 2 PCs (cumulative)", format_percentage(cum2))
             
             # Interpretation
             if pc1:
@@ -156,14 +159,14 @@ def generate_geometry_report(domain: str = None) -> ReportBuilder:
                 )
         
         # PCA over time
-        if 'window_id' in geometry.columns and 'pca_variance_1' in geometry.columns:
+        if 'timestamp' in geometry.columns and pc1_col in geometry.columns:
             pca_trend = (
                 geometry
-                .group_by('window_id')
+                .group_by('timestamp')
                 .agg([
-                    pl.col('pca_variance_1').mean().alias('pc1_mean'),
+                    pl.col(pc1_col).mean().alias('pc1_mean'),
                 ])
-                .sort('window_id')
+                .sort('timestamp')
             )
             
             if len(pca_trend) >= 2:

@@ -23,10 +23,10 @@ from typing import List, Dict, Any
 
 import polars as pl
 
-from prism.db.parquet_store import get_parquet_path
-from report_utils import (
-    ReportBuilder, 
-    load_domain_config, 
+from prism.db.parquet_store import get_path, OBSERVATIONS, VECTOR, GEOMETRY, STATE, COHORTS
+from reports.report_utils import (
+    ReportBuilder,
+    load_domain_config,
     translate_signal_id,
     format_number,
 )
@@ -163,7 +163,7 @@ def generate_cohort_discovery_report(domain: str = None) -> ReportBuilder:
     report = ReportBuilder("Cohort Discovery Report", domain=domain)
     
     # Load cohort members
-    cohort_path = get_parquet_path('config', 'cohort_members')
+    cohort_path = get_path(COHORTS)
     if not Path(cohort_path).exists():
         report.add_section("Error", f"Cohort data not found: {cohort_path}\nRun cohort discovery first.")
         return report

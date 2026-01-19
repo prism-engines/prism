@@ -99,3 +99,4 @@ htmlcov/
 *.rar
 .claude/
 .pre-commit-config.yaml
+reports/output/

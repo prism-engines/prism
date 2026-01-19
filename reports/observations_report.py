@@ -20,10 +20,10 @@ from pathlib import Path
 
 import polars as pl
 
-from prism.db.parquet_store import get_parquet_path
-from report_utils import (
-    ReportBuilder, 
-    load_domain_config, 
+from prism.db.parquet_store import get_path, OBSERVATIONS, VECTOR, GEOMETRY, STATE
+from reports.report_utils import (
+    ReportBuilder,
+    load_domain_config,
     translate_signal_id,
     format_number,
     get_time_unit,
@@ -42,7 +42,7 @@ def generate_observations_report(domain: str = None) -> ReportBuilder:
     report = ReportBuilder("Observations Report", domain=domain)
     
     # Load observations
-    obs_path = get_parquet_path('raw', 'observations')
+    obs_path = get_path(OBSERVATIONS)
     if not Path(obs_path).exists():
         report.add_section("Error", f"Observations not found: {obs_path}")
         return report

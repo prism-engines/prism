@@ -21,10 +21,10 @@ from typing import Dict, Any
 import polars as pl
 import numpy as np
 
-from prism.db.parquet_store import get_parquet_path
-from report_utils import (
-    ReportBuilder, 
-    load_domain_config, 
+from prism.db.parquet_store import get_path, OBSERVATIONS, VECTOR, GEOMETRY, STATE
+from reports.report_utils import (
+    ReportBuilder,
+    load_domain_config,
     translate_signal_id,
     format_number,
     format_percentage,
@@ -71,7 +71,7 @@ def generate_signal_vector_report(domain: str = None) -> ReportBuilder:
     report = ReportBuilder("Signal Vector Report", domain=domain)
     
     # Load vector data
-    vector_path = get_parquet_path('vector', 'signal')
+    vector_path = get_path(VECTOR)
     if not Path(vector_path).exists():
         report.add_section("Error", f"Vector data not found: {vector_path}\nRun signal_vector entry point first.")
         return report
