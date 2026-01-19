@@ -117,6 +117,50 @@ def compute_adaptive_windows(
     }
 
 
+def compute_windows_from_end(
+    entity_length: int,
+    window_size: int,
+    stride: int,
+) -> List[tuple]:
+    """
+    Compute window boundaries anchored from END, working backward.
+
+    This ensures we ALWAYS capture end-of-life data (RUL → 0),
+    which is the critical zone for failure prediction.
+
+    Args:
+        entity_length: Total observations for this entity
+        window_size: Size of each window
+        stride: Step between window endpoints
+
+    Returns:
+        List of (start, end) tuples in chronological order
+
+    Example:
+        >>> compute_windows_from_end(192, 50, 16)
+        [(0, 50), (14, 64), (30, 80), ..., (142, 192)]
+        # Last window always ends at entity_length (RUL=0)
+    """
+    windows = []
+    end = entity_length
+
+    # Work backward from end (guarantees RUL=0 coverage)
+    while end - window_size >= 0:
+        start = end - window_size
+        windows.append((start, end))
+        end -= stride
+
+    # Reverse to chronological order
+    windows = list(reversed(windows))
+
+    # If first window doesn't start at 0, add a baseline window
+    # But only if gap is significant (> stride/2) to avoid redundant overlap
+    if windows and windows[0][0] > stride // 2:
+        windows.insert(0, (0, window_size))
+
+    return windows
+
+
 def get_entity_window_configs(
     observations: pl.DataFrame,
     entity_col: str = 'entity_id',
@@ -165,8 +209,53 @@ def get_entity_window_configs(
         f"windows {min(n_windows)}-{max(n_windows)}, "
         f"{insufficient} with insufficient data"
     )
-    
+
     return configs
+
+
+def get_entity_windows_from_end(
+    observations: pl.DataFrame,
+    entity_col: str = 'entity_id',
+    signal_col: str = 'signal_id',
+    **kwargs,
+) -> Dict[str, List[tuple]]:
+    """
+    Compute window boundaries for each entity, anchored from END.
+
+    This ensures every entity has windows that cover RUL=0 (failure).
+
+    Args:
+        observations: DataFrame with entity_col and signal_col
+        entity_col: Column identifying entities
+        signal_col: Column identifying signals
+        **kwargs: Passed to compute_adaptive_windows()
+
+    Returns:
+        dict mapping entity_id → list of (start, end) window tuples
+    """
+    # Get configs first
+    configs = get_entity_window_configs(
+        observations, entity_col, signal_col, **kwargs
+    )
+
+    # Generate windows for each entity
+    entity_windows = {}
+    for entity_id, config in configs.items():
+        windows = compute_windows_from_end(
+            entity_length=config['entity_length'],
+            window_size=config['size'],
+            stride=config['stride'],
+        )
+        entity_windows[entity_id] = windows
+
+    # Log coverage stats
+    total_windows = sum(len(w) for w in entity_windows.values())
+    logger.info(
+        f"Generated {total_windows} windows for {len(entity_windows)} entities "
+        f"(anchored from end, covers RUL=0)"
+    )
+
+    return entity_windows
 
 
 def create_entity_windows(

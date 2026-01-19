@@ -564,6 +564,9 @@ def generate_windows(
     """
     Generate sliding windows from observations using Polars.
 
+    Windows are anchored from the END to ensure coverage of late-life data.
+    For run-to-failure scenarios, this guarantees we capture RUL → 0.
+
     Args:
         observations: DataFrame with timestamp and value columns
         target_obs: Target number of observations per window
@@ -585,19 +588,38 @@ def generate_windows(
     values = df["value"].to_numpy()
     n = len(values)
 
-    windows = []
-    start_idx = max(min_obs, target_obs) - 1
+    # Generate window boundaries anchored from END
+    # This ensures we always capture end-of-life data (RUL → 0)
+    window_size = min(target_obs, n)
 
-    for end_idx in range(start_idx, n, stride):
-        window_start_idx = max(0, end_idx - target_obs + 1)
-        window_len = end_idx - window_start_idx + 1
+    window_bounds = []
+    end_idx = n - 1  # Start from last observation
+
+    # Work backward from end to guarantee coverage of failure zone
+    while end_idx >= window_size - 1:
+        start_idx = end_idx - window_size + 1
+        window_bounds.append((start_idx, end_idx))
+        end_idx -= stride
+
+    # Reverse to chronological order
+    window_bounds = list(reversed(window_bounds))
+
+    # Add baseline window at start if there's a significant gap
+    # This ensures we also capture early-life behavior
+    if window_bounds and window_bounds[0][0] > stride // 2:
+        window_bounds.insert(0, (0, window_size - 1))
+
+    # Build window tuples
+    windows = []
+    for start_idx, end_idx in window_bounds:
+        window_len = end_idx - start_idx + 1
 
         if window_len < min_obs:
             continue
 
-        window_values = values[window_start_idx : end_idx + 1]
+        window_values = values[start_idx : end_idx + 1]
         timestamp = timestamps[end_idx]
-        lookback_start = timestamps[window_start_idx]
+        lookback_start = timestamps[start_idx]
 
         # Keep float timestamps as-is (cycles, seconds, etc.)
         # Only convert datetime types if present (legacy support)
