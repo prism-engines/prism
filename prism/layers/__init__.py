@@ -5,31 +5,34 @@ PRISM Analytical Layers
 Pure orchestrators that call engines and produce meaning.
 Contains ZERO computation - all computation lives in engines/.
 
-Layers:
-    1. signal_typology: What type of signal is this?
-    2. system_physics: What are the physical properties?
-    3. behavioral_geometry: How do signals relate?
-    4. phase_state: What regime?
-    5. dynamical_systems: Stable or bifurcating?
-    6. derivatives: Where is it heading?
-    7. thesis_summary: Unified narrative
+ORTHON Four-Layer Framework:
+    1. Signal Typology: What is it?
+    2. Behavioral Geometry: How does it behave?
+    3. Dynamical Systems: When/how does it change?
+    4. Causal Mechanics: Why does it change?
 
 Rule: If you see `np.` or `scipy.` in a layer file, STOP.
       That computation belongs in an engine.
 """
 
 from .signal_typology import SignalTypologyLayer
-from .system_physics import (
+from .causal_mechanics import (
+    CausalMechanicsLayer,
+    CausalMechanicsOutput,
+    MechanicsVector,
+    MechanicsTypology,
+    analyze_mechanics,
+    EnergyClass,
+    EquilibriumClass,
+    FlowClass,
+    OrbitClass,
+    DominanceClass,
+    # Backwards compatibility
     SystemPhysicsLayer,
     SystemPhysicsOutput,
     PhysicsVector,
     PhysicsTypology,
     analyze_physics,
-    EnergyClass,
-    EquilibriumClass,
-    FlowClass,
-    OrbitClass,
-    DominanceClass
 )
 from .behavioral_geometry import (
     BehavioralGeometryLayer,
@@ -45,17 +48,26 @@ from .behavioral_geometry import (
 __all__ = [
     # Signal Typology
     'SignalTypologyLayer',
-    # System Physics
-    'SystemPhysicsLayer',
-    'SystemPhysicsOutput',
-    'PhysicsVector',
-    'PhysicsTypology',
-    'analyze_physics',
+
+    # Causal Mechanics (new names)
+    'CausalMechanicsLayer',
+    'CausalMechanicsOutput',
+    'MechanicsVector',
+    'MechanicsTypology',
+    'analyze_mechanics',
     'EnergyClass',
     'EquilibriumClass',
     'FlowClass',
     'OrbitClass',
     'DominanceClass',
+
+    # Causal Mechanics (backwards compatibility)
+    'SystemPhysicsLayer',
+    'SystemPhysicsOutput',
+    'PhysicsVector',
+    'PhysicsTypology',
+    'analyze_physics',
+
     # Behavioral Geometry
     'BehavioralGeometryLayer',
     'BehavioralGeometryOutput',

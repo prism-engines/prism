@@ -1,9 +1,9 @@
 """
-System Physics Layer
-====================
+Causal Mechanics Layer
+======================
 
 Orchestrates physics engines to answer:
-    "What are the physical properties of this system?"
+    "Why does this system change? What are the causal drivers?"
 
 Sub-questions:
     - Energy: Is energy conserved? (Hamiltonian)
@@ -15,9 +15,15 @@ Sub-questions:
 This is a PURE ORCHESTRATOR - no computation here.
 All physics calculations delegated to engines/physics/.
 
+Part of ORTHON four-layer framework:
+    - Signal Typology: What is it?
+    - Behavioral Geometry: How does it behave?
+    - Dynamical Systems: When/how does it change?
+    - Causal Mechanics: Why does it change? (this layer)
+
 Output:
-    - PhysicsVector: Numerical measurements for downstream layers
-    - PhysicsTypology: Classification for interpretation
+    - MechanicsVector: Numerical measurements for downstream layers
+    - MechanicsTypology: Classification for interpretation
 """
 
 import numpy as np
@@ -74,9 +80,9 @@ class DominanceClass(Enum):
 # =============================================================================
 
 @dataclass
-class PhysicsVector:
+class MechanicsVector:
     """
-    Numerical measurements from system physics.
+    Numerical measurements from causal mechanics.
     This is the DATA output - consumed by downstream layers.
     """
 
@@ -143,9 +149,9 @@ class PhysicsVector:
 
 
 @dataclass
-class PhysicsTypology:
+class MechanicsTypology:
     """
-    Classification from system physics.
+    Classification from causal mechanics.
     This is the INFORMATION output - human-interpretable.
     """
 
@@ -202,10 +208,10 @@ class PhysicsTypology:
 
 
 @dataclass
-class SystemPhysicsOutput:
-    """Complete output from System Physics layer"""
-    vector: PhysicsVector
-    typology: PhysicsTypology
+class CausalMechanicsOutput:
+    """Complete output from Causal Mechanics layer"""
+    vector: MechanicsVector
+    typology: MechanicsTypology
 
     def to_dict(self) -> Dict:
         """Combined dictionary for full output."""
@@ -214,13 +220,19 @@ class SystemPhysicsOutput:
         return result
 
 
+# Backwards compatibility aliases
+PhysicsVector = MechanicsVector
+PhysicsTypology = MechanicsTypology
+SystemPhysicsOutput = CausalMechanicsOutput
+
+
 # =============================================================================
 # LAYER IMPLEMENTATION
 # =============================================================================
 
-class SystemPhysicsLayer:
+class CausalMechanicsLayer:
     """
-    System Physics Layer: What are the physical properties of this system?
+    Causal Mechanics Layer: Why does this system change?
 
     Pure orchestrator. Calls physics engines, classifies results.
     Contains ZERO computation - only coordination and classification logic.
@@ -241,10 +253,10 @@ class SystemPhysicsLayer:
         series: np.ndarray,
         entity_id: str = "unknown",
         signal_id: str = "unknown",
-        previous: Optional[SystemPhysicsOutput] = None
-    ) -> SystemPhysicsOutput:
+        previous: Optional[CausalMechanicsOutput] = None
+    ) -> CausalMechanicsOutput:
         """
-        Analyze physical properties of a signal.
+        Analyze causal mechanics of a signal.
 
         Args:
             series: 1D numpy array
@@ -253,7 +265,7 @@ class SystemPhysicsLayer:
             previous: Previous window output (for transition detection)
 
         Returns:
-            SystemPhysicsOutput with vector and typology
+            CausalMechanicsOutput with vector and typology
         """
         # Import engines (deferred to avoid circular imports)
         from ..engines.physics import (
@@ -285,15 +297,15 @@ class SystemPhysicsLayer:
             H_result, L_result, G_result, AM_result, MF_result
         )
 
-        return SystemPhysicsOutput(vector=vector, typology=typology)
+        return CausalMechanicsOutput(vector=vector, typology=typology)
 
     def _build_vector(
         self, entity_id, signal_id,
         H, L, KE, PE, G, AM, MF
-    ) -> PhysicsVector:
-        """Assemble PhysicsVector from engine outputs."""
+    ) -> MechanicsVector:
+        """Assemble MechanicsVector from engine outputs."""
 
-        return PhysicsVector(
+        return MechanicsVector(
             entity_id=entity_id,
             signal_id=signal_id,
             timestamp=datetime.now(),
@@ -346,7 +358,7 @@ class SystemPhysicsLayer:
     def _classify(
         self, entity_id, signal_id, vector,
         H, L, G, AM, MF
-    ) -> PhysicsTypology:
+    ) -> MechanicsTypology:
         """Convert measurements to classification."""
 
         # Energy class (from Hamiltonian)
@@ -403,7 +415,7 @@ class SystemPhysicsLayer:
         # Confidence
         confidence = self._compute_confidence(H, G, MF)
 
-        return PhysicsTypology(
+        return MechanicsTypology(
             entity_id=entity_id,
             signal_id=signal_id,
             energy_class=energy_class,
@@ -510,22 +522,30 @@ class SystemPhysicsLayer:
         return float(np.clip(confidence, 0, 1))
 
 
+# Backwards compatibility alias
+SystemPhysicsLayer = CausalMechanicsLayer
+
+
 # =============================================================================
 # CONVENIENCE FUNCTION
 # =============================================================================
 
-def analyze_physics(
+def analyze_mechanics(
     series: np.ndarray,
     entity_id: str = "unknown",
     signal_id: str = "unknown"
-) -> SystemPhysicsOutput:
+) -> CausalMechanicsOutput:
     """
-    Convenience function for quick physics analysis.
+    Convenience function for quick causal mechanics analysis.
 
     Example:
-        result = analyze_physics(my_series)
+        result = analyze_mechanics(my_series)
         print(result.typology.summary)
         print(result.typology.system_class)
     """
-    layer = SystemPhysicsLayer()
+    layer = CausalMechanicsLayer()
     return layer.analyze(series, entity_id, signal_id)
+
+
+# Backwards compatibility alias
+analyze_physics = analyze_mechanics
