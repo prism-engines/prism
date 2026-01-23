@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ørthon Explorer</title>
+    
+    <!-- DuckDB WASM -->
+    <script src="https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-browser-mvp.js"></script>
+    
+    <!-- Plotly for charts -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        :root {
+            --primary: #f56a6a;
+            --primary-dark: #e55555;
+            --bg: #f5f6f7;
+            --text: #3d4449;
+            --text-light: #7f888f;
+            --border: rgba(210, 215, 217, 0.75);
+            --white: #ffffff;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --sidebar-width: 300px;
+        }
+        
+        body {
+            font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-weight: 300;
+            line-height: 1.65;
+            color: var(--text);
+            background: var(--bg);
+        }
+        
+        /* Layout */
+        .wrapper { display: flex; min-height: 100vh; }
+        
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
+            background: var(--bg);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .logo { margin-bottom: 1.5rem; }
+        .logo h1 { font-size: 1.5rem; font-weight: 900; }
+        .logo .tagline { font-size: 0.85rem; color: var(--text-light); font-style: italic; }
+        
+        .sidebar h2 {
+            font-size: 0.75rem;
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .sidebar section { margin-bottom: 1.5rem; }
+        
+        /* Folder browser */
+        .folder-browser {
+            background: var(--white);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .folder-path {
+            padding: 0.5rem 0.75rem;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.75rem;
+            color: var(--text-light);
+            word-break: break-all;
+        }
+        
+        .folder-item {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .folder-item:last-child { border-bottom: none; }
+        .folder-item:hover { background: rgba(245, 106, 106, 0.1); }
+        .folder-item.parent { color: var(--text-light); }
+        .folder-item .icon { width: 16px; text-align: center; }
+        
+        /* File status */
+        .file-status { margin-top: 1rem; }
+        
+        .file-check {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.3rem 0;
+            font-size: 0.85rem;
+        }
+        
+        .file-check .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+        
+        .file-check .dot.found { background: var(--success); }
+        .file-check .dot.missing { background: #ccc; }
+        
+        /* Load button */
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover { background: var(--primary-dark); }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        /* Filters */
+        .filter-group { margin-bottom: 0.75rem; }
+        .filter-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .filter-group select, .filter-group input {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        
+        /* Main content */
+        .main {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 1.5rem 2rem;
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .tab {
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-light);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab.disabled { opacity: 0.4; cursor: not-allowed; }
+        
+        /* Tab content */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .tab-content h2 { font-size: 1.5rem; font-weight: 400; margin-bottom: 0.25rem; }
+        .tab-content .description { color: var(--text-light); margin-bottom: 1.5rem; font-size: 0.95rem; }
+        
+        /* Cards */
+        .card {
+            background: var(--white);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+        
+        .card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; }
+        
+        /* Metrics */
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .metric {
+            background: var(--white);
+            border-radius: 6px;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .metric .value { font-size: 1.75rem; font-weight: 700; color: var(--primary); }
+        .metric .label { font-size: 0.7rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        /* SQL Console */
+        .sql-input {
+            width: 100%;
+            height: 100px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.85rem;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-bottom: 0.75rem;
+            resize: vertical;
+        }
+        
+        /* Data table */
+        .data-table { overflow-x: auto; }
+        
+        .data-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        
+        .data-table th, .data-table td {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .data-table th { font-weight: 600; background: var(--bg); position: sticky; top: 0; }
+        .data-table tr:hover { background: rgba(245, 106, 106, 0.03); }
+        
+        /* Chart */
+        .chart-container { width: 100%; height: 350px; }
+        
+        /* Controls */
+        .controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: end; }
+        .controls .filter-group { margin-bottom: 0; min-width: 150px; }
+        
+        /* Welcome */
+        .welcome { text-align: center; padding: 3rem; }
+        .welcome h2 { font-size: 1.75rem; margin-bottom: 0.75rem; }
+        .welcome p { color: var(--text-light); max-width: 450px; margin: 0 auto 0.75rem; }
+        
+        /* Status */
+        .status { padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.9rem; }
+        .status.info { background: #e3f2fd; color: #1565c0; }
+        .status.success { background: #e8f5e9; color: #2e7d32; }
+        .status.error { background: #ffebee; color: #c62828; }
+        .status.loading { background: #fff3e0; color: #e65100; }
+        
+        /* Responsive */
+        @media (max-width: 900px) {
+            .sidebar { position: relative; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+            .main { margin-left: 0; }
+            .wrapper { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>Ørthon</h1>
+                <p class="tagline">geometry leads</p>
+            </div>
+            
+            <section>
+                <h2>Select Folder</h2>
+                <div class="folder-browser" id="folderBrowser">
+                    <div class="folder-path" id="currentPath">Loading...</div>
+                    <div id="folderList"></div>
+                </div>
+                
+                <div class="file-status" id="fileStatus"></div>
+                
+                <button class="btn" id="loadBtn" disabled>Load Data</button>
+            </section>
+            
+            <section id="filtersSection" style="display: none;">
+                <h2>Filters</h2>
+                <div class="filter-group">
+                    <label>Entity</label>
+                    <select id="entityFilter"><option value="">All entities</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Window</label>
+                    <select id="windowFilter"><option value="">All windows</option></select>
+                </div>
+            </section>
+            
+            <section>
+                <h2>About</h2>
+                <p style="font-size: 0.8rem; color: var(--text-light);">
+                    Ørthon detects degradation by analyzing how relationships between components evolve.
+                </p>
+                <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem; font-style: italic;">
+                    "Systems lose coherence before they fail."
+                </p>
+            </section>
+        </aside>
+        
+        <!-- Main -->
+        <main class="main">
+            <div class="tabs" id="tabs">
+                <div class="tab active" data-tab="summary">Summary</div>
+                <div class="tab disabled" data-tab="vector">Vector</div>
+                <div class="tab disabled" data-tab="geometry">Geometry</div>
+                <div class="tab disabled" data-tab="state">State</div>
+                <div class="tab disabled" data-tab="cohort">Cohort</div>
+                <div class="tab disabled" data-tab="sql">SQL</div>
+            </div>
+            
+            <!-- Welcome -->
+            <div id="welcome" class="welcome">
+                <h2>Welcome to Ørthon Explorer</h2>
+                <p>Select a folder containing your analysis results using the sidebar.</p>
+                <p style="font-size: 0.85rem;">
+                    Expected files: <strong>vector.parquet</strong>, <strong>geometry.parquet</strong>, 
+                    <strong>state.parquet</strong>, <strong>cohort.parquet</strong>
+                </p>
+            </div>
+            
+            <!-- Tab: Summary -->
+            <div class="tab-content" id="tab-summary">
+                <h2>Data Summary</h2>
+                <p class="description">Overview of loaded analysis outputs</p>
+                <div class="metrics" id="summaryMetrics"></div>
+                <div class="card">
+                    <h3>Loaded Tables</h3>
+                    <div id="tableSummary"></div>
+                </div>
+            </div>
+            
+            <!-- Tab: Vector -->
+            <div class="tab-content" id="tab-vector">
+                <h2>Vector Layer</h2>
+                <p class="description">Behavioral metrics per signal</p>
+                <div class="card">
+                    <div class="controls">
+                        <div class="filter-group">
+                            <label>Entity</label>
+                            <select id="vectorEntity"></select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Metric</label>
+                            <select id="vectorMetric"></select>
+                        </div>
+                    </div>
+                    <div class="chart-container" id="vectorChart"></div>
+                </div>
+                <div class="card">
+                    <h3>Data</h3>
+                    <div class="data-table" id="vectorTable"></div>
+                </div>
+            </div>
+            
+            <!-- Tab: Geometry -->
+            <div class="tab-content" id="tab-geometry">
+                <h2>Geometry Layer</h2>
+                <p class="description">Pairwise relationships between signals</p>
+                <div class="card">
+                    <div class="controls">
+                        <div class="filter-group">
+                            <label>Entity</label>
+                            <select id="geometryEntity"></select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Metric</label>
+                            <select id="geometryMetric">
+                                <option value="mean_correlation">Mean Correlation</option>
+                                <option value="clustering_silhouette">Clustering Silhouette</option>
+                                <option value="lof_mean_score">LOF Score</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="chart-container" id="geometryChart"></div>
+                </div>
+                <div class="card">
+                    <h3>Data</h3>
+                    <div class="data-table" id="geometryTable"></div>
+                </div>
+            </div>
+            
+            <!-- Tab: State -->
+            <div class="tab-content" id="tab-state">
+                <h2>State Layer</h2>
+                <p class="description">Coherence tracking, regime detection</p>
+                <div class="card">
+                    <div class="controls">
+                        <div class="filter-group">
+                            <label>Entity</label>
+                            <select id="stateEntity"></select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Metric</label>
+                            <select id="stateMetric">
+                                <option value="hd_slope">hd_slope (coherence velocity)</option>
+                                <option value="distance_from_baseline">Distance from Baseline</option>
+                                <option value="velocity">Velocity</option>
+                                <option value="regime_stability">Regime Stability</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="chart-container" id="stateChart"></div>
+                </div>
+                <div class="card">
+                    <h3>Data</h3>
+                    <div class="data-table" id="stateTable"></div>
+                </div>
+            </div>
+            
+            <!-- Tab: Cohort -->
+            <div class="tab-content" id="tab-cohort">
+                <h2>Cohort Analysis</h2>
+                <p class="description">Behavioral groupings</p>
+                <div class="metrics" id="cohortMetrics"></div>
+                <div class="card">
+                    <h3>Cohort Assignments</h3>
+                    <div class="data-table" id="cohortTable"></div>
+                </div>
+            </div>
+            
+            <!-- Tab: SQL -->
+            <div class="tab-content" id="tab-sql">
+                <h2>SQL Console</h2>
+                <p class="description">Query loaded tables directly</p>
+                <div class="card">
+                    <h3>Available Tables</h3>
+                    <p id="availableTables" style="font-family: monospace; font-size: 0.85rem; color: var(--text-light);"></p>
+                </div>
+                <div class="card">
+                    <h3>Query</h3>
+                    <textarea class="sql-input" id="sqlInput" placeholder="SELECT * FROM vector LIMIT 100"></textarea>
+                    <button class="btn" id="runSql">Run Query</button>
+                </div>
+                <div class="card" id="sqlResultCard" style="display: none;">
+                    <h3>Results</h3>
+                    <div class="data-table" id="sqlResult"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    // =============================================================================
+    // STATE
+    // =============================================================================
+    
+    const state = {
+        currentPath: null,
+        expectedFiles: {},
+        config: null,
+        db: null,
+        tables: {},
+    };
+    
+    const API = 'http://localhost:8000/api';
+    
+    // =============================================================================
+    // FOLDER BROWSER
+    // =============================================================================
+    
+    async function loadFolder(path = '~') {
+        try {
+            const res = await fetch(`${API}/folders?path=${encodeURIComponent(path)}`);
+            const data = await res.json();
+            
+            state.currentPath = data.current_path;
+            state.expectedFiles = data.expected_files;
+            state.config = data.config;
+            
+            renderFolderBrowser(data);
+            renderFileStatus(data.expected_files);
+            
+            document.getElementById('loadBtn').disabled = !data.ready;
+        } catch (err) {
+            console.error('Failed to load folder:', err);
+            document.getElementById('folderList').innerHTML = '<div style="padding: 1rem; color: #c62828;">Failed to connect to server</div>';
+        }
+    }
+    
+    function renderFolderBrowser(data) {
+        document.getElementById('currentPath').textContent = data.current_path;
+        
+        let html = '';
+        
+        // Parent folder
+        if (data.parent_path) {
+            html += `<div class="folder-item parent" onclick="loadFolder('${data.parent_path}')">
+                <span class="icon">📁</span> ..
+            </div>`;
+        }
+        
+        // Folders
+        for (const folder of data.folders) {
+            html += `<div class="folder-item" onclick="loadFolder('${folder.path}')">
+                <span class="icon">📁</span> ${folder.name}
+            </div>`;
+        }
+        
+        // Parquet files
+        for (const file of data.parquet_files) {
+            const icon = file.expected ? '✓' : '📄';
+            html += `<div class="folder-item" style="color: ${file.expected ? 'var(--success)' : 'var(--text-light)'}">
+                <span class="icon">${icon}</span> ${file.name}
+            </div>`;
+        }
+        
+        document.getElementById('folderList').innerHTML = html;
+    }
+    
+    function renderFileStatus(expected) {
+        const required = ['vector.parquet', 'geometry.parquet', 'state.parquet', 'cohort.parquet'];
+        let html = '';
+        
+        for (const file of required) {
+            const found = expected[file];
+            html += `<div class="file-check">
+                <span class="dot ${found ? 'found' : 'missing'}"></span>
+                <span>${file}</span>
+            </div>`;
+        }
+        
+        document.getElementById('fileStatus').innerHTML = html;
+    }
+    
+    // =============================================================================
+    // DATA LOADING (DuckDB)
+    // =============================================================================
+    
+    async function initDuckDB() {
+        const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+        const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+        const worker_url = URL.createObjectURL(
+            new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
+        );
+        const worker = new Worker(worker_url);
+        const logger = new duckdb.ConsoleLogger();
+        state.db = new duckdb.AsyncDuckDB(logger, worker);
+        await state.db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+        URL.revokeObjectURL(worker_url);
+    }
+    
+    async function loadData() {
+        if (!state.db) {
+            await initDuckDB();
+        }
+        
+        const conn = await state.db.connect();
+        
+        // Load each parquet file
+        const files = ['vector', 'geometry', 'state', 'cohort'];
+        
+        for (const name of files) {
+            if (state.expectedFiles[`${name}.parquet`]) {
+                try {
+                    const url = `${API}/parquet/${state.currentPath}/${name}.parquet`;
+                    const res = await fetch(url);
+                    const buffer = await res.arrayBuffer();
+                    
+                    await state.db.registerFileBuffer(`${name}.parquet`, new Uint8Array(buffer));
+                    await conn.query(`CREATE OR REPLACE TABLE ${name} AS SELECT * FROM read_parquet('${name}.parquet')`);
+                    
+                    const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM ${name}`);
+                    state.tables[name] = { loaded: true, rows: Number(countResult.toArray()[0].cnt) };
+                    
+                    console.log(`Loaded ${name}: ${state.tables[name].rows} rows`);
+                } catch (err) {
+                    console.error(`Failed to load ${name}:`, err);
+                    state.tables[name] = { loaded: false, error: err.message };
+                }
+            }
+        }
+        
+        await conn.close();
+        
+        // Update UI
+        showDataUI();
+        populateFilters();
+        renderSummary();
+    }
+    
+    // =============================================================================
+    // UI UPDATES
+    // =============================================================================
+    
+    function showDataUI() {
+        document.getElementById('welcome').style.display = 'none';
+        document.getElementById('filtersSection').style.display = 'block';
+        
+        // Enable tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('disabled');
+        });
+        
+        // Show summary tab
+        showTab('summary');
+    }
+    
+    function showTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
+        
+        // Update content
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        const content = document.getElementById(`tab-${tabName}`);
+        if (content) {
+            content.classList.add('active');
+            
+            // Load tab-specific data
+            if (tabName === 'vector') loadVectorTab();
+            if (tabName === 'geometry') loadGeometryTab();
+            if (tabName === 'state') loadStateTab();
+            if (tabName === 'cohort') loadCohortTab();
+            if (tabName === 'sql') loadSqlTab();
+        }
+    }
+    
+    async function populateFilters() {
+        const conn = await state.db.connect();
+        
+        try {
+            // Get unique entities from state table
+            const entities = await conn.query(`SELECT DISTINCT entity_id FROM state ORDER BY entity_id`);
+            const entityList = entities.toArray().map(r => r.entity_id);
+            
+            // Populate all entity dropdowns
+            ['entityFilter', 'vectorEntity', 'geometryEntity', 'stateEntity'].forEach(id => {
+                const select = document.getElementById(id);
+                if (select) {
+                    select.innerHTML = '<option value="">All entities</option>' + 
+                        entityList.map(e => `<option value="${e}">${e}</option>`).join('');
+                }
+            });
+            
+            // Get window sizes if available
+            if (state.config && state.config.windows) {
+                const windowSelect = document.getElementById('windowFilter');
+                windowSelect.innerHTML = '<option value="">All windows</option>' +
+                    state.config.windows.map(w => `<option value="${w}">${w}</option>`).join('');
+            }
+        } catch (err) {
+            console.error('Error populating filters:', err);
+        }
+        
+        await conn.close();
+    }
+    
+    async function renderSummary() {
+        // Metrics
+        let metricsHtml = '';
+        for (const [name, info] of Object.entries(state.tables)) {
+            if (info.loaded) {
+                metricsHtml += `<div class="metric">
+                    <div class="value">${info.rows.toLocaleString()}</div>
+                    <div class="label">${name} rows</div>
+                </div>`;
+            }
+        }
+        document.getElementById('summaryMetrics').innerHTML = metricsHtml;
+        
+        // Table details
+        const conn = await state.db.connect();
+        let tableHtml = '';
+        
+        for (const [name, info] of Object.entries(state.tables)) {
+            if (info.loaded) {
+                const schema = await conn.query(`DESCRIBE ${name}`);
+                const cols = schema.toArray().map(r => r.column_name).join(', ');
+                tableHtml += `<p style="margin-bottom: 0.75rem;"><strong>${name}</strong>: ${cols}</p>`;
+            }
+        }
+        
+        document.getElementById('tableSummary').innerHTML = tableHtml;
+        await conn.close();
+    }
+    
+    // =============================================================================
+    // TAB LOADERS
+    // =============================================================================
+    
+    async function loadVectorTab() {
+        const conn = await state.db.connect();
+        
+        try {
+            // Get metrics
+            const cols = await conn.query(`DESCRIBE vector`);
+            const numericCols = cols.toArray()
+                .filter(r => ['DOUBLE', 'FLOAT', 'INTEGER', 'BIGINT'].some(t => r.column_type.includes(t)))
+                .filter(r => !['entity_id', 'signal_id', 'timestamp', 'window_start', 'window_size'].includes(r.column_name))
+                .map(r => r.column_name);
+            
+            const metricSelect = document.getElementById('vectorMetric');
+            metricSelect.innerHTML = numericCols.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            // Load data
+            const data = await conn.query(`SELECT * FROM vector LIMIT 100`);
+            renderTable('vectorTable', data);
+            
+            // Chart
+            await renderVectorChart();
+        } catch (err) {
+            console.error('Vector tab error:', err);
+        }
+        
+        await conn.close();
+    }
+    
+    async function renderVectorChart() {
+        const entity = document.getElementById('vectorEntity').value;
+        const metric = document.getElementById('vectorMetric').value || 'mean';
+        
+        const conn = await state.db.connect();
+        
+        let query = `SELECT timestamp, ${metric} as value FROM vector`;
+        if (entity) query += ` WHERE entity_id = '${entity}'`;
+        query += ` ORDER BY timestamp LIMIT 500`;
+        
+        const data = await conn.query(query);
+        const rows = data.toArray();
+        
+        Plotly.newPlot('vectorChart', [{
+            x: rows.map(r => r.timestamp),
+            y: rows.map(r => r.value),
+            type: 'scatter',
+            mode: 'lines',
+            line: { color: '#f56a6a' }
+        }], {
+            margin: { t: 20, r: 20, b: 40, l: 50 },
+            xaxis: { title: 'Timestamp' },
+            yaxis: { title: metric }
+        }, { responsive: true });
+        
+        await conn.close();
+    }
+    
+    async function loadGeometryTab() {
+        const conn = await state.db.connect();
+        const data = await conn.query(`SELECT * FROM geometry LIMIT 100`);
+        renderTable('geometryTable', data);
+        await conn.close();
+        await renderGeometryChart();
+    }
+    
+    async function renderGeometryChart() {
+        const entity = document.getElementById('geometryEntity').value;
+        const metric = document.getElementById('geometryMetric').value || 'mean_correlation';
+        
+        const conn = await state.db.connect();
+        
+        let query = `SELECT timestamp, ${metric} as value FROM geometry`;
+        if (entity) query += ` WHERE entity_id = '${entity}'`;
+        query += ` ORDER BY timestamp LIMIT 500`;
+        
+        try {
+            const data = await conn.query(query);
+            const rows = data.toArray();
+            
+            Plotly.newPlot('geometryChart', [{
+                x: rows.map(r => r.timestamp),
+                y: rows.map(r => r.value),
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#f56a6a' }
+            }], {
+                margin: { t: 20, r: 20, b: 40, l: 50 },
+                xaxis: { title: 'Timestamp' },
+                yaxis: { title: metric }
+            }, { responsive: true });
+        } catch (err) {
+            console.error('Geometry chart error:', err);
+        }
+        
+        await conn.close();
+    }
+    
+    async function loadStateTab() {
+        const conn = await state.db.connect();
+        const data = await conn.query(`SELECT * FROM state LIMIT 100`);
+        renderTable('stateTable', data);
+        await conn.close();
+        await renderStateChart();
+    }
+    
+    async function renderStateChart() {
+        const entity = document.getElementById('stateEntity').value;
+        const metric = document.getElementById('stateMetric').value || 'hd_slope';
+        
+        const conn = await state.db.connect();
+        
+        let query = `SELECT timestamp, ${metric} as value FROM state`;
+        if (entity) query += ` WHERE entity_id = '${entity}'`;
+        query += ` ORDER BY timestamp LIMIT 500`;
+        
+        try {
+            const data = await conn.query(query);
+            const rows = data.toArray();
+            
+            Plotly.newPlot('stateChart', [{
+                x: rows.map(r => r.timestamp),
+                y: rows.map(r => r.value),
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#f56a6a' }
+            }], {
+                margin: { t: 20, r: 20, b: 40, l: 50 },
+                xaxis: { title: 'Timestamp' },
+                yaxis: { title: metric }
+            }, { responsive: true });
+        } catch (err) {
+            console.error('State chart error:', err);
+        }
+        
+        await conn.close();
+    }
+    
+    async function loadCohortTab() {
+        const conn = await state.db.connect();
+        
+        // Metrics
+        const summary = await conn.query(`
+            SELECT cohort, COUNT(*) as count 
+            FROM cohort 
+            GROUP BY cohort 
+            ORDER BY cohort
+        `);
+        const rows = summary.toArray();
+        
+        let metricsHtml = '';
+        for (const row of rows) {
+            metricsHtml += `<div class="metric">
+                <div class="value">${row.count}</div>
+                <div class="label">Cohort ${row.cohort}</div>
+            </div>`;
+        }
+        document.getElementById('cohortMetrics').innerHTML = metricsHtml;
+        
+        // Table
+        const data = await conn.query(`SELECT * FROM cohort ORDER BY cohort, entity_id`);
+        renderTable('cohortTable', data);
+        
+        await conn.close();
+    }
+    
+    function loadSqlTab() {
+        const tables = Object.keys(state.tables).filter(t => state.tables[t].loaded);
+        document.getElementById('availableTables').textContent = tables.join(', ');
+    }
+    
+    async function runSql() {
+        const sql = document.getElementById('sqlInput').value;
+        if (!sql.trim()) return;
+        
+        const conn = await state.db.connect();
+        
+        try {
+            const data = await conn.query(sql);
+            renderTable('sqlResult', data);
+            document.getElementById('sqlResultCard').style.display = 'block';
+        } catch (err) {
+            document.getElementById('sqlResult').innerHTML = `<div class="status error">${err.message}</div>`;
+            document.getElementById('sqlResultCard').style.display = 'block';
+        }
+        
+        await conn.close();
+    }
+    
+    // =============================================================================
+    // HELPERS
+    // =============================================================================
+    
+    function renderTable(containerId, data) {
+        const rows = data.toArray();
+        if (rows.length === 0) {
+            document.getElementById(containerId).innerHTML = '<p style="color: var(--text-light);">No data</p>';
+            return;
+        }
+        
+        const cols = Object.keys(rows[0]);
+        
+        let html = '<table><thead><tr>';
+        for (const col of cols) {
+            html += `<th>${col}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+        
+        for (const row of rows.slice(0, 100)) {
+            html += '<tr>';
+            for (const col of cols) {
+                let val = row[col];
+                if (typeof val === 'number') val = val.toFixed ? val.toFixed(4) : val;
+                html += `<td>${val ?? ''}</td>`;
+            }
+            html += '</tr>';
+        }
+        
+        html += '</tbody></table>';
+        if (rows.length > 100) {
+            html += `<p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.8rem;">Showing 100 of ${rows.length} rows</p>`;
+        }
+        
+        document.getElementById(containerId).innerHTML = html;
+    }
+    
+    // =============================================================================
+    // EVENT LISTENERS
+    // =============================================================================
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        // Load initial folder
+        loadFolder('~');
+        
+        // Tab clicks
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (!tab.classList.contains('disabled')) {
+                    showTab(tab.dataset.tab);
+                }
+            });
+        });
+        
+        // Load button
+        document.getElementById('loadBtn').addEventListener('click', loadData);
+        
+        // SQL run
+        document.getElementById('runSql').addEventListener('click', runSql);
+        
+        // Chart updates
+        document.getElementById('vectorEntity')?.addEventListener('change', renderVectorChart);
+        document.getElementById('vectorMetric')?.addEventListener('change', renderVectorChart);
+        document.getElementById('geometryEntity')?.addEventListener('change', renderGeometryChart);
+        document.getElementById('geometryMetric')?.addEventListener('change', renderGeometryChart);
+        document.getElementById('stateEntity')?.addEventListener('change', renderStateChart);
+        document.getElementById('stateMetric')?.addEventListener('change', renderStateChart);
+    });
+    </script>
+</body>
+</html>
