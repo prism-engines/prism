@@ -7,13 +7,9 @@ Domain-Agnostic Signal Analysis Framework
 Run: streamlit run streamlit/app.py
 
 Navigation flow:
-  SIGNALS → What are they?
-  TYPOLOGY → What kind of signals?
-  GROUPS → Which signals behave similarly?
-  GEOMETRY → How do they relate structurally?
-  DYNAMICS → How do they evolve together?
-  MECHANICS → Why do they move? What drives what?
-  SUMMARY → What does it all mean?
+  DISCOVERY → Claude's analysis + chat (LANDING)
+  EXPLORE → Signals, Typology, Groups, Geometry, Dynamics, Mechanics
+  OUTPUT → Report, Export
 """
 
 import streamlit as st
@@ -218,7 +214,7 @@ def check_parquet_exists(filename):
     try:
         df = pd.read_parquet(path)
         return len(df) > 0
-    except:
+    except Exception:
         return False
 
 
@@ -228,12 +224,48 @@ def check_parquet_exists(filename):
 
 st.sidebar.markdown("### ◇ ORTHON")
 
+# Check for page override from session state (from action buttons)
+if 'page' in st.session_state:
+    default_page = st.session_state.page
+    # Clear it so it doesn't persist
+    del st.session_state.page
+else:
+    default_page = "Discovery"
+
+# Navigation options with sections
+NAV_OPTIONS = [
+    "Discovery",
+    "─── EXPLORE ───",
+    "Signals",
+    "Typology",
+    "Groups",
+    "Geometry",
+    "Dynamics",
+    "Mechanics",
+    "─── OUTPUT ───",
+    "Report",
+    "Export",
+]
+
+# Find index for default
+try:
+    default_idx = NAV_OPTIONS.index(default_page)
+except ValueError:
+    default_idx = 0
+
 # Main navigation
 page = st.sidebar.radio(
     "Navigation",
-    ["Signals", "Typology", "Groups", "Geometry", "Dynamics", "Mechanics", "Summary"],
+    NAV_OPTIONS,
+    index=default_idx,
     label_visibility="collapsed",
 )
+
+# Handle separator clicks (redirect to Discovery)
+if page.startswith("───"):
+    page = "Discovery"
+
+st.sidebar.markdown("---")
 
 # Upload & Auth buttons
 render_auth_sidebar()
@@ -257,10 +289,6 @@ with st.sidebar.expander("Data Status", expanded=False):
         exists = check_parquet_exists(filename)
         status = "✅" if exists else "⬜"
         st.text(f"{status} {label}")
-
-# Settings
-with st.sidebar.expander("Settings", expanded=False):
-    st.caption("Settings coming soon")
 
 # Footer
 st.sidebar.markdown("---")
@@ -298,18 +326,24 @@ else:
 # Page Routing
 # -----------------------------------------------------------------------------
 
-# Check for signals data
-if signals is None:
-    st.warning("No data loaded. Place `signals.parquet` or `observations.parquet` in the data directory.")
+# Discovery page (default landing page)
+if page == "Discovery":
+    from pages import discovery
+    discovery.render(
+        signals_df=signals,
+        profile_df=profile,
+        geometry_df=geometry,
+        dynamics_df=dynamics,
+        mechanics_df=mechanics,
+        data_dir=DATA_DIR,
+    )
 
-    st.markdown("**Quick Start:**")
-    st.code("python -m fetchers.hydraulic_fetcher", language="bash")
+elif page == "Signals":
+    # Check for signals data
+    if signals is None:
+        st.warning("No data loaded. Upload data or try an example from the sidebar.")
+        st.stop()
 
-    st.markdown("Or upload your own data in the Signals → Upload tab.")
-    st.stop()
-
-# Route to pages
-if page == "Signals":
     from pages import signals as signals_page
     signals_page.render(signals, DATA_DIR)
 
@@ -363,9 +397,20 @@ elif page == "Mechanics":
         data_dir=DATA_DIR,
     )
 
-elif page == "Summary":
-    from pages import summary
-    summary.render(
+elif page == "Report":
+    from pages import report
+    report.render(
+        signals_df=signals,
+        profile_df=profile,
+        geometry_df=geometry,
+        dynamics_df=dynamics,
+        mechanics_df=mechanics,
+        data_dir=DATA_DIR,
+    )
+
+elif page == "Export":
+    from pages import export
+    export.render(
         signals_df=signals,
         profile_df=profile,
         geometry_df=geometry,
