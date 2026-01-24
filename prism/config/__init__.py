@@ -52,11 +52,21 @@ from prism.config.thresholds import (
     TRANSITION_NUMERIC,
     TRANSITION_SEVERITY,
     STATE_TRANSITION,
+    # Domain overrides
+    DOMAIN_OVERRIDES,
     # Helper functions
     get_typology_thresholds,
     is_meaningful_change,
     classify_severity,
     get_transition_type,
+    get_breaking_threshold,
+    get_domain_thresholds,
+    list_domains,
+    get_domain_description,
+    # Runtime override support (for Streamlit)
+    set_runtime_overrides,
+    clear_runtime_overrides,
+    get_active_thresholds,
 )
 
 __all__ = [
@@ -102,8 +112,16 @@ __all__ = [
     'TRANSITION_NUMERIC',
     'TRANSITION_SEVERITY',
     'STATE_TRANSITION',
+    'DOMAIN_OVERRIDES',
     'get_typology_thresholds',
     'is_meaningful_change',
     'classify_severity',
     'get_transition_type',
+    'get_breaking_threshold',
+    'get_domain_thresholds',
+    'list_domains',
+    'get_domain_description',
+    'set_runtime_overrides',
+    'clear_runtime_overrides',
+    'get_active_thresholds',
 ]
