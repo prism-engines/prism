@@ -189,7 +189,15 @@ def load_config(data_path: Path) -> Dict[str, Any]:
     if config_path.exists():
         with open(config_path) as f:
             user_config = yaml.safe_load(f) or {}
-        config.update(user_config)
+
+        # Extract relevant settings
+        if 'min_samples_dynamics' in user_config:
+            config['min_samples'] = user_config['min_samples_dynamics']
+        elif 'min_samples' in user_config:
+            config['min_samples'] = user_config['min_samples']
+
+        # Store engine config
+        config['engines'] = user_config.get('engines', {})
 
     return config
 

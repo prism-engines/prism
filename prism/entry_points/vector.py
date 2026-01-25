@@ -351,8 +351,25 @@ def load_config(data_path: Path) -> Dict[str, Any]:
     if config_path.exists():
         with open(config_path) as f:
             user_config = yaml.safe_load(f) or {}
-        config.update(user_config)
-        logger.info(f"Loaded config: min_samples={config['min_samples']}")
+
+        # Extract window settings from nested structure
+        if 'window' in user_config:
+            window_cfg = user_config['window']
+            if window_cfg.get('size') is not None:
+                config['window_size'] = window_cfg['size']
+            if window_cfg.get('stride') is not None:
+                config['stride'] = window_cfg['stride']
+            if window_cfg.get('min_samples') is not None:
+                config['min_samples'] = window_cfg['min_samples']
+
+        # Also check top-level min_samples
+        if 'min_samples' in user_config:
+            config['min_samples'] = user_config['min_samples']
+
+        # Store full config for engine selection
+        config['engines'] = user_config.get('engines', {})
+
+        logger.info(f"Loaded config: min_samples={config['min_samples']}, window={config['window_size']}, stride={config['stride']}")
 
     return config
 
