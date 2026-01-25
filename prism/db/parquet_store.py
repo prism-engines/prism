@@ -11,7 +11,7 @@ Directory Structure:
         vector.parquet       # Signal-level metrics
         geometry.parquet     # Pairwise relationships
         dynamics.parquet     # State/transition metrics
-        physics.parquet      # Energy/momentum metrics
+        fields.parquet       # Navier-Stokes field analysis (3D velocity fields)
         cohorts.parquet      # User-defined entity groupings
 
 PRISM Five-File Architecture:
@@ -21,11 +21,11 @@ PRISM Five-File Architecture:
     2. vector.parquet   - signal-level metrics (memory, frequency, volatility)
     3. geometry.parquet - pairwise relationships (correlation, distance)
     4. dynamics.parquet - state/transition metrics (granger, dtw)
-    5. physics.parquet  - energy/momentum metrics (hamiltonian, lagrangian)
+    5. fields.parquet   - Navier-Stokes field analysis (vorticity, TKE, dissipation)
 
 Usage:
     from prism.db.parquet_store import get_path, OBSERVATIONS, DATA, VECTOR
-    from prism.db.parquet_store import GEOMETRY, DYNAMICS, PHYSICS
+    from prism.db.parquet_store import GEOMETRY, DYNAMICS, FIELDS
 
     # Get path to a file
     obs_path = get_path(OBSERVATIONS)  # -> data/observations.parquet
@@ -50,10 +50,13 @@ DATA = "data"           # Observations + numeric characterization
 VECTOR = "vector"       # Signal-level metrics (memory, frequency, volatility)
 GEOMETRY = "geometry"   # Pairwise relationships (correlation, distance)
 DYNAMICS = "dynamics"   # State/transition metrics (granger, dtw)
-PHYSICS = "physics"     # Energy/momentum metrics (hamiltonian, lagrangian)
+FIELDS = "fields"       # Navier-Stokes field analysis (vorticity, TKE, dissipation)
+
+# Legacy alias - will be removed
+PHYSICS = FIELDS        # Backwards compatibility only
 
 # PRISM deliverables - the five parquet files users receive
-PRISM_FILES = [DATA, VECTOR, GEOMETRY, DYNAMICS, PHYSICS]
+PRISM_FILES = [DATA, VECTOR, GEOMETRY, DYNAMICS, FIELDS]
 
 # =============================================================================
 # LEGACY ALIASES (for backwards compatibility)
