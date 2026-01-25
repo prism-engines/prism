@@ -35,7 +35,7 @@ DERIVABLE_ENGINES = {
     'lyapunov': 'prism.engines.lyapunov',
     'sample_entropy': 'prism.engines.entropy',
     'permutation_entropy': 'prism.engines.entropy',
-    'dfa': 'prism.engines.characterize',
+    'dfa': 'prism.engines.memory',
     'spectral_entropy': 'prism.engines.spectral',
     'garch': 'prism.engines.garch',
 }
