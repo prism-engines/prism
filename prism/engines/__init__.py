@@ -28,9 +28,6 @@ import numpy as np
 from prism.engines.engine_base import BaseEngine, EngineResult, get_window_dates
 from prism.engines.metadata import EngineMetadata
 
-# State vector dataclass
-from prism.engines.state.state_vector import StateVector
-
 # =============================================================================
 # Vector Engines (functional interface)
 # =============================================================================
@@ -312,7 +309,6 @@ __all__ = [
     "BaseEngine",
     "EngineResult",
     "EngineMetadata",
-    "StateVector",
     "get_window_dates",
 
     # Registries
