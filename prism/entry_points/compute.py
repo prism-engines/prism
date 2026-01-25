@@ -156,12 +156,12 @@ def compute_vector_layer(
         signal_id = row['signal_id']
         values = np.array(row['values'], dtype=float)
 
-        if len(values) < 50:
+        if len(values) < 20:
             continue
 
         # Remove NaN
         values = values[~np.isnan(values)]
-        if len(values) < 50:
+        if len(values) < 20:
             continue
 
         metrics = {
@@ -170,82 +170,101 @@ def compute_vector_layer(
             'n_samples': len(values),
         }
 
+        def safe_float(v):
+            """Convert value to float, handling non-numeric types."""
+            if v is None:
+                return None
+            if isinstance(v, (int, float, np.integer, np.floating)):
+                val = float(v)
+                return val if np.isfinite(val) else None
+            return None
+
+        def add_metrics(result_dict, prefix):
+            """Add metrics from engine result with type safety."""
+            if result_dict is None:
+                return
+            for k, v in result_dict.items():
+                safe_v = safe_float(v)
+                if safe_v is not None:
+                    metrics[f'{prefix}_{k}'] = safe_v
+
         # Memory engines
         try:
             hurst_result = compute_hurst(values)
-            metrics.update({f'hurst_{k}': v for k, v in hurst_result.items()})
+            add_metrics(hurst_result, 'hurst')
         except Exception:
             pass
 
         # Information engines
         try:
             entropy_result = compute_entropy(values)
-            metrics.update({f'entropy_{k}': v for k, v in entropy_result.items()})
+            add_metrics(entropy_result, 'entropy')
         except Exception:
             pass
 
         # Frequency engines
         try:
             wavelet_result = compute_wavelets(values)
-            metrics.update({f'wavelet_{k}': v for k, v in wavelet_result.items()})
+            add_metrics(wavelet_result, 'wavelet')
         except Exception:
             pass
 
         try:
             spectral_result = compute_spectral(values)
-            metrics.update({f'spectral_{k}': v for k, v in spectral_result.items()})
+            add_metrics(spectral_result, 'spectral')
         except Exception:
             pass
 
         # Volatility engines
         try:
             garch_result = compute_garch(values)
-            metrics.update({f'garch_{k}': v for k, v in garch_result.items()})
+            add_metrics(garch_result, 'garch')
         except Exception:
             pass
 
         try:
             realized_result = compute_realized_vol(values)
-            metrics.update({f'realized_{k}': v for k, v in realized_result.items()})
+            add_metrics(realized_result, 'realized')
         except Exception:
             pass
 
         try:
             hilbert_amp = compute_hilbert_amplitude(values)
-            metrics['hilbert_amplitude'] = float(np.mean(hilbert_amp)) if len(hilbert_amp) > 0 else np.nan
+            if len(hilbert_amp) > 0:
+                metrics['hilbert_amplitude'] = float(np.mean(hilbert_amp))
         except Exception:
             pass
 
         # Recurrence engines
         try:
             rqa_result = compute_rqa(values)
-            metrics.update({f'rqa_{k}': v for k, v in rqa_result.items()})
+            add_metrics(rqa_result, 'rqa')
         except Exception:
             pass
 
         # Lyapunov
         try:
             lyapunov_result = compute_lyapunov(values)
-            metrics.update({f'lyapunov_{k}': v for k, v in lyapunov_result.items()})
+            add_metrics(lyapunov_result, 'lyapunov')
         except Exception:
             pass
 
         # Discontinuity engines
         try:
             break_result = compute_breaks(values)
-            metrics.update({f'break_{k}': v for k, v in break_result.items()})
+            add_metrics(break_result, 'break')
         except Exception:
             pass
 
         try:
             heaviside_result = compute_heaviside(values)
-            metrics.update({f'heaviside_{k}': v for k, v in heaviside_result.items()})
+            add_metrics(heaviside_result, 'heaviside')
         except Exception:
             pass
 
         try:
             dirac_result = compute_dirac(values)
-            metrics.update({f'dirac_{k}': v for k, v in dirac_result.items()})
+            add_metrics(dirac_result, 'dirac')
         except Exception:
             pass
 
@@ -468,7 +487,7 @@ def compute_dynamics_layer(
         values = values[mask]
         timestamps = timestamps[mask]
 
-        if len(values) < 100:
+        if len(values) < 20:
             continue
 
         metrics = {
@@ -594,7 +613,7 @@ def compute_physics_layer(
         # Remove NaN
         values = values[~np.isnan(values)]
 
-        if len(values) < 50:
+        if len(values) < 20:
             continue
 
         metrics = {
