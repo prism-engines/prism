@@ -6,30 +6,30 @@ Core storage for PRISM diagnostics pipeline.
 
 Directory Structure:
     data/
-        observations.parquet        # Raw sensor data
-        signal_typology.parquet     # ORTHON Layer 1: Signal classification
-        manifold_geometry.parquet   # ORTHON Layer 2: Structural geometry
-        dynamical_systems.parquet   # ORTHON Layer 3: System dynamics
-        causal_mechanics.parquet    # ORTHON Layer 4: Physics-inspired analysis
-        cohorts.parquet             # User-defined entity groupings
+        observations.parquet  # Raw sensor data
+        data.parquet         # Observations + characterization
+        vector.parquet       # Signal-level metrics
+        geometry.parquet     # Pairwise relationships
+        dynamics.parquet     # State/transition metrics
+        physics.parquet      # Energy/momentum metrics
+        cohorts.parquet      # User-defined entity groupings
 
-ORTHON Four-Layer Architecture:
-    Each layer produces ONE parquet file with:
-    - Identifiers: entity_id, unit_id, signal_id, window_idx, timestamp
-    - Raw metrics: metric_* columns from engine computations
-    - Classifications: categorical states (e.g., topology_class, dynamics_class)
-    - Numeric states: normalized scores (0-1 or -1 to 1)
+PRISM Five-File Architecture:
+    Pure numerical output - no labels, no classification.
 
-    Transitions are NOT stored separately - they are identified by comparing
-    consecutive windows using thresholds from prism.config.thresholds.
+    1. data.parquet     - observations + numeric characterization
+    2. vector.parquet   - signal-level metrics (memory, frequency, volatility)
+    3. geometry.parquet - pairwise relationships (correlation, distance)
+    4. dynamics.parquet - state/transition metrics (granger, dtw)
+    5. physics.parquet  - energy/momentum metrics (hamiltonian, lagrangian)
 
 Usage:
-    from prism.db.parquet_store import get_path, OBSERVATIONS, SIGNAL_TYPOLOGY
-    from prism.db.parquet_store import MANIFOLD_GEOMETRY, DYNAMICAL_SYSTEMS, CAUSAL_MECHANICS
+    from prism.db.parquet_store import get_path, OBSERVATIONS, DATA, VECTOR
+    from prism.db.parquet_store import GEOMETRY, DYNAMICS, PHYSICS
 
     # Get path to a file
     obs_path = get_path(OBSERVATIONS)  # -> data/observations.parquet
-    typology_path = get_path(SIGNAL_TYPOLOGY)  # -> data/signal_typology.parquet
+    vector_path = get_path(VECTOR)     # -> data/vector.parquet
 """
 
 import os
@@ -43,36 +43,25 @@ from typing import List, Optional
 OBSERVATIONS = "observations"   # Raw sensor data
 
 # =============================================================================
-# ORTHON FOUR-LAYER ARCHITECTURE (one parquet per layer)
+# PRISM PURE CALCULATION OUTPUT (5 files)
 # =============================================================================
 
-SIGNAL_TYPOLOGY = "signal_typology"         # Layer 1: 9-axis profile + classification
-MANIFOLD_GEOMETRY = "manifold_geometry"     # Layer 2: Structural geometry + curvature
-STRUCTURAL_GEOMETRY = "structural_geometry" # Layer 2 alias (backwards compat)
-DYNAMICAL_SYSTEMS = "dynamical_systems"     # Layer 3: 6 dynamics metrics + classification
-CAUSAL_MECHANICS = "causal_mechanics"       # Layer 4: 4 mechanics metrics + classification
+DATA = "data"           # Observations + numeric characterization
+VECTOR = "vector"       # Signal-level metrics (memory, frequency, volatility)
+GEOMETRY = "geometry"   # Pairwise relationships (correlation, distance)
+DYNAMICS = "dynamics"   # State/transition metrics (granger, dtw)
+PHYSICS = "physics"     # Energy/momentum metrics (hamiltonian, lagrangian)
 
-# ORTHON deliverables - the four parquet files users receive
-ORTHON_FILES = [SIGNAL_TYPOLOGY, MANIFOLD_GEOMETRY, DYNAMICAL_SYSTEMS, CAUSAL_MECHANICS]
+# PRISM deliverables - the five parquet files users receive
+PRISM_FILES = [DATA, VECTOR, GEOMETRY, DYNAMICS, PHYSICS]
 
 # =============================================================================
-# LEGACY FILES (kept for backwards compatibility)
+# LEGACY ALIASES (for backwards compatibility)
 # =============================================================================
 
-VECTOR = "vector"               # Legacy: behavioral signals
 SIGNALS = VECTOR                # Legacy alias
-GEOMETRY = "geometry"           # Legacy: system structure
-STATE = "state"                 # Legacy: dynamics
+STATE = DYNAMICS                # Legacy alias
 COHORTS = "cohorts"             # User-defined entity groupings
-
-# Intermediate cohort files
-COHORTS_RAW = "cohorts_raw"     # Cohorts discovered from raw observations
-COHORTS_VECTOR = "cohorts_vector"  # Cohorts discovered from vector signals
-
-# Signal States (unified state-based architecture)
-SIGNAL_STATES = "signal_states"     # Unified signal states across all layers
-COHORT_MEMBERS = "cohort_members"   # User-defined cohort memberships
-CORPUS_CLASS = "corpus_class"       # Corpus-level classifications
 
 # =============================================================================
 # ML ACCELERATOR FILES
@@ -88,19 +77,13 @@ ML_MODEL = "ml_model"           # Serialized model (actually .pkl)
 # =============================================================================
 
 # Core pipeline files
-FILES = [OBSERVATIONS] + ORTHON_FILES + [COHORTS]
+FILES = [OBSERVATIONS] + PRISM_FILES + [COHORTS]
 
 # ML files
 ML_FILES = [ML_FEATURES, ML_RESULTS, ML_IMPORTANCE, ML_MODEL]
 
-# State architecture files
-STATE_FILES = [SIGNAL_STATES, COHORT_MEMBERS, CORPUS_CLASS]
-
-# Legacy files (still supported)
-LEGACY_FILES = [VECTOR, GEOMETRY, STATE, STRUCTURAL_GEOMETRY]
-
 # All valid file names
-ALL_FILES = FILES + [COHORTS_RAW, COHORTS_VECTOR] + ML_FILES + STATE_FILES + LEGACY_FILES
+ALL_FILES = FILES + ML_FILES
 
 
 # =============================================================================

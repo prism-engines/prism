@@ -18,7 +18,10 @@ from typing import List, Optional, Union
 
 import polars as pl
 
-from prism.db.parquet_store import get_path, OBSERVATIONS, SIGNALS, GEOMETRY, STATE, COHORTS
+from prism.db.parquet_store import get_path, OBSERVATIONS, VECTOR, GEOMETRY, DYNAMICS, PHYSICS, COHORTS
+# Legacy aliases
+SIGNALS = VECTOR
+STATE = DYNAMICS
 
 
 def read_parquet(
