@@ -1,7 +1,8 @@
 """
 Electrochemistry Engines
 
-Nernst equation, Butler-Volmer kinetics, Faraday's law, battery analysis.
+Nernst equation, Butler-Volmer kinetics, Faraday's law, battery analysis,
+electrochemical mass transfer.
 """
 
 from .nernst import (
@@ -46,6 +47,16 @@ from .battery import (
     ocv_soc_curve,
 )
 
+from .mass_transfer import (
+    limiting_current_density,
+    rotating_disk,
+    levich_plot,
+    koutecky_levich,
+    concentration_overpotential,
+    diffusion_layer_thickness,
+    sherwood_electrode,
+)
+
 __all__ = [
     # Thermodynamics (Nernst)
     'nernst',
@@ -81,4 +92,12 @@ __all__ = [
     'cycle_life',
     'impedance_spectrum',
     'ocv_soc_curve',
+    # Mass Transfer
+    'limiting_current_density',
+    'rotating_disk',
+    'levich_plot',
+    'koutecky_levich',
+    'concentration_overpotential',
+    'diffusion_layer_thickness',
+    'sherwood_electrode',
 ]

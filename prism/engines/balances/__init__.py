@@ -1,7 +1,8 @@
 """
 Material & Energy Balance Engines
 
-Conservation equations, process calculations, heat exchanger design.
+Conservation equations, process calculations, heat exchanger design,
+degrees of freedom analysis.
 """
 
 from .material import (
@@ -31,6 +32,15 @@ from .energy import (
     ntu_from_effectiveness,
 )
 
+from .combined import (
+    degrees_of_freedom,
+    unit_dof,
+    process_simulation_sequential,
+    recycle_convergence,
+    mass_energy_summary,
+    equation_ordering,
+)
+
 __all__ = [
     # Material Balances
     'total_mass_balance',
@@ -55,4 +65,11 @@ __all__ = [
     'lmtd',
     'effectiveness_ntu',
     'ntu_from_effectiveness',
+    # Combined Balances
+    'degrees_of_freedom',
+    'unit_dof',
+    'process_simulation_sequential',
+    'recycle_convergence',
+    'mass_energy_summary',
+    'equation_ordering',
 ]

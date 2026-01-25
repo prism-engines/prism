@@ -38,6 +38,16 @@ from .activity_models import (
     unifac,
 )
 
+from .lle import (
+    tie_line,
+    lever_rule,
+    binodal_curve_margules,
+    plait_point,
+    ternary_coordinates,
+    ternary_diagram,
+    distribution_coefficient,
+)
+
 __all__ = [
     # VLE
     'antoine',
@@ -67,4 +77,12 @@ __all__ = [
     'nrtl_binary',
     'uniquac',
     'unifac',
+    # LLE
+    'tie_line',
+    'lever_rule',
+    'binodal_curve_margules',
+    'plait_point',
+    'ternary_coordinates',
+    'ternary_diagram',
+    'distribution_coefficient',
 ]
