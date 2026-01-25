@@ -58,29 +58,84 @@ logger = logging.getLogger(__name__)
 # ENGINE IMPORTS
 # =============================================================================
 
-def import_engines():
-    """Import all physics engines."""
+def import_engines(config: Dict[str, Any]):
+    """
+    Import physics engines based on config selection.
+
+    Config structure:
+        engines:
+          physics:
+            hamiltonian: true
+            lagrangian: false
+            ...
+    """
     engines = {}
+    engine_config = config.get('engines', {}).get('physics', {})
 
-    try:
-        from prism.engines.physics import (
-            compute_hamiltonian, compute_lagrangian,
-            compute_kinetic, compute_potential,
-            compute_gibbs, compute_angular_momentum,
-            compute_momentum_flux, compute_derivatives,
-        )
-        engines['hamiltonian'] = compute_hamiltonian
-        engines['lagrangian'] = compute_lagrangian
-        engines['kinetic'] = compute_kinetic
-        engines['potential'] = compute_potential
-        engines['gibbs'] = compute_gibbs
-        engines['angular_momentum'] = compute_angular_momentum
-        engines['momentum_flux'] = compute_momentum_flux
-        engines['derivatives'] = compute_derivatives
-        logger.info(f"  Physics engines: {len(engines)} loaded")
-    except ImportError as e:
-        logger.warning(f"  Physics engines failed: {e}")
+    # If no config, enable all engines by default
+    if not engine_config:
+        engine_config = {k: True for k in [
+            'hamiltonian', 'lagrangian', 'kinetic', 'potential',
+            'gibbs', 'angular_momentum', 'momentum_flux', 'derivatives',
+        ]}
 
+    if engine_config.get('hamiltonian', True):
+        try:
+            from prism.engines.physics import compute_hamiltonian
+            engines['hamiltonian'] = compute_hamiltonian
+        except ImportError:
+            pass
+
+    if engine_config.get('lagrangian', True):
+        try:
+            from prism.engines.physics import compute_lagrangian
+            engines['lagrangian'] = compute_lagrangian
+        except ImportError:
+            pass
+
+    if engine_config.get('kinetic', True):
+        try:
+            from prism.engines.physics import compute_kinetic
+            engines['kinetic'] = compute_kinetic
+        except ImportError:
+            pass
+
+    if engine_config.get('potential', True):
+        try:
+            from prism.engines.physics import compute_potential
+            engines['potential'] = compute_potential
+        except ImportError:
+            pass
+
+    if engine_config.get('gibbs', True):
+        try:
+            from prism.engines.physics import compute_gibbs
+            engines['gibbs'] = compute_gibbs
+        except ImportError:
+            pass
+
+    if engine_config.get('angular_momentum', True):
+        try:
+            from prism.engines.physics import compute_angular_momentum
+            engines['angular_momentum'] = compute_angular_momentum
+        except ImportError:
+            pass
+
+    if engine_config.get('momentum_flux', True):
+        try:
+            from prism.engines.physics import compute_momentum_flux
+            engines['momentum_flux'] = compute_momentum_flux
+        except ImportError:
+            pass
+
+    if engine_config.get('derivatives', True):
+        try:
+            from prism.engines.physics import compute_derivatives
+            engines['derivatives'] = compute_derivatives
+        except ImportError:
+            pass
+
+    logger.info(f"  Loaded {len(engines)} physics engines from config")
     return engines
 
 
@@ -255,8 +310,8 @@ def main():
 
     config = load_config(data_path)
 
-    logger.info("Loading engines...")
-    engines = import_engines()
+    logger.info("Loading engines from config...")
+    engines = import_engines(config)
     logger.info(f"Total engines: {len(engines)}")
 
     observations = read_parquet(obs_path)

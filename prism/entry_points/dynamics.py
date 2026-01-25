@@ -67,79 +67,108 @@ logger = logging.getLogger(__name__)
 # ENGINE IMPORTS
 # =============================================================================
 
-def import_engines():
-    """Import all dynamics/state engines."""
+def import_engines(config: Dict[str, Any]):
+    """
+    Import dynamics engines based on config selection.
+
+    Config structure:
+        engines:
+          dynamics:
+            embedding: true
+            phase_space: false
+            ...
+    """
     engines = {}
+    engine_config = config.get('engines', {}).get('dynamics', {})
+
+    # If no config, enable all engines by default
+    if not engine_config:
+        engine_config = {k: True for k in [
+            'embedding', 'phase_space', 'lyapunov', 'break_detector',
+            'granger', 'cross_correlation', 'cointegration', 'dtw',
+            'dmd', 'transfer_entropy', 'trajectory',
+        ]}
 
     # Dynamics engines
-    try:
-        from prism.engines.dynamics import (
-            compute_embedding, compute_phase_space, compute_lyapunov
-        )
-        engines['embedding'] = compute_embedding
-        engines['phase_space'] = compute_phase_space
-        engines['lyapunov'] = compute_lyapunov
-        logger.info("  Dynamics engines: 3 loaded")
-    except ImportError as e:
-        logger.warning(f"  Dynamics engines failed: {e}")
+    if engine_config.get('embedding', True):
+        try:
+            from prism.engines.dynamics import compute_embedding
+            engines['embedding'] = compute_embedding
+        except ImportError:
+            pass
+
+    if engine_config.get('phase_space', True):
+        try:
+            from prism.engines.dynamics import compute_phase_space
+            engines['phase_space'] = compute_phase_space
+        except ImportError:
+            pass
+
+    if engine_config.get('lyapunov', True):
+        try:
+            from prism.engines.dynamics import compute_lyapunov
+            engines['lyapunov'] = compute_lyapunov
+        except ImportError:
+            pass
 
     # State engines
-    try:
-        from prism.engines.state import break_detector
-        engines['break_detector'] = break_detector.compute_breaks
-        logger.info("  Break detector: loaded")
-    except ImportError as e:
-        logger.warning(f"  Break detector failed: {e}")
+    if engine_config.get('break_detector', True):
+        try:
+            from prism.engines.state import break_detector
+            engines['break_detector'] = break_detector.compute_breaks
+        except ImportError:
+            pass
 
-    try:
-        from prism.engines.state import granger
-        engines['granger'] = granger.compute
-        logger.info("  Granger: loaded")
-    except ImportError as e:
-        logger.debug(f"  Granger failed: {e}")
+    if engine_config.get('granger', True):
+        try:
+            from prism.engines.state import granger
+            engines['granger'] = granger.compute
+        except ImportError:
+            pass
 
-    try:
-        from prism.engines.state import cross_correlation
-        engines['cross_correlation'] = cross_correlation.compute
-        logger.info("  Cross-correlation: loaded")
-    except ImportError as e:
-        logger.debug(f"  Cross-correlation failed: {e}")
+    if engine_config.get('cross_correlation', True):
+        try:
+            from prism.engines.state import cross_correlation
+            engines['cross_correlation'] = cross_correlation.compute
+        except ImportError:
+            pass
 
-    try:
-        from prism.engines.state import cointegration
-        engines['cointegration'] = cointegration.compute
-        logger.info("  Cointegration: loaded")
-    except ImportError as e:
-        logger.debug(f"  Cointegration failed: {e}")
+    if engine_config.get('cointegration', True):
+        try:
+            from prism.engines.state import cointegration
+            engines['cointegration'] = cointegration.compute
+        except ImportError:
+            pass
 
-    try:
-        from prism.engines.state import dtw
-        engines['dtw'] = dtw.compute
-        logger.info("  DTW: loaded")
-    except ImportError as e:
-        logger.debug(f"  DTW failed: {e}")
+    if engine_config.get('dtw', True):
+        try:
+            from prism.engines.state import dtw
+            engines['dtw'] = dtw.compute
+        except ImportError:
+            pass
 
-    try:
-        from prism.engines.state import dmd
-        engines['dmd'] = dmd.compute
-        logger.info("  DMD: loaded")
-    except ImportError as e:
-        logger.debug(f"  DMD failed: {e}")
+    if engine_config.get('dmd', True):
+        try:
+            from prism.engines.state import dmd
+            engines['dmd'] = dmd.compute
+        except ImportError:
+            pass
 
-    try:
-        from prism.engines.state import transfer_entropy
-        engines['transfer_entropy'] = transfer_entropy.compute
-        logger.info("  Transfer entropy: loaded")
-    except ImportError as e:
-        logger.debug(f"  Transfer entropy failed: {e}")
+    if engine_config.get('transfer_entropy', True):
+        try:
+            from prism.engines.state import transfer_entropy
+            engines['transfer_entropy'] = transfer_entropy.compute
+        except ImportError:
+            pass
 
-    try:
-        from prism.engines.state import trajectory
-        engines['trajectory'] = trajectory.compute
-        logger.info("  Trajectory: loaded")
-    except ImportError as e:
-        logger.debug(f"  Trajectory failed: {e}")
+    if engine_config.get('trajectory', True):
+        try:
+            from prism.engines.state import trajectory
+            engines['trajectory'] = trajectory.compute
+        except ImportError:
+            pass
 
+    logger.info(f"  Loaded {len(engines)} dynamics engines from config")
     return engines
 
 
@@ -344,8 +373,8 @@ def main():
 
     config = load_config(data_path)
 
-    logger.info("Loading engines...")
-    engines = import_engines()
+    logger.info("Loading engines from config...")
+    engines = import_engines(config)
     logger.info(f"Total engines: {len(engines)}")
 
     observations = read_parquet(obs_path)

@@ -64,30 +64,92 @@ logger = logging.getLogger(__name__)
 # ENGINE IMPORTS
 # =============================================================================
 
-def import_engines():
-    """Import all geometry engines."""
+def import_engines(config: Dict[str, Any]):
+    """
+    Import geometry engines based on config selection.
+
+    Config structure:
+        engines:
+          geometry:
+            pca: true
+            mst: false
+            ...
+    """
     engines = {}
+    engine_config = config.get('engines', {}).get('geometry', {})
 
-    try:
-        from prism.engines.geometry import (
-            PCAEngine, MSTEngine, ClusteringEngine, LOFEngine,
-            DistanceEngine, ConvexHullEngine, CopulaEngine,
-            MutualInformationEngine, BarycenterEngine,
-            GEOMETRY_ENGINES,
-        )
-        engines['pca'] = PCAEngine()
-        engines['mst'] = MSTEngine()
-        engines['clustering'] = ClusteringEngine()
-        engines['lof'] = LOFEngine()
-        engines['distance'] = DistanceEngine()
-        engines['convex_hull'] = ConvexHullEngine()
-        engines['copula'] = CopulaEngine()
-        engines['mutual_information'] = MutualInformationEngine()
-        engines['barycenter'] = BarycenterEngine()
-        logger.info(f"  Loaded {len(engines)} geometry engines")
-    except ImportError as e:
-        logger.warning(f"  Geometry engine import failed: {e}")
+    # If no config, enable all engines by default
+    if not engine_config:
+        engine_config = {k: True for k in [
+            'pca', 'mst', 'clustering', 'lof', 'distance',
+            'convex_hull', 'copula', 'mutual_information', 'barycenter',
+        ]}
 
+    # Class-based geometry engines
+    if engine_config.get('pca', True):
+        try:
+            from prism.engines.geometry import PCAEngine
+            engines['pca'] = PCAEngine()
+        except ImportError:
+            pass
+
+    if engine_config.get('mst', True):
+        try:
+            from prism.engines.geometry import MSTEngine
+            engines['mst'] = MSTEngine()
+        except ImportError:
+            pass
+
+    if engine_config.get('clustering', True):
+        try:
+            from prism.engines.geometry import ClusteringEngine
+            engines['clustering'] = ClusteringEngine()
+        except ImportError:
+            pass
+
+    if engine_config.get('lof', True):
+        try:
+            from prism.engines.geometry import LOFEngine
+            engines['lof'] = LOFEngine()
+        except ImportError:
+            pass
+
+    if engine_config.get('distance', True):
+        try:
+            from prism.engines.geometry import DistanceEngine
+            engines['distance'] = DistanceEngine()
+        except ImportError:
+            pass
+
+    if engine_config.get('convex_hull', True):
+        try:
+            from prism.engines.geometry import ConvexHullEngine
+            engines['convex_hull'] = ConvexHullEngine()
+        except ImportError:
+            pass
+
+    if engine_config.get('copula', True):
+        try:
+            from prism.engines.geometry import CopulaEngine
+            engines['copula'] = CopulaEngine()
+        except ImportError:
+            pass
+
+    if engine_config.get('mutual_information', True):
+        try:
+            from prism.engines.geometry import MutualInformationEngine
+            engines['mutual_information'] = MutualInformationEngine()
+        except ImportError:
+            pass
+
+    if engine_config.get('barycenter', True):
+        try:
+            from prism.engines.geometry import BarycenterEngine
+            engines['barycenter'] = BarycenterEngine()
+        except ImportError:
+            pass
+
+    logger.info(f"  Loaded {len(engines)} geometry engines from config")
     return engines
 
 
@@ -309,9 +371,10 @@ def main():
     # Load config
     config = load_config(data_path)
 
-    # Load engines
-    logger.info("Loading engines...")
-    engines = import_engines()
+    # Load engines from config
+    logger.info("Loading engines from config...")
+    engines = import_engines(config)
+    logger.info(f"Total engines: {len(engines)}")
 
     # Load data
     observations = read_parquet(obs_path)

@@ -57,119 +57,226 @@ logger = logging.getLogger(__name__)
 # ENGINE IMPORTS
 # =============================================================================
 
-def import_engines():
-    """Import all vector engines with graceful fallbacks."""
+def import_engines(config: Dict[str, Any]):
+    """
+    Import vector engines based on config selection.
+
+    Config structure:
+        engines:
+          vector:
+            hurst_dfa: true
+            hurst_rs: false
+            ...
+    """
     engines = {}
+    engine_config = config.get('engines', {}).get('vector', {})
+
+    # If no config, enable all engines by default
+    if not engine_config:
+        engine_config = {k: True for k in [
+            'hurst_dfa', 'hurst_rs', 'acf_decay', 'spectral_slope',
+            'permutation_entropy', 'sample_entropy', 'entropy_rate',
+            'spectral', 'wavelet', 'garch', 'realized_vol',
+            'bipower_variation', 'hilbert_amplitude', 'rqa',
+            'cusum', 'derivative_stats', 'distribution', 'rolling_volatility',
+            'seasonality', 'stationarity', 'takens', 'trend',
+            'derivatives', 'hilbert', 'statistical', 'runs_test',
+            'dirac', 'heaviside', 'structural',
+        ]}
 
     # Memory engines
-    try:
-        from prism.engines.memory import (
-            compute_hurst_dfa, compute_hurst_rs,
-            compute_acf_decay, compute_spectral_slope
-        )
-        engines['hurst_dfa'] = compute_hurst_dfa
-        engines['hurst_rs'] = compute_hurst_rs
-        engines['acf_decay'] = compute_acf_decay
-        engines['spectral_slope'] = compute_spectral_slope
-        logger.info("  Memory engines: 4 loaded")
-    except ImportError as e:
-        logger.warning(f"  Memory engines failed: {e}")
+    if engine_config.get('hurst_dfa', True):
+        try:
+            from prism.engines.memory import compute_hurst_dfa
+            engines['hurst_dfa'] = compute_hurst_dfa
+        except ImportError:
+            pass
+    if engine_config.get('hurst_rs', True):
+        try:
+            from prism.engines.memory import compute_hurst_rs
+            engines['hurst_rs'] = compute_hurst_rs
+        except ImportError:
+            pass
+    if engine_config.get('acf_decay', True):
+        try:
+            from prism.engines.memory import compute_acf_decay
+            engines['acf_decay'] = compute_acf_decay
+        except ImportError:
+            pass
+    if engine_config.get('spectral_slope', True):
+        try:
+            from prism.engines.memory import compute_spectral_slope
+            engines['spectral_slope'] = compute_spectral_slope
+        except ImportError:
+            pass
 
     # Information engines
-    try:
-        from prism.engines.information import (
-            compute_permutation_entropy, compute_sample_entropy,
-            compute_entropy_rate
-        )
-        engines['permutation_entropy'] = compute_permutation_entropy
-        engines['sample_entropy'] = compute_sample_entropy
-        engines['entropy_rate'] = compute_entropy_rate
-        logger.info("  Information engines: 3 loaded")
-    except ImportError as e:
-        logger.warning(f"  Information engines failed: {e}")
+    if engine_config.get('permutation_entropy', True):
+        try:
+            from prism.engines.information import compute_permutation_entropy
+            engines['permutation_entropy'] = compute_permutation_entropy
+        except ImportError:
+            pass
+    if engine_config.get('sample_entropy', True):
+        try:
+            from prism.engines.information import compute_sample_entropy
+            engines['sample_entropy'] = compute_sample_entropy
+        except ImportError:
+            pass
+    if engine_config.get('entropy_rate', True):
+        try:
+            from prism.engines.information import compute_entropy_rate
+            engines['entropy_rate'] = compute_entropy_rate
+        except ImportError:
+            pass
 
     # Frequency engines
-    try:
-        from prism.engines.frequency import compute_spectral, compute_wavelet
-        engines['spectral'] = compute_spectral
-        engines['wavelet'] = compute_wavelet
-        logger.info("  Frequency engines: 2 loaded")
-    except ImportError as e:
-        logger.warning(f"  Frequency engines failed: {e}")
+    if engine_config.get('spectral', True):
+        try:
+            from prism.engines.frequency import compute_spectral
+            engines['spectral'] = compute_spectral
+        except ImportError:
+            pass
+    if engine_config.get('wavelet', True):
+        try:
+            from prism.engines.frequency import compute_wavelet
+            engines['wavelet'] = compute_wavelet
+        except ImportError:
+            pass
 
     # Volatility engines
-    try:
-        from prism.engines.volatility import (
-            compute_garch, compute_realized_vol,
-            compute_bipower_variation, compute_hilbert_amplitude
-        )
-        engines['garch'] = compute_garch
-        engines['realized_vol'] = compute_realized_vol
-        engines['bipower_variation'] = compute_bipower_variation
-        engines['hilbert_amplitude'] = compute_hilbert_amplitude
-        logger.info("  Volatility engines: 4 loaded")
-    except ImportError as e:
-        logger.warning(f"  Volatility engines failed: {e}")
+    if engine_config.get('garch', True):
+        try:
+            from prism.engines.volatility import compute_garch
+            engines['garch'] = compute_garch
+        except ImportError:
+            pass
+    if engine_config.get('realized_vol', True):
+        try:
+            from prism.engines.volatility import compute_realized_vol
+            engines['realized_vol'] = compute_realized_vol
+        except ImportError:
+            pass
+    if engine_config.get('bipower_variation', True):
+        try:
+            from prism.engines.volatility import compute_bipower_variation
+            engines['bipower_variation'] = compute_bipower_variation
+        except ImportError:
+            pass
+    if engine_config.get('hilbert_amplitude', True):
+        try:
+            from prism.engines.volatility import compute_hilbert_amplitude
+            engines['hilbert_amplitude'] = compute_hilbert_amplitude
+        except ImportError:
+            pass
 
     # Recurrence engines
-    try:
-        from prism.engines.recurrence import compute_rqa
-        engines['rqa'] = compute_rqa
-        logger.info("  Recurrence engines: 1 loaded")
-    except ImportError as e:
-        logger.warning(f"  Recurrence engines failed: {e}")
+    if engine_config.get('rqa', True):
+        try:
+            from prism.engines.recurrence import compute_rqa
+            engines['rqa'] = compute_rqa
+        except ImportError:
+            pass
 
     # Typology engines
-    try:
-        from prism.engines.typology import (
-            compute_cusum, compute_derivative_stats, compute_distribution,
-            compute_rolling_volatility, compute_seasonality,
-            compute_stationarity, compute_takens, compute_trend
-        )
-        engines['cusum'] = compute_cusum
-        engines['derivative_stats'] = compute_derivative_stats
-        engines['distribution'] = compute_distribution
-        engines['rolling_volatility'] = compute_rolling_volatility
-        engines['seasonality'] = compute_seasonality
-        engines['stationarity'] = compute_stationarity
-        engines['takens'] = compute_takens
-        engines['trend'] = compute_trend
-        logger.info("  Typology engines: 8 loaded")
-    except ImportError as e:
-        logger.warning(f"  Typology engines failed: {e}")
+    if engine_config.get('cusum', True):
+        try:
+            from prism.engines.typology import compute_cusum
+            engines['cusum'] = compute_cusum
+        except ImportError:
+            pass
+    if engine_config.get('derivative_stats', True):
+        try:
+            from prism.engines.typology import compute_derivative_stats
+            engines['derivative_stats'] = compute_derivative_stats
+        except ImportError:
+            pass
+    if engine_config.get('distribution', True):
+        try:
+            from prism.engines.typology import compute_distribution
+            engines['distribution'] = compute_distribution
+        except ImportError:
+            pass
+    if engine_config.get('rolling_volatility', True):
+        try:
+            from prism.engines.typology import compute_rolling_volatility
+            engines['rolling_volatility'] = compute_rolling_volatility
+        except ImportError:
+            pass
+    if engine_config.get('seasonality', True):
+        try:
+            from prism.engines.typology import compute_seasonality
+            engines['seasonality'] = compute_seasonality
+        except ImportError:
+            pass
+    if engine_config.get('stationarity', True):
+        try:
+            from prism.engines.typology import compute_stationarity
+            engines['stationarity'] = compute_stationarity
+        except ImportError:
+            pass
+    if engine_config.get('takens', True):
+        try:
+            from prism.engines.typology import compute_takens
+            engines['takens'] = compute_takens
+        except ImportError:
+            pass
+    if engine_config.get('trend', True):
+        try:
+            from prism.engines.typology import compute_trend
+            engines['trend'] = compute_trend
+        except ImportError:
+            pass
 
     # Pointwise engines
-    try:
-        from prism.engines.pointwise import (
-            compute_derivatives, compute_hilbert, compute_statistical
-        )
-        engines['derivatives'] = compute_derivatives
-        engines['hilbert'] = compute_hilbert
-        engines['statistical'] = compute_statistical
-        logger.info("  Pointwise engines: 3 loaded")
-    except ImportError as e:
-        logger.warning(f"  Pointwise engines failed: {e}")
+    if engine_config.get('derivatives', True):
+        try:
+            from prism.engines.pointwise import compute_derivatives
+            engines['derivatives'] = compute_derivatives
+        except ImportError:
+            pass
+    if engine_config.get('hilbert', True):
+        try:
+            from prism.engines.pointwise import compute_hilbert
+            engines['hilbert'] = compute_hilbert
+        except ImportError:
+            pass
+    if engine_config.get('statistical', True):
+        try:
+            from prism.engines.pointwise import compute_statistical
+            engines['statistical'] = compute_statistical
+        except ImportError:
+            pass
 
     # Momentum engines
-    try:
-        from prism.engines.momentum import compute_runs_test
-        engines['runs_test'] = compute_runs_test
-        logger.info("  Momentum engines: 1 loaded")
-    except ImportError as e:
-        logger.warning(f"  Momentum engines failed: {e}")
+    if engine_config.get('runs_test', True):
+        try:
+            from prism.engines.momentum import compute_runs_test
+            engines['runs_test'] = compute_runs_test
+        except ImportError:
+            pass
 
     # Discontinuity engines
-    try:
-        from prism.engines.discontinuity import (
-            compute_dirac, compute_heaviside, compute_structural
-        )
-        engines['dirac'] = compute_dirac
-        engines['heaviside'] = compute_heaviside
-        engines['structural'] = compute_structural
-        logger.info("  Discontinuity engines: 3 loaded")
-    except ImportError as e:
-        logger.warning(f"  Discontinuity engines failed: {e}")
+    if engine_config.get('dirac', True):
+        try:
+            from prism.engines.discontinuity import compute_dirac
+            engines['dirac'] = compute_dirac
+        except ImportError:
+            pass
+    if engine_config.get('heaviside', True):
+        try:
+            from prism.engines.discontinuity import compute_heaviside
+            engines['heaviside'] = compute_heaviside
+        except ImportError:
+            pass
+    if engine_config.get('structural', True):
+        try:
+            from prism.engines.discontinuity import compute_structural
+            engines['structural'] = compute_structural
+        except ImportError:
+            pass
 
+    logger.info(f"  Loaded {len(engines)} engines from config")
     return engines
 
 
@@ -433,9 +540,9 @@ def main():
     if args.stride:
         config['stride'] = args.stride
 
-    # Load engines
-    logger.info("Loading engines...")
-    engines = import_engines()
+    # Load engines from config
+    logger.info("Loading engines from config...")
+    engines = import_engines(config)
     logger.info(f"Total engines: {len(engines)}")
 
     # Load data
