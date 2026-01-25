@@ -75,24 +75,6 @@ from prism.engines.state.coupled_inertia import CoupledInertiaEngine
 # =============================================================================
 from prism.engines.state.energy_dynamics import EnergyDynamicsEngine, compute_energy_dynamics
 from prism.engines.state.tension_dynamics import TensionDynamicsEngine, compute_tension_dynamics
-from prism.engines.state.phase_detector import PhaseDetectorEngine, detect_phase
-from prism.engines.cohort_aggregator import CohortAggregatorEngine, aggregate_cohort
-from prism.engines.state.transfer_detector import TransferDetectorEngine, detect_transfer
-
-# =============================================================================
-# Observation-Level Engines (run BEFORE windowing, point precision)
-# =============================================================================
-from prism.engines.state.break_detector import (
-    compute_breaks,
-    compute_breaks_polars,
-    compute_break_summary_polars,
-    analyze_break_pattern,
-    get_break_metrics,
-    create_adaptive_windows,
-    identify_break_regions,
-    BreakPattern,
-    DEFAULT_CONFIG as BREAK_DETECTOR_CONFIG,
-)
 
 # Detection engines (honestly named)
 from prism.engines.detection.step_detector import compute as compute_step
@@ -172,19 +154,14 @@ STATE_ENGINES: Dict[str, Type[BaseEngine]] = {
 TEMPORAL_DYNAMICS_ENGINES: Dict[str, Type] = {
     "energy_dynamics": EnergyDynamicsEngine,
     "tension_dynamics": TensionDynamicsEngine,
-    "phase_detector": PhaseDetectorEngine,
-    "cohort_aggregator": CohortAggregatorEngine,
-    "transfer_detector": TransferDetectorEngine,
 }
 
 # Observation-level engines: name -> compute function
 # These run BEFORE windowing at point precision
-# Discontinuity engines form a hierarchy:
-#   break_detector -> screens for ALL discontinuities
+# Discontinuity engines:
 #   heaviside -> measures PERSISTENT level shifts (steps)
 #   dirac -> measures TRANSIENT shocks (impulses)
 OBSERVATION_ENGINES: Dict[str, Callable] = {
-    "break_detector": get_break_metrics,
     "heaviside": get_heaviside_metrics,
     "dirac": get_dirac_metrics,
 }
@@ -400,30 +377,13 @@ __all__ = [
     "TEMPORAL_DYNAMICS_ENGINES",
     "EnergyDynamicsEngine",
     "TensionDynamicsEngine",
-    "PhaseDetectorEngine",
-    "CohortAggregatorEngine",
-    "TransferDetectorEngine",
 
     # Temporal dynamics functions
     "compute_energy_dynamics",
     "compute_tension_dynamics",
-    "detect_phase",
-    "aggregate_cohort",
-    "detect_transfer",
 
     # Observation-level engines (discontinuity detection)
     "OBSERVATION_ENGINES",
-
-    # Break detector
-    "compute_breaks",
-    "compute_breaks_polars",
-    "compute_break_summary_polars",
-    "analyze_break_pattern",
-    "get_break_metrics",
-    "create_adaptive_windows",
-    "identify_break_regions",
-    "BreakPattern",
-    "BREAK_DETECTOR_CONFIG",
 
     # Heaviside (step function measurement)
     "compute_heaviside",

@@ -10,7 +10,7 @@ REQUIRES: vector.parquet, geometry.parquet, dynamics.parquet
 Orchestrates state engines - NO INLINE COMPUTATION.
 All compute lives in prism/engines/state/.
 
-Engines (14 total):
+Engines (11 total):
     Causality:
         - transfer_entropy: Information transfer between signals
         - granger: Granger causality relationships
@@ -20,11 +20,6 @@ Engines (14 total):
         - tension_dynamics: Spring-like tension in feature space
         - energy_dynamics: Energy flow metrics
         - trajectory: State space trajectory analysis
-
-    Detection:
-        - break_detector: Structural breaks and changepoints
-        - phase_detector: Phase transitions
-        - transfer_detector: Causal transfer events
 
     Pairwise:
         - cointegration: Long-run equilibrium relationships
@@ -81,11 +76,8 @@ from prism.engines.state.cointegration import CointegrationEngine
 from prism.engines.state.cross_correlation import CrossCorrelationEngine
 from prism.engines.state.dtw import DTWEngine
 from prism.engines.state.dmd import DMDEngine
-from prism.engines.state.phase_detector import PhaseDetectorEngine
-from prism.engines.state.transfer_detector import TransferDetectorEngine
 
 # Function-based engines
-from prism.engines.state.break_detector import compute_breaks
 from prism.engines.state.trajectory import compute_state_trajectory, compute_state_metrics
 from prism.engines.state.cohort import run_cohort_state
 
@@ -101,13 +93,10 @@ CLASS_ENGINES = {
     'cross_correlation': CrossCorrelationEngine,
     'dtw': DTWEngine,
     'dmd': DMDEngine,
-    'phase_detector': PhaseDetectorEngine,
-    'transfer_detector': TransferDetectorEngine,
 }
 
 # Engine registry - function-based
 FUNCTION_ENGINES = {
-    'break_detector': compute_breaks,
     'trajectory': compute_state_trajectory,
     'cohort': run_cohort_state,
 }
@@ -226,11 +215,7 @@ def run_state_engines(
         try:
             params = engine_params.get(engine_name, {})
 
-            if engine_name == 'break_detector':
-                # Break detection on feature matrix
-                series = np.mean(feature_matrix, axis=1)
-                result = compute_fn(series, **params)
-            elif engine_name == 'trajectory':
+            if engine_name == 'trajectory':
                 # Trajectory analysis
                 result = compute_fn(feature_matrix, **params)
                 if hasattr(result, '__dict__'):
