@@ -12,6 +12,9 @@ scikit-learn>=1.2.0
 polars>=0.20.0
 pyarrow>=12.0.0
 
+# SQL engine
+duckdb>=0.9.0
+
 # Time series analysis
 nolds>=0.5.0           # Lyapunov, correlation dimension
 arch>=6.0.0            # GARCH volatility
