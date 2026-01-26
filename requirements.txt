@@ -2,17 +2,16 @@
 # =======================
 
 # Data processing (Polars + Parquet architecture)
-polars>=0.20.0          # Primary DataFrame library (all I/O)
+polars>=1.0.0           # Primary DataFrame library (all I/O)
 pyarrow>=14.0.0         # Parquet file support
 numpy>=1.24.0
 pandas>=2.0.0           # Required for scipy/sklearn engine interfaces
 scipy>=1.10.0
 scikit-learn>=1.3.0
+pydantic>=2.0.0         # Config schema validation
 
 # Performance acceleration
 numba>=0.58.0           # JIT for pure Python loops (RQA, Hurst, entropy)
-bottleneck>=1.3.0       # Fast rolling windows, NaN handling
-numexpr>=2.8.0          # Fast element-wise math expressions
 
 # Math/Scientific Engines (Academic-Grade)
 antropy>=0.1.6          # Entropy calculations (Shannon, spectral, etc.)
@@ -25,24 +24,27 @@ networkx>=3.0           # Graph/network analysis (MST, etc.)
 # Statistics
 statsmodels>=0.14.0     # Granger causality, cointegration, etc.
 
-# ML Accelerator (RUL prediction)
-xgboost>=2.0.0          # Gradient boosting
-lightgbm>=4.0.0         # Light gradient boosting
-catboost>=1.2.0         # Categorical boosting
-
 # Data fetching
 requests>=2.28.0
 pyyaml>=6.0
 
-# Visualization
-matplotlib>=3.8.0       # Plotting and visualization
-streamlit>=1.30.0       # Interactive web applications
+# Optional: Streaming I/O (falls back to polars if not available)
+# duckdb>=0.9.0         # DuckDB for streaming parquet queries
 
-# Notebooks and Documentation
-jupyterlab>=4.0.0       # Interactive notebooks for derivations
-nbconvert>=7.0.0        # Export notebooks to HTML/PDF/Markdown
+# Optional: ML Accelerator (RUL prediction)
+# xgboost>=2.0.0        # Gradient boosting
+# lightgbm>=4.0.0       # Light gradient boosting
+# catboost>=1.2.0       # Categorical boosting
 
-# Development (optional but recommended)
-black>=23.0.0
-ruff>=0.1.0
-pytest>=7.0.0
+# Optional: Visualization
+# matplotlib>=3.8.0     # Plotting and visualization
+# streamlit>=1.30.0     # Interactive web applications
+
+# Optional: Notebooks and Documentation
+# jupyterlab>=4.0.0     # Interactive notebooks for derivations
+# nbconvert>=7.0.0      # Export notebooks to HTML/PDF/Markdown
+
+# Optional: Development
+# black>=23.0.0
+# ruff>=0.1.0
+# pytest>=7.0.0
