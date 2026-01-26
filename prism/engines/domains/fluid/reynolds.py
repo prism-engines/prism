@@ -188,17 +188,17 @@ def _convert_viscosity(nu: float, constants: Dict[str, Any]) -> float:
 
 
 def _null_result(reason: str) -> Dict[str, Any]:
-    """Return null result with reason."""
+    """Return NaN result with reason."""
     return {
-        'reynolds': None,
-        'reynolds_mean': None,
-        'reynolds_min': None,
-        'reynolds_max': None,
-        'reynolds_std': None,
+        'reynolds': float('nan'),
+        'reynolds_mean': float('nan'),
+        'reynolds_min': float('nan'),
+        'reynolds_max': float('nan'),
+        'reynolds_std': float('nan'),
         'flow_regime': None,
-        'characteristic_length': None,
-        'kinematic_viscosity': None,
-        'is_laminar': None,
-        'is_turbulent': None,
-        'reynolds_error': reason,
+        'characteristic_length': float('nan'),
+        'kinematic_viscosity': float('nan'),
+        'is_laminar': False,
+        'is_turbulent': False,
+        'error': reason,
     }

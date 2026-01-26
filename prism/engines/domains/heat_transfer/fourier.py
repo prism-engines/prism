@@ -5,6 +5,8 @@ The fundamental law governing heat transfer by conduction:
 
     q = -k * (dT/dx)
 
+REQUIRES: thermal_conductivity [W/(m·K)]
+
 Where:
     q = heat flux [W/m²]
     k = thermal conductivity [W/(m·K)]
@@ -34,25 +36,54 @@ import numpy as np
 from typing import Dict, Any, Optional
 
 
+def _nan_result(reason: str, keys: list) -> Dict[str, Any]:
+    """Return NaN result with error reason."""
+    result = {k: float('nan') for k in keys}
+    result['error'] = reason
+    return result
+
+
 def compute_heat_flux(
-    thermal_conductivity: float,
-    temperature_gradient: float
+    thermal_conductivity: float = None,
+    temperature_gradient: float = None,
+    config: Dict[str, Any] = None,
 ) -> Dict[str, float]:
     """
     Compute heat flux from Fourier's law.
 
+    REQUIRES: thermal_conductivity [W/(m·K)]
+
     Parameters
     ----------
     thermal_conductivity : float
-        k [W/(m·K)]
+        k [W/(m·K)]. REQUIRED.
     temperature_gradient : float
         dT/dx [K/m] (positive = temperature increasing in x direction)
+    config : dict, optional
+        Config with global_constants
 
     Returns
     -------
     dict
         heat_flux: q [W/m²] (negative = heat flows opposite to gradient)
     """
+    # Get from config if not provided
+    if thermal_conductivity is None and config is not None:
+        thermal_conductivity = config.get('global_constants', {}).get('thermal_conductivity')
+
+    # VALIDATION
+    if thermal_conductivity is None or np.isnan(thermal_conductivity):
+        return _nan_result(
+            'Missing required constant: thermal_conductivity [W/(m·K)]',
+            ['heat_flux', 'thermal_conductivity', 'temperature_gradient']
+        )
+
+    if temperature_gradient is None or np.isnan(temperature_gradient):
+        return _nan_result(
+            'Missing temperature_gradient [K/m]',
+            ['heat_flux', 'thermal_conductivity', 'temperature_gradient']
+        )
+
     q = -thermal_conductivity * temperature_gradient
 
     return {
@@ -63,24 +94,29 @@ def compute_heat_flux(
 
 
 def compute_conduction_slab(
-    thermal_conductivity: float,
-    area: float,
-    temperature_difference: float,
-    thickness: float
+    thermal_conductivity: float = None,
+    area: float = None,
+    temperature_difference: float = None,
+    thickness: float = None,
+    config: Dict[str, Any] = None,
 ) -> Dict[str, float]:
     """
     Steady-state heat conduction through a plane slab.
 
+    REQUIRES: thermal_conductivity [W/(m·K)], area [m²], thickness [m]
+
     Parameters
     ----------
     thermal_conductivity : float
-        k [W/(m·K)]
+        k [W/(m·K)]. REQUIRED.
     area : float
-        A [m²]
+        A [m²]. REQUIRED.
     temperature_difference : float
         ΔT = T_hot - T_cold [K]
     thickness : float
-        L [m]
+        L [m]. REQUIRED.
+    config : dict, optional
+        Config with global_constants
 
     Returns
     -------
@@ -89,8 +125,27 @@ def compute_conduction_slab(
         thermal_resistance: R [K/W]
         heat_flux: q [W/m²]
     """
-    if thickness <= 0:
-        return {'heat_rate': np.nan, 'thermal_resistance': np.nan, 'heat_flux': np.nan}
+    # Get from config if not provided
+    if config is not None:
+        gc = config.get('global_constants', {})
+        if thermal_conductivity is None:
+            thermal_conductivity = gc.get('thermal_conductivity')
+        if area is None:
+            area = gc.get('area')
+        if thickness is None:
+            thickness = gc.get('thickness')
+
+    result_keys = ['heat_rate', 'thermal_resistance', 'heat_flux']
+
+    # VALIDATION
+    if thermal_conductivity is None or np.isnan(thermal_conductivity):
+        return _nan_result('Missing required constant: thermal_conductivity [W/(m·K)]', result_keys)
+    if area is None or np.isnan(area):
+        return _nan_result('Missing required constant: area [m²]', result_keys)
+    if thickness is None or thickness <= 0:
+        return _nan_result('Missing or invalid thickness [m]', result_keys)
+    if temperature_difference is None or np.isnan(temperature_difference):
+        return _nan_result('Missing temperature_difference [K]', result_keys)
 
     Q = thermal_conductivity * area * temperature_difference / thickness
     R = thickness / (thermal_conductivity * area)

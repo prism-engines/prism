@@ -1,6 +1,8 @@
 """
 Faraday's Law and Electrochemical Applications
 
+REQUIRES: n_electrons, molar_mass [kg/mol]
+
 Electrolysis, electroplating, corrosion rates.
 """
 
@@ -12,10 +14,19 @@ from typing import Dict, Any, Optional
 F = 96485.33212  # Faraday constant [C/mol]
 
 
-def faraday(I: float, t: float, M: float, n: int,
-            efficiency: float = 1.0) -> Dict[str, Any]:
+def _nan_result(reason: str, keys: list) -> Dict[str, Any]:
+    """Return NaN result with error reason."""
+    result = {k: float('nan') for k in keys}
+    result['error'] = reason
+    return result
+
+
+def faraday(I: float = None, t: float = None, M: float = None, n: int = None,
+            efficiency: float = 1.0, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Faraday's Law of Electrolysis.
+
+    REQUIRES: n (electrons), M (molar_mass)
 
     m = (I·t·M) / (n·F)
 
@@ -26,11 +37,13 @@ def faraday(I: float, t: float, M: float, n: int,
     t : float
         Time [s]
     M : float
-        Molar mass [kg/mol] (or g/mol)
+        Molar mass [kg/mol]. REQUIRED.
     n : int
-        Number of electrons transferred
+        Number of electrons transferred. REQUIRED.
     efficiency : float
         Current efficiency (0-1)
+    config : dict, optional
+        Config with global_constants
 
     Returns
     -------
@@ -39,6 +52,26 @@ def faraday(I: float, t: float, M: float, n: int,
         moles: Moles reacted
         charge: Total charge passed [C]
     """
+    # Get from config if not provided
+    if config is not None:
+        gc = config.get('global_constants', {})
+        if M is None:
+            M = gc.get('molar_mass')
+        if n is None:
+            n = gc.get('n_electrons')
+
+    result_keys = ['mass', 'moles', 'charge']
+
+    # VALIDATION
+    if n is None:
+        return _nan_result('Missing required constant: n_electrons', result_keys)
+    if M is None or np.isnan(M):
+        return _nan_result('Missing required constant: molar_mass [kg/mol]', result_keys)
+    if I is None or np.isnan(I):
+        return _nan_result('Missing current I [A]', result_keys)
+    if t is None or np.isnan(t):
+        return _nan_result('Missing time t [s]', result_keys)
+
     Q = I * t  # Charge [C]
     moles = Q / (n * F)
     mass = moles * M * efficiency

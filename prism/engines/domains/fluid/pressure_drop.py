@@ -269,19 +269,19 @@ def _convert_length(value: float, constants: Dict[str, Any], param: str) -> floa
 
 
 def _null_result(reason: str) -> Dict[str, Any]:
-    """Return null result with reason."""
+    """Return NaN result with reason."""
     return {
-        'pressure_drop': None,
-        'pressure_drop_min': None,
-        'pressure_drop_max': None,
-        'friction_factor': None,
-        'head_loss': None,
-        'power_loss': None,
-        'reynolds_mean': None,
-        'pipe_length': None,
-        'pipe_diameter': None,
-        'pipe_roughness': None,
-        'relative_roughness': None,
+        'pressure_drop': float('nan'),
+        'pressure_drop_min': float('nan'),
+        'pressure_drop_max': float('nan'),
+        'friction_factor': float('nan'),
+        'head_loss': float('nan'),
+        'power_loss': float('nan'),
+        'reynolds_mean': float('nan'),
+        'pipe_length': float('nan'),
+        'pipe_diameter': float('nan'),
+        'pipe_roughness': float('nan'),
+        'relative_roughness': float('nan'),
         'units': None,
-        'pressure_drop_error': reason,
+        'error': reason,
     }

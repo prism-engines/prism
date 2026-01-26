@@ -1,6 +1,8 @@
 """
 Fick's Laws of Diffusion
 
+REQUIRES: diffusivity [m²/s]
+
 Fick's First Law (steady-state diffusion):
     J = -D * (dC/dx)
 
@@ -23,30 +25,59 @@ Key diffusivity correlations:
 """
 
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
+
+
+def _nan_result(reason: str, keys: list) -> Dict[str, Any]:
+    """Return NaN result with error reason."""
+    result = {k: float('nan') for k in keys}
+    result['error'] = reason
+    return result
 
 
 def compute_molar_flux(
-    diffusivity: float,
-    concentration_gradient: float
+    diffusivity: float = None,
+    concentration_gradient: float = None,
+    config: Dict[str, Any] = None,
 ) -> Dict[str, float]:
     """
     Fick's first law: molar flux from concentration gradient.
+
+    REQUIRES: diffusivity [m²/s]
 
     J = -D * (dC/dx)
 
     Parameters
     ----------
     diffusivity : float
-        D [m²/s]
+        D [m²/s]. REQUIRED.
     concentration_gradient : float
         dC/dx [mol/m⁴]
+    config : dict, optional
+        Config with global_constants
 
     Returns
     -------
     dict
         molar_flux: J [mol/(m²·s)]
     """
+    # Get from config if not provided
+    if diffusivity is None and config is not None:
+        diffusivity = config.get('global_constants', {}).get('diffusivity')
+
+    # VALIDATION
+    if diffusivity is None or np.isnan(diffusivity):
+        return _nan_result(
+            'Missing required constant: diffusivity [m²/s]',
+            ['molar_flux', 'diffusivity', 'concentration_gradient']
+        )
+
+    if concentration_gradient is None or np.isnan(concentration_gradient):
+        return _nan_result(
+            'Missing concentration_gradient [mol/m⁴]',
+            ['molar_flux', 'diffusivity', 'concentration_gradient']
+        )
+
     J = -diffusivity * concentration_gradient
 
     return {
