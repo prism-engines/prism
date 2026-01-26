@@ -41,19 +41,26 @@ class FlowRegime(Enum):
     TURBULENT = "turbulent"
 
 
+class MissingFieldConstantError(Exception):
+    """Raised when required field constant is not provided."""
+    pass
+
+
 @dataclass
 class VelocityField:
     """
     3D velocity field container.
 
+    REQUIRES: nu [m²/s], rho [kg/m³], dx/dy/dz [m]
+
     Attributes:
         u: x-component of velocity, shape (nx, ny, nz) or (nx, ny, nz, nt)
         v: y-component of velocity
         w: z-component of velocity
-        dx, dy, dz: Grid spacing in each direction [m]
+        dx, dy, dz: Grid spacing in each direction [m]. REQUIRED.
         dt: Time step (if time-varying) [s]
-        nu: Kinematic viscosity [m^2/s]
-        rho: Density [kg/m^3] (default 1.0 for incompressible)
+        nu: Kinematic viscosity [m^2/s]. REQUIRED - no default.
+        rho: Density [kg/m^3]. REQUIRED - no default.
     """
     u: np.ndarray
     v: np.ndarray
@@ -64,8 +71,9 @@ class VelocityField:
     dz: float
     dt: float = 1.0
 
-    nu: float = 1e-6      # Water at 20C
-    rho: float = 1.0      # Normalized for incompressible
+    # NO DEFAULTS - must be explicitly provided
+    nu: float = None      # Kinematic viscosity [m²/s]
+    rho: float = None     # Density [kg/m³]
 
     @property
     def shape(self) -> Tuple[int, ...]:
@@ -81,7 +89,21 @@ class VelocityField:
         return np.sqrt(self.u**2 + self.v**2 + self.w**2)
 
     def validate(self) -> None:
-        """Validate field data."""
+        """Validate field data and REQUIRED constants."""
+        # VALIDATION: nu MUST be provided
+        if self.nu is None:
+            raise MissingFieldConstantError(
+                "Missing required constant: nu (kinematic viscosity) [m²/s]. "
+                "Common values: water=1e-6, air=1.5e-5, oil=1e-4"
+            )
+
+        # VALIDATION: rho MUST be provided
+        if self.rho is None:
+            raise MissingFieldConstantError(
+                "Missing required constant: rho (density) [kg/m³]. "
+                "Common values: water=1000, air=1.2, oil=900"
+            )
+
         if self.u.shape != self.v.shape or self.u.shape != self.w.shape:
             raise ValueError("Velocity components must have same shape")
         if len(self.u.shape) not in [3, 4]:
@@ -90,6 +112,8 @@ class VelocityField:
             raise ValueError("Grid spacing must be positive")
         if self.nu <= 0:
             raise ValueError("Viscosity must be positive")
+        if self.rho <= 0:
+            raise ValueError("Density must be positive")
 
 
 # =============================================================================

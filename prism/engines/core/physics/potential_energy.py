@@ -5,131 +5,141 @@ Harmonic:      V = ½k(x - x₀)²  [J]
 Gravitational: V = mgh          [J]
 Elastic:       V = ½kx²         [J]
 
-When constants known: Returns energy in Joules
-When constants unknown: Returns specific/normalized form
+REQUIRES: spring_constant [N/m] for harmonic, mass [kg] for gravitational
 """
 
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
+
+from prism.engines.validation import get_constant
 
 
 def compute_potential_energy_harmonic(
     position: np.ndarray,
     equilibrium: float = 0.0,
     spring_constant: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
 ) -> Dict:
     """
     Harmonic oscillator potential: V = ½k(x - x₀)²
 
+    REQUIRES: spring_constant [N/m]
+
     Args:
         position: x [m] or displacement signal
         equilibrium: x₀ equilibrium position [m]
-        spring_constant: k [N/m]. If None, returns V/k.
+        spring_constant: k [N/m]. REQUIRED.
+        config: Optional config dict
 
     Returns:
         Dict with potential energy
     """
+    # Get spring_constant from config if not provided
+    if spring_constant is None and config is not None:
+        spring_constant = get_constant(config, 'spring_constant')
+
+    # VALIDATION: spring_constant MUST exist
+    if spring_constant is None or np.isnan(spring_constant):
+        return {
+            'potential_energy': float('nan'),
+            'mean_potential_energy': float('nan'),
+            'max_potential_energy': float('nan'),
+            'error': 'Missing required constant: spring_constant [N/m]',
+            'equation': 'V = ½k(x-x₀)²',
+        }
+
     x = np.asarray(position, dtype=float)
 
     if np.all(np.isnan(x)):
         return {
-            'potential_energy': None,
-            'mean_potential_energy': None,
-            'max_potential_energy': None,
-            'displacement': None,
-            'displacement_squared': None,
-            'equilibrium_position': equilibrium,
+            'potential_energy': float('nan'),
+            'mean_potential_energy': float('nan'),
+            'max_potential_energy': float('nan'),
+            'error': 'Invalid position data (all NaN)',
             'spring_constant': spring_constant,
-            'is_specific': spring_constant is None,
-            'units': None,
-            'equation': 'V = ½k(x-x₀)²' if spring_constant else 'V/k = ½(x-x₀)²',
+            'equation': 'V = ½k(x-x₀)²',
         }
 
     displacement = x - equilibrium
     displacement_squared = displacement**2
-
-    if spring_constant is not None:
-        V = 0.5 * spring_constant * displacement_squared
-        units = 'J'
-        is_specific = False
-    else:
-        V = 0.5 * displacement_squared
-        units = 'm²'  # V/k has units of m²
-        is_specific = True
+    V = 0.5 * spring_constant * displacement_squared
 
     return {
         'potential_energy': V,
         'mean_potential_energy': float(np.nanmean(V)),
         'max_potential_energy': float(np.nanmax(V)),
-
         'displacement': displacement,
         'displacement_squared': displacement_squared,
         'equilibrium_position': equilibrium,
-
         'spring_constant': spring_constant,
-        'is_specific': is_specific,
-        'units': units,
-        'equation': 'V = ½k(x-x₀)²' if spring_constant else 'V/k = ½(x-x₀)²',
+        'units': 'J',
+        'equation': 'V = ½k(x-x₀)²',
     }
 
 
 def compute_potential_energy_gravitational(
     height: np.ndarray,
     mass: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
     g: float = 9.81,
     reference_height: float = 0.0,
 ) -> Dict:
     """
     Gravitational potential energy: V = mg(h - h₀)
 
+    REQUIRES: mass [kg]
+
     Args:
         height: h [m]
-        mass: m [kg]. If None, returns V/m = g(h - h₀).
+        mass: m [kg]. REQUIRED.
+        config: Optional config dict
         g: Gravitational acceleration [m/s²]
         reference_height: h₀ [m]
     """
+    # Get mass from config if not provided
+    if mass is None and config is not None:
+        mass = get_constant(config, 'mass')
+
+    # VALIDATION: mass MUST exist
+    if mass is None or np.isnan(mass):
+        return {
+            'potential_energy': float('nan'),
+            'mean_potential_energy': float('nan'),
+            'max_potential_energy': float('nan'),
+            'min_potential_energy': float('nan'),
+            'error': 'Missing required constant: mass [kg]',
+            'equation': 'V = mgh',
+        }
+
     h = np.asarray(height, dtype=float)
 
     if np.all(np.isnan(h)):
         return {
-            'potential_energy': None,
-            'mean_potential_energy': None,
-            'height': None,
-            'height_change': None,
-            'reference_height': reference_height,
+            'potential_energy': float('nan'),
+            'mean_potential_energy': float('nan'),
+            'max_potential_energy': float('nan'),
+            'min_potential_energy': float('nan'),
+            'error': 'Invalid height data (all NaN)',
             'mass': mass,
             'g': g,
-            'is_specific': mass is None,
-            'units': None,
-            'equation': 'V = mgh' if mass else 'V/m = gh',
+            'equation': 'V = mgh',
         }
 
     delta_h = h - reference_height
-
-    if mass is not None:
-        V = mass * g * delta_h
-        units = 'J'
-        is_specific = False
-    else:
-        V = g * delta_h
-        units = 'J/kg'
-        is_specific = True
+    V = mass * g * delta_h
 
     return {
         'potential_energy': V,
         'mean_potential_energy': float(np.nanmean(V)),
         'max_potential_energy': float(np.nanmax(V)),
         'min_potential_energy': float(np.nanmin(V)),
-
         'height': h,
         'height_change': delta_h,
         'reference_height': reference_height,
-
         'mass': mass,
         'g': g,
-        'is_specific': is_specific,
-        'units': units,
-        'equation': 'V = mgh' if mass else 'V/m = gh',
+        'units': 'J',
+        'equation': 'V = mgh',
     }
 
 
@@ -193,17 +203,21 @@ def compute(
     spring_constant: Optional[float] = None,
     potential_type: str = 'harmonic',
     mass: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
     g: float = 9.81,
 ) -> Dict:
     """
     Main compute function for potential energy.
 
+    REQUIRES: spring_constant [N/m] for harmonic, mass [kg] for gravitational
+
     Args:
         values: Position array [m] or height array [m]
         equilibrium: Equilibrium position [m] (for harmonic)
-        spring_constant: k [N/m] (for harmonic). If None, returns specific.
+        spring_constant: k [N/m] (for harmonic). REQUIRED for harmonic.
         potential_type: 'harmonic' or 'gravitational'
-        mass: Mass [kg] (for gravitational). If None, returns specific.
+        mass: Mass [kg] (for gravitational). REQUIRED for gravitational.
+        config: Optional config dict
         g: Gravitational acceleration [m/s²]
 
     Returns:
@@ -215,6 +229,7 @@ def compute(
         return compute_potential_energy_gravitational(
             height=values,
             mass=mass,
+            config=config,
             g=g,
             reference_height=equilibrium,
         )
@@ -223,4 +238,5 @@ def compute(
             position=values,
             equilibrium=equilibrium,
             spring_constant=spring_constant,
+            config=config,
         )

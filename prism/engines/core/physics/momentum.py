@@ -4,62 +4,73 @@ Momentum Engine — THE REAL EQUATIONS
 Linear:  p = mv     [kg·m/s]
 Angular: L = r × p  [kg·m²/s]
 
+REQUIRES: mass [kg]
+
 Momentum is conserved in closed systems.
 """
 
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
+
+from prism.engines.validation import get_constant
 
 
 def compute_linear_momentum(
     velocity: np.ndarray,
     mass: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
 ) -> Dict:
     """
     Compute linear momentum: p = mv
 
+    REQUIRES: mass [kg]
+
     Args:
         velocity: v [m/s], can be 1D or 3D
-        mass: m [kg]. If None, returns specific momentum (= velocity)
+        mass: m [kg]. REQUIRED.
+        config: Optional config dict
 
     Returns:
         Dict with momentum
     """
+    # Get mass from config if not provided
+    if mass is None and config is not None:
+        mass = get_constant(config, 'mass')
+
+    # VALIDATION: mass MUST exist
+    if mass is None or np.isnan(mass):
+        return {
+            'momentum': float('nan'),
+            'momentum_magnitude': float('nan'),
+            'mean_momentum_magnitude': float('nan'),
+            'max_momentum_magnitude': float('nan'),
+            'error': 'Missing required constant: mass [kg]',
+            'equation': 'p = mv',
+        }
+
     v = np.asarray(velocity, dtype=float)
 
     if np.all(np.isnan(v)):
         return {
-            'momentum': None,
-            'momentum_magnitude': None,
-            'mean_momentum_magnitude': None,
+            'momentum': float('nan'),
+            'momentum_magnitude': float('nan'),
+            'mean_momentum_magnitude': float('nan'),
+            'max_momentum_magnitude': float('nan'),
+            'error': 'Invalid velocity data (all NaN)',
             'mass': mass,
-            'is_specific': mass is None,
-            'units': None,
-            'equation': 'p = mv' if mass else 'p/m = v',
+            'equation': 'p = mv',
         }
 
-    if mass is not None:
-        p = mass * v
-        units = 'kg·m/s'
-        is_specific = False
-    else:
-        p = v.copy()
-        units = 'm/s'
-        is_specific = True
+    p = mass * v
 
     # Magnitude
-    # Handle both time series of scalars and single/multiple 3D vectors
     if v.ndim > 1:
-        # Time series of vectors: shape (N, 3)
         p_magnitude = np.sqrt(np.sum(p**2, axis=-1))
     elif v.ndim == 1 and len(v) == 3:
-        # Single 3D vector: shape (3,)
         p_magnitude = float(np.sqrt(np.sum(p**2)))
     else:
-        # Time series of scalars: shape (N,)
         p_magnitude = np.abs(p)
 
-    # Ensure mean/max work for both scalar and array
     if np.isscalar(p_magnitude):
         mean_mag = p_magnitude
         max_mag = p_magnitude
@@ -72,11 +83,9 @@ def compute_linear_momentum(
         'momentum_magnitude': p_magnitude,
         'mean_momentum_magnitude': mean_mag,
         'max_momentum_magnitude': max_mag,
-
         'mass': mass,
-        'is_specific': is_specific,
-        'units': units,
-        'equation': 'p = mv' if mass else 'p/m = v',
+        'units': 'kg·m/s',
+        'equation': 'p = mv',
     }
 
 
@@ -84,34 +93,50 @@ def compute_angular_momentum(
     position: np.ndarray,
     velocity: np.ndarray,
     mass: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
     origin: Optional[np.ndarray] = None,
 ) -> Dict:
     """
     Compute angular momentum: L = r × p = m(r × v)
 
-    THIS IS THE REAL CROSS PRODUCT.
+    REQUIRES: mass [kg]
 
     Args:
         position: r [m], shape (..., 3) for 3D
         velocity: v [m/s], shape (..., 3) for 3D
-        mass: m [kg]. If None, returns specific angular momentum r × v
+        mass: m [kg]. REQUIRED.
+        config: Optional config dict
         origin: Origin point [m], default [0,0,0]
 
     Returns:
         Dict with angular momentum vector and magnitude
     """
+    # Get mass from config if not provided
+    if mass is None and config is not None:
+        mass = get_constant(config, 'mass')
+
+    # VALIDATION: mass MUST exist
+    if mass is None or np.isnan(mass):
+        return {
+            'angular_momentum': float('nan'),
+            'angular_momentum_magnitude': float('nan'),
+            'mean_magnitude': float('nan'),
+            'max_magnitude': float('nan'),
+            'error': 'Missing required constant: mass [kg]',
+            'equation': 'L = r × p = m(r × v)',
+        }
+
     r = np.asarray(position, dtype=float)
     v = np.asarray(velocity, dtype=float)
 
     # Validate 3D
     if r.shape[-1] != 3 or v.shape[-1] != 3:
         return {
-            'angular_momentum': None,
-            'angular_momentum_magnitude': None,
-            'mean_magnitude': None,
+            'angular_momentum': float('nan'),
+            'angular_momentum_magnitude': float('nan'),
+            'mean_magnitude': float('nan'),
+            'max_magnitude': float('nan'),
             'mass': mass,
-            'is_specific': mass is None,
-            'units': None,
             'error': f'Angular momentum requires 3D vectors. Got position shape {r.shape}, velocity shape {v.shape}',
             'equation': 'L = r × p = m(r × v)',
         }
@@ -122,15 +147,7 @@ def compute_angular_momentum(
 
     # Cross product: L = r × p = m(r × v)
     r_cross_v = np.cross(r, v)
-
-    if mass is not None:
-        L = mass * r_cross_v
-        units = 'kg·m²/s'
-        is_specific = False
-    else:
-        L = r_cross_v
-        units = 'm²/s'
-        is_specific = True
+    L = mass * r_cross_v
 
     # Magnitude
     L_magnitude = np.sqrt(np.sum(L**2, axis=-1))
@@ -146,11 +163,9 @@ def compute_angular_momentum(
         'angular_momentum_direction': L_direction,
         'mean_magnitude': float(np.nanmean(L_magnitude)),
         'max_magnitude': float(np.nanmax(L_magnitude)),
-
         'mass': mass,
         'origin': origin,
-        'is_specific': is_specific,
-        'units': units,
+        'units': 'kg·m²/s',
         'equation': 'L = r × p = m(r × v)',
     }
 
@@ -248,15 +263,19 @@ def compute_impulse(
 def compute(
     velocity: np.ndarray,
     mass: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
     position: Optional[np.ndarray] = None,
     dt: float = 1.0,
 ) -> Dict:
     """
     Main compute function for momentum.
 
+    REQUIRES: mass [kg]
+
     Args:
         velocity: v [m/s]
-        mass: m [kg]
+        mass: m [kg]. REQUIRED.
+        config: Optional config dict
         position: r [m] (for angular momentum, must be 3D)
         dt: Time step [s]
 
@@ -264,22 +283,22 @@ def compute(
         Dict with momentum metrics
     """
     # Compute linear momentum
-    result = compute_linear_momentum(velocity, mass)
+    result = compute_linear_momentum(velocity, mass, config)
 
-    # Add conservation check
-    if result['momentum'] is not None:
+    # Add conservation check if valid momentum
+    if 'error' not in result and not np.isnan(result.get('mean_momentum_magnitude', float('nan'))):
         conservation = check_momentum_conservation(result['momentum'], dt)
         result['is_conserved'] = conservation['is_conserved']
         result['relative_variation'] = conservation['relative_variation']
         result['mean_force_magnitude'] = conservation['mean_force_magnitude']
 
     # Compute angular momentum if 3D position provided
-    if position is not None:
+    if position is not None and 'error' not in result:
         v = np.asarray(velocity, dtype=float)
         r = np.asarray(position, dtype=float)
         if r.shape[-1] == 3 and v.shape[-1] == 3:
-            angular = compute_angular_momentum(position, velocity, mass)
-            result['angular_momentum'] = angular['angular_momentum']
-            result['angular_momentum_magnitude'] = angular['mean_magnitude']
+            angular = compute_angular_momentum(position, velocity, mass, config)
+            result['angular_momentum'] = angular.get('angular_momentum')
+            result['angular_momentum_magnitude'] = angular.get('mean_magnitude')
 
     return result

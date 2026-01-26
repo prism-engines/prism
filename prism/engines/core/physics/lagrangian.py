@@ -3,12 +3,16 @@ Lagrangian Mechanics Engine — THE REAL EQUATION
 
 L(q, q̇, t) = T - V  [J]
 
+REQUIRES: mass [kg], spring_constant [N/m]
+
 The action integral S = ∫L dt is stationary for true paths.
 Euler-Lagrange: d/dt(∂L/∂q̇) - ∂L/∂q = 0
 """
 
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
+
+from prism.engines.validation import get_constant
 
 
 def compute_lagrangian(
@@ -16,34 +20,66 @@ def compute_lagrangian(
     velocity: np.ndarray,
     mass: Optional[float] = None,
     spring_constant: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
     equilibrium: float = 0.0,
 ) -> Dict:
     """
     Compute Lagrangian: L = T - V
 
+    REQUIRES: mass [kg], spring_constant [N/m]
+
     Args:
         position: Generalized coordinate q
         velocity: Generalized velocity q̇ = dq/dt
-        mass: m [kg]
-        spring_constant: k [N/m] for harmonic potential
+        mass: m [kg]. REQUIRED.
+        spring_constant: k [N/m]. REQUIRED.
+        config: Optional config dict
         equilibrium: q₀ equilibrium position
 
     Returns:
         Dict with Lagrangian and components
     """
+    # Get constants from config if not provided
+    if mass is None and config is not None:
+        mass = get_constant(config, 'mass')
+    if spring_constant is None and config is not None:
+        spring_constant = get_constant(config, 'spring_constant')
+
+    # VALIDATION: mass MUST exist
+    if mass is None or np.isnan(mass):
+        return {
+            'lagrangian': float('nan'),
+            'kinetic_energy': float('nan'),
+            'potential_energy': float('nan'),
+            'mean_L': float('nan'),
+            'error': 'Missing required constant: mass [kg]',
+            'equation': 'L = T - V = ½mq̇² - V(q)',
+        }
+
+    # VALIDATION: spring_constant MUST exist
+    if spring_constant is None or np.isnan(spring_constant):
+        return {
+            'lagrangian': float('nan'),
+            'kinetic_energy': float('nan'),
+            'potential_energy': float('nan'),
+            'mean_L': float('nan'),
+            'error': 'Missing required constant: spring_constant [N/m]',
+            'equation': 'L = T - V = ½mq̇² - V(q)',
+        }
+
     q = np.asarray(position, dtype=float)
     q_dot = np.asarray(velocity, dtype=float)
 
     # Validate inputs
     if np.all(np.isnan(q)) or np.all(np.isnan(q_dot)):
         return {
-            'lagrangian': None,
-            'kinetic_energy': None,
-            'potential_energy': None,
-            'mean_L': None,
+            'lagrangian': float('nan'),
+            'kinetic_energy': float('nan'),
+            'potential_energy': float('nan'),
+            'mean_L': float('nan'),
+            'error': 'Invalid position/velocity data (all NaN)',
             'mass': mass,
             'spring_constant': spring_constant,
-            'is_specific': True,
             'equation': 'L = T - V = ½mq̇² - V(q)',
         }
 
@@ -53,10 +89,7 @@ def compute_lagrangian(
     else:
         v_squared = q_dot**2
 
-    if mass is not None:
-        T = 0.5 * mass * v_squared
-    else:
-        T = 0.5 * v_squared
+    T = 0.5 * mass * v_squared
 
     # Potential energy
     displacement = q - equilibrium
@@ -65,16 +98,10 @@ def compute_lagrangian(
     else:
         disp_sq = displacement**2
 
-    if spring_constant is not None:
-        V = 0.5 * spring_constant * disp_sq
-    else:
-        V = 0.5 * disp_sq
+    V = 0.5 * spring_constant * disp_sq
 
     # Lagrangian
     L = T - V
-
-    # Determine if specific
-    is_specific = mass is None or spring_constant is None
 
     mean_T = float(np.nanmean(T))
     mean_V = float(np.nanmean(V))
@@ -94,7 +121,7 @@ def compute_lagrangian(
 
         'mass': mass,
         'spring_constant': spring_constant,
-        'is_specific': is_specific,
+        'units': 'J',
         'equation': 'L = T - V = ½mq̇² - V(q)',
     }
 
@@ -188,17 +215,21 @@ def compute(
     velocity: np.ndarray,
     mass: Optional[float] = None,
     spring_constant: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
     equilibrium: float = 0.0,
     dt: float = 1.0,
 ) -> Dict:
     """
     Main compute function for Lagrangian.
 
+    REQUIRES: mass [kg], spring_constant [N/m]
+
     Args:
         position: q [m]
         velocity: v [m/s]
-        mass: m [kg]
-        spring_constant: k [N/m]
+        mass: m [kg]. REQUIRED.
+        spring_constant: k [N/m]. REQUIRED.
+        config: Optional config dict
         equilibrium: x₀ [m]
         dt: Time step [s]
 
@@ -210,14 +241,15 @@ def compute(
         velocity=velocity,
         mass=mass,
         spring_constant=spring_constant,
+        config=config,
         equilibrium=equilibrium,
     )
 
     # Also compute action if we have a valid Lagrangian
-    if result['lagrangian'] is not None:
+    if 'error' not in result and not np.isnan(result.get('mean_L', float('nan'))):
         action_result = compute_action(result['lagrangian'], dt)
         result['action'] = action_result['action']
     else:
-        result['action'] = None
+        result['action'] = float('nan')
 
     return result

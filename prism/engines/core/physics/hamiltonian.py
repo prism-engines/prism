@@ -3,54 +3,90 @@ Hamiltonian Mechanics Engine — THE REAL EQUATION
 
 H(q, p, t) = T(p) + V(q)  [J]
 
-Total mechanical energy. Conserved in closed systems.
+REQUIRES: mass [kg], spring_constant [N/m] (for harmonic potential)
 
-When mass/constants known: Real Hamiltonian in Joules
-When unknown: Specific Hamiltonian H/m
+Total mechanical energy. Conserved in closed systems.
 """
 
 import numpy as np
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional, Callable, Any
+
+from prism.engines.validation import get_constant
 
 
 def compute_hamiltonian(
     position: np.ndarray,
     velocity: np.ndarray,
     mass: Optional[float] = None,
-    potential_func: Optional[Callable] = None,
     spring_constant: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
+    potential_func: Optional[Callable] = None,
     equilibrium: float = 0.0,
 ) -> Dict:
     """
     Compute Hamiltonian: H = T + V (total mechanical energy)
 
+    REQUIRES: mass [kg], spring_constant [N/m]
+
     Args:
         position: q [m]
         velocity: v = dq/dt [m/s]
-        mass: m [kg]
+        mass: m [kg]. REQUIRED.
+        spring_constant: k [N/m]. REQUIRED (unless potential_func provided).
+        config: Optional config dict
         potential_func: V(q) function returning potential energy
-        spring_constant: k [N/m] for harmonic potential (if no potential_func)
         equilibrium: x₀ for harmonic potential
 
     Returns:
         Dict with Hamiltonian and components
     """
+    # Get constants from config if not provided
+    if mass is None and config is not None:
+        mass = get_constant(config, 'mass')
+    if spring_constant is None and config is not None:
+        spring_constant = get_constant(config, 'spring_constant')
+
+    # VALIDATION: mass MUST exist
+    if mass is None or np.isnan(mass):
+        return {
+            'hamiltonian': float('nan'),
+            'kinetic_energy': float('nan'),
+            'potential_energy': float('nan'),
+            'momentum': float('nan'),
+            'mean_H': float('nan'),
+            'energy_conserved': False,
+            'error': 'Missing required constant: mass [kg]',
+            'equation': 'H = T + V = ½mv² + V(q)',
+        }
+
+    # VALIDATION: spring_constant MUST exist (unless potential_func provided)
+    if potential_func is None and (spring_constant is None or np.isnan(spring_constant)):
+        return {
+            'hamiltonian': float('nan'),
+            'kinetic_energy': float('nan'),
+            'potential_energy': float('nan'),
+            'momentum': float('nan'),
+            'mean_H': float('nan'),
+            'energy_conserved': False,
+            'error': 'Missing required constant: spring_constant [N/m]',
+            'equation': 'H = T + V = ½mv² + V(q)',
+        }
+
     q = np.asarray(position, dtype=float)
     v = np.asarray(velocity, dtype=float)
 
     # Validate inputs
     if np.all(np.isnan(q)) or np.all(np.isnan(v)):
         return {
-            'hamiltonian': None,
-            'kinetic_energy': None,
-            'potential_energy': None,
-            'momentum': None,
-            'mean_H': None,
-            'energy_conserved': None,
+            'hamiltonian': float('nan'),
+            'kinetic_energy': float('nan'),
+            'potential_energy': float('nan'),
+            'momentum': float('nan'),
+            'mean_H': float('nan'),
+            'energy_conserved': False,
+            'error': 'Invalid position/velocity data (all NaN)',
             'mass': mass,
             'spring_constant': spring_constant,
-            'is_specific': True,
-            'units': None,
             'equation': 'H = T + V = ½mv² + V(q)',
         }
 
@@ -61,31 +97,19 @@ def compute_hamiltonian(
         v_squared = v**2
 
     # Kinetic energy
-    if mass is not None:
-        T = 0.5 * mass * v_squared
-        p = mass * v  # Momentum
-    else:
-        T = 0.5 * v_squared  # Specific
-        p = v  # Specific momentum
+    T = 0.5 * mass * v_squared
+    p = mass * v  # Momentum
 
     # Potential energy
     if potential_func is not None:
         V = potential_func(q)
-    elif spring_constant is not None:
+    else:
         displacement = q - equilibrium
         if q.ndim > 1:
             disp_sq = np.sum(displacement**2, axis=-1)
         else:
             disp_sq = displacement**2
         V = 0.5 * spring_constant * disp_sq
-    else:
-        # Specific harmonic potential (k=1)
-        displacement = q - equilibrium
-        if q.ndim > 1:
-            disp_sq = np.sum(displacement**2, axis=-1)
-        else:
-            disp_sq = displacement**2
-        V = 0.5 * disp_sq
 
     # Hamiltonian
     H = T + V
@@ -94,14 +118,6 @@ def compute_hamiltonian(
     H_mean = np.nanmean(H)
     H_std = np.nanstd(H)
     is_conserved = (H_std / np.abs(H_mean)) < 0.01 if H_mean != 0 else H_std < 0.01
-
-    # Determine units
-    if mass is not None and (potential_func is not None or spring_constant is not None):
-        units = 'J'
-        is_specific = False
-    else:
-        units = 'J/kg or m²/s²'
-        is_specific = True
 
     return {
         'hamiltonian': H,
@@ -122,8 +138,7 @@ def compute_hamiltonian(
 
         'mass': mass,
         'spring_constant': spring_constant,
-        'is_specific': is_specific,
-        'units': units,
+        'units': 'J',
         'equation': 'H = T + V = ½mv² + V(q)',
     }
 
@@ -201,16 +216,20 @@ def compute(
     velocity: np.ndarray,
     mass: Optional[float] = None,
     spring_constant: Optional[float] = None,
+    config: Optional[Dict[str, Any]] = None,
     equilibrium: float = 0.0,
 ) -> Dict:
     """
     Main compute function for Hamiltonian.
 
+    REQUIRES: mass [kg], spring_constant [N/m]
+
     Args:
         position: q [m]
         velocity: v [m/s]
-        mass: m [kg]
-        spring_constant: k [N/m]
+        mass: m [kg]. REQUIRED.
+        spring_constant: k [N/m]. REQUIRED.
+        config: Optional config dict
         equilibrium: x₀ [m]
 
     Returns:
@@ -221,5 +240,6 @@ def compute(
         velocity=velocity,
         mass=mass,
         spring_constant=spring_constant,
+        config=config,
         equilibrium=equilibrium,
     )
