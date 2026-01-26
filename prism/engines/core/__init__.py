@@ -11,6 +11,8 @@ These engines cannot be expressed in SQL. They require:
 - Graph algorithms (mst, clustering)
 - Density estimation (lof)
 - Geometric algorithms (convex_hull)
+- PDE solvers (navier_stokes)
+- Integral transforms (laplace_transform)
 """
 
 # Memory / Long-range dependence
@@ -56,42 +58,30 @@ from . import copula
 from . import divergence
 from . import convex_hull
 from . import lof
+from . import modes
+
+# Fields / PDEs
+from . import navier_stokes
+from . import laplace_transform
 
 __all__ = [
     # Memory
-    'hurst',
-    'acf_decay',
-    'spectral_slope',
+    'hurst', 'acf_decay', 'spectral_slope',
     # Dynamics
-    'lyapunov',
-    'embedding',
-    'attractor',
-    'basin',
+    'lyapunov', 'embedding', 'attractor', 'basin',
     # Frequency
-    'fft',
-    'wavelet',
-    'hilbert',
+    'fft', 'wavelet', 'hilbert',
     # Information
-    'entropy',
-    'entropy_rate',
+    'entropy', 'entropy_rate',
     # Volatility
     'garch',
     # Recurrence
     'rqa',
     # State
-    'granger',
-    'transfer_entropy',
-    'cointegration',
-    'dtw',
-    'dmd',
+    'granger', 'transfer_entropy', 'cointegration', 'dtw', 'dmd',
     # Geometry
-    'pca',
-    'umap',
-    'clustering',
-    'mst',
-    'mutual_info',
-    'copula',
-    'divergence',
-    'convex_hull',
-    'lof',
+    'pca', 'umap', 'clustering', 'mst', 'mutual_info', 
+    'copula', 'divergence', 'convex_hull', 'lof', 'modes',
+    # Fields
+    'navier_stokes', 'laplace_transform',
 ]
