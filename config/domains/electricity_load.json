@@ -1,0 +1,100 @@
+{
+  "domain": "electricity_load",
+  "description": "Electricity Load Time Series - Multi-client consumption data",
+  "download_url": "https://huggingface.co/datasets/electricity_load_diagrams",
+  "alternate_url": "UCI Machine Learning Repository",
+
+  "index": {
+    "column": "timestamp",
+    "dimension": "time",
+    "unit": "h",
+    "sampling_interval_min": 15,
+    "resampled_to_hourly": true
+  },
+
+  "signals": {
+    "load": {"unit": "kW", "quantity": "power", "class": "periodic", "description": "Electricity consumption"}
+  },
+
+  "global_constants": {
+    "n_clients": 370,
+    "duration_years": 4,
+    "start_year": 2011,
+    "end_year": 2014
+  },
+
+  "periodicities": {
+    "daily": {
+      "period_hours": 24,
+      "description": "Daily consumption cycle"
+    },
+    "weekly": {
+      "period_hours": 168,
+      "description": "Weekday vs weekend patterns"
+    },
+    "yearly": {
+      "period_hours": 8760,
+      "description": "Seasonal variation (heating/cooling)"
+    }
+  },
+
+  "expected_behaviors": {
+    "load": {
+      "trend": "periodic",
+      "stationarity": false,
+      "seasonality": ["daily", "weekly", "yearly"],
+      "description": "Non-stationary with multiple periodicities"
+    }
+  },
+
+  "expected_patterns": {
+    "weekday": {
+      "morning_ramp": "06:00-09:00",
+      "daytime_plateau": "09:00-17:00",
+      "evening_peak": "18:00-20:00",
+      "night_trough": "00:00-06:00"
+    },
+    "weekend": {
+      "pattern": "different_from_weekday",
+      "morning_ramp": "08:00-11:00",
+      "description": "Later start, lower peaks"
+    },
+    "seasonal": {
+      "winter": "higher_heating_load",
+      "summer": "higher_cooling_load",
+      "spring_fall": "minimum_load"
+    }
+  },
+
+  "fft_expected_peaks": [
+    {"period_hours": 24, "description": "Daily cycle"},
+    {"period_hours": 12, "description": "Half-day harmonic"},
+    {"period_hours": 168, "description": "Weekly cycle"},
+    {"period_hours": 8760, "description": "Annual cycle"}
+  ],
+
+  "hurst_behavior": {
+    "short_term": {
+      "window_hours": 24,
+      "expected_H": [0.5, 0.8],
+      "description": "Demand persistence within day"
+    },
+    "long_term": {
+      "window_days": 365,
+      "expected_H": [0.3, 0.5],
+      "description": "Seasonal mean reversion"
+    }
+  },
+
+  "stationarity_notes": {
+    "raw": "Non-stationary due to trend and seasonality",
+    "detrended": "Closer to stationary",
+    "deseasonalized": "Approximately stationary",
+    "differenced": "Stationary"
+  },
+
+  "validation": {
+    "engines_to_test": ["fft", "wavelet", "hurst", "entropy", "garch"],
+    "primary_use_case": "Multiple periodicities, seasonality detection, forecasting"
+  }
+}

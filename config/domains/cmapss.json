@@ -1,0 +1,82 @@
+{
+  "domain": "nasa_cmapss",
+  "description": "NASA C-MAPSS Turbofan Engine Degradation Simulation",
+  "download_url": "https://phm-datasets.s3.amazonaws.com/NASA/6.+Turbofan+Engine+Degradation+Simulation+Data+Set.zip",
+
+  "index": {
+    "column": "cycle",
+    "dimension": "time",
+    "unit": "cycles"
+  },
+
+  "entity": {
+    "column": "unit_id",
+    "description": "Engine unit number (1-100)"
+  },
+
+  "signals": {
+    "sensor_1": {"unit": "°R", "quantity": "temperature", "class": "analog", "description": "Total temperature at fan inlet"},
+    "sensor_2": {"unit": "°R", "quantity": "temperature", "class": "analog", "description": "Total temperature at LPC outlet"},
+    "sensor_3": {"unit": "°R", "quantity": "temperature", "class": "analog", "description": "Total temperature at HPC outlet"},
+    "sensor_4": {"unit": "°R", "quantity": "temperature", "class": "analog", "description": "Total temperature at LPT outlet"},
+    "sensor_5": {"unit": "psia", "quantity": "pressure", "class": "analog", "description": "Total pressure at fan inlet"},
+    "sensor_6": {"unit": "psia", "quantity": "pressure", "class": "analog", "description": "Total pressure at bypass duct"},
+    "sensor_7": {"unit": "psia", "quantity": "pressure", "class": "analog", "description": "Total pressure at HPC outlet"},
+    "sensor_8": {"unit": "rpm", "quantity": "frequency", "class": "analog", "description": "Physical fan speed"},
+    "sensor_9": {"unit": "rpm", "quantity": "frequency", "class": "analog", "description": "Physical core speed"},
+    "sensor_10": {"unit": "ratio", "quantity": "dimensionless", "class": "analog", "description": "Engine pressure ratio"},
+    "sensor_11": {"unit": "psia", "quantity": "pressure", "class": "analog", "description": "Static pressure at HPC outlet"},
+    "sensor_12": {"unit": "pps/psi", "quantity": "flow_rate", "class": "analog", "description": "Ratio of fuel flow to Ps30"},
+    "sensor_13": {"unit": "rpm", "quantity": "frequency", "class": "analog", "description": "Corrected fan speed"},
+    "sensor_14": {"unit": "rpm", "quantity": "frequency", "class": "analog", "description": "Corrected core speed"},
+    "sensor_15": {"unit": "ratio", "quantity": "dimensionless", "class": "analog", "description": "Bypass ratio"},
+    "sensor_16": {"unit": "ratio", "quantity": "dimensionless", "class": "analog", "description": "Burner fuel-air ratio"},
+    "sensor_17": {"unit": "BTU/lbm", "quantity": "specific_energy", "class": "analog", "description": "Bleed enthalpy"},
+    "sensor_18": {"unit": "rpm", "quantity": "frequency", "class": "analog", "description": "Demanded fan speed"},
+    "sensor_19": {"unit": "rpm", "quantity": "frequency", "class": "analog", "description": "Demanded corrected fan speed"},
+    "sensor_20": {"unit": "lbm/s", "quantity": "mass_flow", "class": "analog", "description": "HPT coolant bleed"},
+    "sensor_21": {"unit": "lbm/s", "quantity": "mass_flow", "class": "analog", "description": "LPT coolant bleed"},
+    "op_setting_1": {"unit": "ft", "quantity": "altitude", "class": "digital", "description": "Operational setting 1 (altitude)"},
+    "op_setting_2": {"unit": "Mach", "quantity": "dimensionless", "class": "digital", "description": "Operational setting 2 (Mach number)"},
+    "op_setting_3": {"unit": "deg", "quantity": "angle", "class": "digital", "description": "Operational setting 3 (throttle resolver angle)"}
+  },
+
+  "global_constants": {
+    "R_air": 53.35,
+    "gamma_air": 1.4,
+    "g": 32.174
+  },
+
+  "expected_behaviors": {
+    "sensor_2": {"trend": "trending", "hurst_range": [0.6, 0.9], "description": "Temperature rise over life"},
+    "sensor_3": {"trend": "trending", "hurst_range": [0.6, 0.9], "description": "Temperature rise over life"},
+    "sensor_4": {"trend": "trending", "hurst_range": [0.6, 0.9], "description": "Temperature rise over life"},
+    "sensor_7": {"trend": "trending", "hurst_range": [0.5, 0.8], "description": "Pressure degradation"},
+    "sensor_11": {"trend": "trending", "hurst_range": [0.5, 0.8], "description": "Pressure degradation"},
+    "sensor_8": {"trend": "mean_reverting", "hurst_range": [0.3, 0.5], "description": "Speed within regimes"},
+    "sensor_9": {"trend": "mean_reverting", "hurst_range": [0.3, 0.5], "description": "Speed within regimes"}
+  },
+
+  "expected_causality": [
+    {"source": "sensor_7", "target": "sensor_11", "type": "correlation", "description": "HPC pressures strongly correlated"},
+    {"source": "sensor_8", "target": "sensor_9", "type": "correlation", "description": "Fan and core speeds coupled"},
+    {"source": "sensor_3", "target": "sensor_4", "type": "causal_lag", "lag_range": [1, 5], "description": "Temperature cascade"}
+  ],
+
+  "expected_regimes": {
+    "early_life": {"description": "Stable operation", "cycle_range": [0, 50]},
+    "mid_life": {"description": "Gradual degradation begins", "cycle_range": [50, 150]},
+    "late_life": {"description": "Accelerated degradation", "cycle_range": [150, null]}
+  },
+
+  "coupling_clusters": {
+    "temperatures": ["sensor_1", "sensor_2", "sensor_3", "sensor_4"],
+    "pressures": ["sensor_5", "sensor_6", "sensor_7", "sensor_11"],
+    "speeds": ["sensor_8", "sensor_9", "sensor_13", "sensor_14"]
+  },
+
+  "validation": {
+    "engines_to_test": ["hurst", "lyapunov", "entropy", "garch", "pca", "umap", "granger", "transfer_entropy", "dtw", "dmd"],
+    "primary_use_case": "Degradation trending, regime changes, RUL prediction"
+  }
+}

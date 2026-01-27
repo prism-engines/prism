@@ -1,0 +1,117 @@
+{
+  "domain": "tennessee_eastman",
+  "description": "Tennessee Eastman Chemical Process Simulation",
+  "download_url": "https://github.com/mv-per/tennessee-eastman-dataset",
+
+  "index": {
+    "column": "sample",
+    "dimension": "time",
+    "unit": "min",
+    "sample_interval_min": 3
+  },
+
+  "signals": {
+    "XMEAS_1": {"unit": "kscmh", "quantity": "flow_volume", "class": "analog", "description": "A feed (stream 1)"},
+    "XMEAS_2": {"unit": "kg/hr", "quantity": "flow_mass", "class": "analog", "description": "D feed (stream 2)"},
+    "XMEAS_3": {"unit": "kg/hr", "quantity": "flow_mass", "class": "analog", "description": "E feed (stream 3)"},
+    "XMEAS_4": {"unit": "kscmh", "quantity": "flow_volume", "class": "analog", "description": "A and C feed (stream 4)"},
+    "XMEAS_5": {"unit": "kscmh", "quantity": "flow_volume", "class": "analog", "description": "Recycle flow (stream 8)"},
+    "XMEAS_6": {"unit": "kscmh", "quantity": "flow_volume", "class": "analog", "description": "Reactor feed rate (stream 6)"},
+    "XMEAS_7": {"unit": "kPa", "quantity": "pressure", "class": "analog", "description": "Reactor pressure"},
+    "XMEAS_8": {"unit": "%", "quantity": "level", "class": "analog", "description": "Reactor level"},
+    "XMEAS_9": {"unit": "°C", "quantity": "temperature", "class": "analog", "description": "Reactor temperature"},
+    "XMEAS_10": {"unit": "kscmh", "quantity": "flow_volume", "class": "analog", "description": "Purge rate (stream 9)"},
+    "XMEAS_11": {"unit": "°C", "quantity": "temperature", "class": "analog", "description": "Separator temperature"},
+    "XMEAS_12": {"unit": "%", "quantity": "level", "class": "analog", "description": "Separator level"},
+    "XMEAS_13": {"unit": "kPa", "quantity": "pressure", "class": "analog", "description": "Separator pressure"},
+    "XMEAS_14": {"unit": "m³/hr", "quantity": "flow_volume", "class": "analog", "description": "Separator underflow (stream 10)"},
+    "XMEAS_15": {"unit": "%", "quantity": "level", "class": "analog", "description": "Stripper level"},
+    "XMEAS_16": {"unit": "kPa", "quantity": "pressure", "class": "analog", "description": "Stripper pressure"},
+    "XMEAS_17": {"unit": "m³/hr", "quantity": "flow_volume", "class": "analog", "description": "Stripper underflow (stream 11)"},
+    "XMEAS_18": {"unit": "°C", "quantity": "temperature", "class": "analog", "description": "Stripper temperature"},
+    "XMEAS_19": {"unit": "kg/hr", "quantity": "flow_mass", "class": "analog", "description": "Stripper steam flow"},
+    "XMEAS_20": {"unit": "kW", "quantity": "power", "class": "analog", "description": "Compressor work"},
+    "XMEAS_21": {"unit": "°C", "quantity": "temperature", "class": "analog", "description": "Reactor cooling water outlet temp"},
+    "XMEAS_22": {"unit": "°C", "quantity": "temperature", "class": "analog", "description": "Separator cooling water outlet temp"},
+    "XMV_1": {"unit": "%", "quantity": "position", "class": "analog", "description": "D feed flow valve"},
+    "XMV_2": {"unit": "%", "quantity": "position", "class": "analog", "description": "E feed flow valve"},
+    "XMV_3": {"unit": "%", "quantity": "position", "class": "analog", "description": "A feed flow valve"},
+    "XMV_4": {"unit": "%", "quantity": "position", "class": "analog", "description": "Separator pot liquid flow valve"},
+    "XMV_5": {"unit": "%", "quantity": "position", "class": "analog", "description": "Compressor recycle valve"},
+    "XMV_6": {"unit": "%", "quantity": "position", "class": "analog", "description": "Purge valve"},
+    "XMV_7": {"unit": "%", "quantity": "position", "class": "analog", "description": "Separator underflow valve"},
+    "XMV_8": {"unit": "%", "quantity": "position", "class": "analog", "description": "Stripper underflow valve"},
+    "XMV_9": {"unit": "%", "quantity": "position", "class": "analog", "description": "Stripper steam valve"},
+    "XMV_10": {"unit": "%", "quantity": "position", "class": "analog", "description": "Reactor cooling water flow"},
+    "XMV_11": {"unit": "%", "quantity": "position", "class": "analog", "description": "Condenser cooling water flow"}
+  },
+
+  "global_constants": {
+    "reactor_volume_m3": 122,
+    "separator_volume_m3": 98,
+    "stripper_volume_m3": 40
+  },
+
+  "expected_causality": [
+    {"source": "XMV_1", "target": "XMEAS_2", "type": "control", "lag_range": [1, 5], "description": "D feed valve controls D feed flow"},
+    {"source": "XMV_2", "target": "XMEAS_3", "type": "control", "lag_range": [1, 5], "description": "E feed valve controls E feed flow"},
+    {"source": "XMV_3", "target": "XMEAS_1", "type": "control", "lag_range": [1, 5], "description": "A feed valve controls A feed flow"},
+    {"source": "XMEAS_1", "target": "XMEAS_7", "type": "process", "lag_range": [5, 20], "description": "Feed affects reactor pressure"},
+    {"source": "XMEAS_9", "target": "XMEAS_11", "type": "thermal", "lag_range": [10, 30], "description": "Reactor temp → separator temp"}
+  ],
+
+  "coupling_clusters": {
+    "reactor": ["XMEAS_6", "XMEAS_7", "XMEAS_8", "XMEAS_9", "XMEAS_21"],
+    "separator": ["XMEAS_11", "XMEAS_12", "XMEAS_13", "XMEAS_14", "XMEAS_22"],
+    "stripper": ["XMEAS_15", "XMEAS_16", "XMEAS_17", "XMEAS_18", "XMEAS_19"],
+    "feeds": ["XMEAS_1", "XMEAS_2", "XMEAS_3", "XMEAS_4"]
+  },
+
+  "fault_types": {
+    "IDV_1": "A/C feed ratio, B composition constant (stream 4)",
+    "IDV_2": "B composition, A/C ratio constant (stream 4)",
+    "IDV_3": "D feed temperature (stream 2)",
+    "IDV_4": "Reactor cooling water inlet temperature",
+    "IDV_5": "Condenser cooling water inlet temperature",
+    "IDV_6": "A feed loss (stream 1)",
+    "IDV_7": "C header pressure loss (stream 4)",
+    "IDV_8": "A, B, C feed composition (stream 4)",
+    "IDV_9": "D feed temperature (stream 2)",
+    "IDV_10": "C feed temperature (stream 4)",
+    "IDV_11": "Reactor cooling water inlet temperature",
+    "IDV_12": "Condenser cooling water inlet temperature",
+    "IDV_13": "Reaction kinetics",
+    "IDV_14": "Reactor cooling water valve",
+    "IDV_15": "Condenser cooling water valve",
+    "IDV_16": "Unknown",
+    "IDV_17": "Unknown",
+    "IDV_18": "Unknown",
+    "IDV_19": "Unknown",
+    "IDV_20": "Unknown"
+  },
+
+  "expected_regimes": {
+    "training_normal": {"sample_range": [0, 60], "description": "First hour normal operation"},
+    "training_fault": {"sample_range": [60, null], "description": "Fault injected at 1 hour"},
+    "testing_normal": {"sample_range": [0, 160], "description": "First 8 hours normal"},
+    "testing_fault": {"sample_range": [160, null], "description": "Fault injected at 8 hours"}
+  },
+
+  "physics_constraints": {
+    "mass_balance": {
+      "inputs": ["XMEAS_1", "XMEAS_2", "XMEAS_3", "XMEAS_4"],
+      "outputs": ["XMEAS_10", "XMEAS_17"],
+      "tolerance": 0.05
+    },
+    "energy_balance": {
+      "inputs": ["XMEAS_19", "XMEAS_20"],
+      "outputs": ["XMEAS_21", "XMEAS_22"],
+      "tolerance": 0.1
+    }
+  },
+
+  "validation": {
+    "engines_to_test": ["entropy", "garch", "pca", "umap", "granger", "transfer_entropy", "cointegration", "dmd"],
+    "primary_use_case": "Multivariate causality, regime changes, fault detection, chemical process physics"
+  }
+}

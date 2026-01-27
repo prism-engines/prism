@@ -1,0 +1,111 @@
+{
+  "domain": "power_grid_frequency",
+  "description": "Power Grid Frequency Monitoring Data",
+  "download_url": "https://power-grid-frequency.org/",
+  "alternate_url": "https://zenodo.org/records/3744121",
+
+  "index": {
+    "column": "timestamp",
+    "dimension": "time",
+    "unit": "s",
+    "sampling_rate_hz": 1
+  },
+
+  "signals": {
+    "frequency": {"unit": "Hz", "quantity": "frequency", "class": "analog", "description": "Grid frequency"}
+  },
+
+  "global_constants": {
+    "nominal_frequency_eu": 50.0,
+    "nominal_frequency_us": 60.0,
+    "deadband_hz": 0.01,
+    "primary_control_hz": 0.2,
+    "emergency_threshold_hz": 0.8
+  },
+
+  "regions": {
+    "continental_europe": {
+      "source": "TransnetBW",
+      "nominal_hz": 50.0,
+      "sampling_hz": 1
+    },
+    "great_britain": {
+      "source": "National Grid",
+      "nominal_hz": 50.0,
+      "sampling_hz": 1
+    },
+    "nordic": {
+      "source": "Fingrid",
+      "nominal_hz": 50.0,
+      "sampling_hz": 0.1
+    },
+    "north_america": {
+      "source": "Various ISOs",
+      "nominal_hz": 60.0,
+      "sampling_hz": 1
+    }
+  },
+
+  "expected_behaviors": {
+    "frequency": {
+      "trend": "mean_reverting",
+      "stationarity": true,
+      "mean": 50.0,
+      "std_normal": 0.02,
+      "std_stressed": 0.05,
+      "hurst_range": [0.3, 0.5],
+      "description": "Mean-reverting around nominal due to frequency control"
+    }
+  },
+
+  "event_signatures": {
+    "generation_loss": {
+      "pattern": "sudden_drop",
+      "magnitude_hz": 0.1,
+      "recovery_time_s": 30,
+      "description": "Generator trip causes frequency drop then recovery"
+    },
+    "demand_surge": {
+      "pattern": "gradual_drop",
+      "magnitude_hz": 0.05,
+      "description": "Load increase during peak hours"
+    },
+    "interconnection_loss": {
+      "pattern": "oscillation",
+      "frequency_hz": 0.2,
+      "description": "Inter-area oscillations after tie-line loss"
+    }
+  },
+
+  "expected_regimes": {
+    "normal": {
+      "frequency_range": [49.95, 50.05],
+      "description": "Tight band around nominal"
+    },
+    "alert": {
+      "frequency_range": [49.8, 49.95],
+      "description": "Primary frequency response active"
+    },
+    "emergency": {
+      "frequency_range": [49.0, 49.8],
+      "description": "Load shedding may occur"
+    }
+  },
+
+  "periodicities": {
+    "daily_load_cycle": {
+      "period_hours": 24,
+      "visible_in_variance": true,
+      "description": "Variance higher during load transitions"
+    },
+    "weekly_cycle": {
+      "period_hours": 168,
+      "description": "Weekend vs weekday patterns"
+    }
+  },
+
+  "validation": {
+    "engines_to_test": ["hurst", "entropy", "garch"],
+    "primary_use_case": "Mean reversion, stationarity, synchronization, regime shifts"
+  }
+}
