@@ -1,30 +1,46 @@
 """
-PRISM - Stream Compute Engine
-=============================
+PRISM - Signal Analysis Engine
+==============================
 
-Stateless stream processing for signal primitives.
-
-    BYTES IN → COMPUTE → BYTES OUT
-               (nothing stored)
+Math is universal. Domains are Orthon's problem.
 
 Architecture:
-    - engines/: Irreducible algorithms (hurst, fft, garch, etc.)
-    - stream/: Streaming infrastructure (parser, buffer, writer)
-    - server/: HTTP/Lambda handlers
+    - engines/python/:          Signal-level engines (one value per signal)
+    - engines/python_windowed/: Observation-level engines (rolling window)
+    - engines/sql/:             SQL engines (DuckDB)
+    - runner.py:                ManifestRunner (executes manifests)
+    - cli.py:                   Command line interface
 
 Usage:
-    # Start server
-    uvicorn prism.server.routes:app --host 0.0.0.0 --port 8080
-    
-    # Or use Lambda
-    from prism.server import lambda_handler
+    # CLI
+    python -m prism run --manifest manifest.json
+    python -m prism list
+
+    # Python
+    from prism.runner import ManifestRunner
+    runner = ManifestRunner(manifest)
+    runner.run()
 """
 
-__version__ = "2.0.0"
-__architecture__ = "stream"
+__version__ = "3.0.0"
+__architecture__ = "atomic"
 
-from . import engines
-from . import stream
-from . import server
+# Lazy imports to avoid circular dependencies
+__all__ = ['runner', 'engines', 'stream', 'server', '__version__']
 
-__all__ = ['engines', 'stream', 'server', '__version__']
+
+def __getattr__(name):
+    """Lazy import of submodules."""
+    if name == 'runner':
+        from . import runner
+        return runner
+    elif name == 'engines':
+        from . import engines
+        return engines
+    elif name == 'stream':
+        from . import stream
+        return stream
+    elif name == 'server':
+        from . import server
+        return server
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -2,20 +2,48 @@
 PRISM API Routes
 ================
 
-HTTP endpoints for stream compute.
+HTTP endpoints for manifest-based compute.
+
+ORTHON pushes:
+  - observations.parquet → data/input/
+  - manifest.json → data/input/
+
+PRISM runs ManifestRunner, writes results to data/output/
 """
 
-from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Form
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
 import time
+import json
+import shutil
+from datetime import datetime
 
-from prism.stream import parse_work_order
-from prism.server.handler import stream_compute_sync
+from prism.runner import ManifestRunner
+
+# Data directories
+DATA_DIR = Path(__file__).parent.parent.parent / "data"
+INPUT_DIR = DATA_DIR / "input"
+OUTPUT_DIR = DATA_DIR / "output"
+
+# Ensure directories exist
+INPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(
     title="PRISM",
-    description="Stateless stream compute for signal primitives",
+    description="Manifest-based compute for signal primitives",
     version="2.0.0"
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -25,95 +53,131 @@ async def health():
     return {
         "status": "ok",
         "version": "2.0.0",
-        "architecture": "stream"
+        "timestamp": datetime.now().isoformat()
     }
 
 
 @app.post("/compute")
-async def compute(request: Request):
+async def compute(
+    observations: UploadFile = File(...),
+    manifest: UploadFile = File(...),
+):
     """
-    Stream compute endpoint.
-    
-    Headers:
-        Content-Type: application/octet-stream
-        X-Work-Order: Base64 encoded JSON (optional)
-    
-    Body:
-        Parquet or CSV bytes
-    
+    Manifest-based compute endpoint.
+
+    Receives:
+        - observations: observations.parquet file
+        - manifest: manifest.json file
+
     Returns:
-        Parquet bytes with computed primitives
+        - status: complete/error
+        - output_dir: path to results
+        - files: list of output parquet files
     """
     start = time.time()
-    
-    # Get work order from header
-    work_order_header = request.headers.get("X-Work-Order")
-    
-    # Read body
-    body = await request.body()
-    
-    if not body:
-        raise HTTPException(status_code=400, detail="Empty body")
-    
+
+    # Create job directory
+    job_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    job_input = INPUT_DIR / job_id
+    job_output = OUTPUT_DIR / job_id
+    job_input.mkdir(parents=True, exist_ok=True)
+    job_output.mkdir(parents=True, exist_ok=True)
+
     try:
-        # Compute
-        result = stream_compute_sync(body, work_order_header)
-        
+        # Save uploaded files
+        obs_path = job_input / "observations.parquet"
+        manifest_path = job_input / "manifest.json"
+
+        obs_content = await observations.read()
+        with open(obs_path, 'wb') as f:
+            f.write(obs_content)
+
+        manifest_content = await manifest.read()
+        manifest_dict = json.loads(manifest_content)
+
+        # Inject paths into manifest
+        manifest_dict['observations_path'] = str(obs_path)
+        manifest_dict['output_dir'] = str(job_output)
+
+        # Save manifest with paths
+        with open(manifest_path, 'w') as f:
+            json.dump(manifest_dict, f, indent=2)
+
+        # Run ManifestRunner
+        runner = ManifestRunner(manifest_dict)
+        result = runner.run()
+
         duration = time.time() - start
-        
-        return Response(
-            content=result,
-            media_type="application/octet-stream",
-            headers={
-                "X-Compute-Duration": str(duration),
-                "X-Architecture": "stream"
+
+        # List output files
+        output_files = [f.name for f in job_output.glob("*.parquet")]
+
+        return {
+            "status": "complete",
+            "job_id": job_id,
+            "duration_seconds": round(duration, 2),
+            "output_dir": str(job_output),
+            "files": output_files,
+            "file_urls": [f"/results/{job_id}/{f}" for f in output_files],
+        }
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "job_id": job_id,
+                "message": str(e),
             }
         )
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/results/{job_id}/{filename}")
+async def get_result(job_id: str, filename: str):
+    """Download a result parquet file."""
+    # Security: prevent path traversal
+    import os
+    safe_job_id = os.path.basename(job_id)
+    safe_filename = os.path.basename(filename)
+
+    file_path = OUTPUT_DIR / safe_job_id / safe_filename
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+
+    return FileResponse(
+        path=file_path,
+        filename=safe_filename,
+        media_type="application/octet-stream"
+    )
+
+
+@app.get("/jobs")
+async def list_jobs():
+    """List all jobs."""
+    jobs = []
+    for job_dir in sorted(OUTPUT_DIR.iterdir(), reverse=True):
+        if job_dir.is_dir():
+            files = list(job_dir.glob("*.parquet"))
+            jobs.append({
+                "job_id": job_dir.name,
+                "files": [f.name for f in files],
+                "file_count": len(files),
+            })
+    return {"jobs": jobs[:20]}  # Last 20 jobs
 
 
 @app.get("/engines")
 async def list_engines():
     """List available engines."""
-    from prism.engines import core, physics
-
-    core_engines = sorted([e for e in dir(core) if not e.startswith('_')])
-
-    physics_engines = {}
-    for subdir in ['fluids', 'thermal', 'thermo', 'chemical', 'mechanical', 'electrical', 'control', 'process']:
-        mod = getattr(physics, subdir)
-        physics_engines[subdir] = sorted([e for e in dir(mod) if not e.startswith('_')])
+    from prism.python_runner import SIGNAL_ENGINES, PAIR_ENGINES, SYMMETRIC_PAIR_ENGINES, WINDOWED_ENGINES
+    from prism.sql_runner import SQL_ENGINES
 
     return {
-        "core": core_engines,
-        "physics": physics_engines,
-        "total": len(core_engines) + sum(len(v) for v in physics_engines.values())
-    }
-
-
-@app.get("/schema")
-async def output_schema():
-    """Output parquet schema."""
-    return {
-        "columns": {
-            "signal_id": "string",
-            "entity_id": "string (optional)",
-            "hurst": "float64 (optional)",
-            "hurst_r2": "float64 (optional)",
-            "lyapunov": "float64 (optional)",
-            "fft_dominant_freq": "float64 (optional)",
-            "fft_power": "float64 (optional)",
-            "garch_omega": "float64 (optional)",
-            "garch_alpha": "float64 (optional)",
-            "garch_beta": "float64 (optional)",
-            "sample_entropy": "float64 (optional)",
-            "permutation_entropy": "float64 (optional)",
-            "wavelet_energy": "list<float64> (optional)",
-            "rqa_rr": "float64 (optional)",
-            "rqa_det": "float64 (optional)",
-            "rqa_lam": "float64 (optional)"
-        },
-        "note": "Only requested fields are populated. Others NULL."
+        "signal": SIGNAL_ENGINES,
+        "pair": PAIR_ENGINES,
+        "symmetric_pair": SYMMETRIC_PAIR_ENGINES,
+        "windowed": WINDOWED_ENGINES,
+        "sql": SQL_ENGINES,
+        "total": len(SIGNAL_ENGINES) + len(PAIR_ENGINES) + len(SYMMETRIC_PAIR_ENGINES) + len(WINDOWED_ENGINES) + len(SQL_ENGINES)
     }

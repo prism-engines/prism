@@ -2,10 +2,9 @@
 PRISM Server
 ============
 
-HTTP/Lambda handlers for stream compute.
+HTTP handlers for manifest-based compute.
 """
 
-from .handler import stream_compute_sync, lambda_handler
 from .routes import app
 
-__all__ = ['stream_compute_sync', 'lambda_handler', 'app']
+__all__ = ['app']

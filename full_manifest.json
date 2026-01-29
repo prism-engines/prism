@@ -1,0 +1,99 @@
+{
+  "job_id": "full-test-001",
+  "callback_url": null,
+
+  "observations_path": "/path/to/observations.parquet",
+  "output_dir": "/tmp/prism_full_test",
+
+  "engines": {
+    "signal": [
+      "rms",
+      "peak",
+      "crest_factor",
+      "kurtosis",
+      "skewness",
+      "envelope",
+      "harmonics",
+      "frequency_bands",
+      "spectral",
+      "hurst",
+      "entropy",
+      "lyapunov",
+      "garch",
+      "attractor",
+      "dmd"
+    ],
+
+    "pair": [
+      "granger",
+      "transfer_entropy"
+    ],
+
+    "symmetric_pair": [
+      "cointegration",
+      "mutual_info",
+      "correlation"
+    ],
+
+    "windowed": [
+      "derivatives",
+      "manifold",
+      "stability",
+      "rolling_rms",
+      "rolling_kurtosis",
+      "rolling_entropy",
+      "rolling_hurst",
+      "rolling_volatility",
+      "rolling_mean",
+      "rolling_std"
+    ],
+
+    "sql": [
+      "zscore",
+      "statistics",
+      "correlation",
+      "regime_assignment"
+    ]
+  },
+
+  "params": {
+    "harmonics": {
+      "sample_rate": 12000
+    },
+    "frequency_bands": {
+      "sample_rate": 12000,
+      "bands": {
+        "low": [0, 500],
+        "mid": [500, 2000],
+        "high": [2000, 6000]
+      }
+    },
+    "rolling_rms": {
+      "window": 500
+    },
+    "rolling_kurtosis": {
+      "window": 500
+    },
+    "rolling_entropy": {
+      "window": 500
+    },
+    "rolling_hurst": {
+      "window": 500
+    },
+    "rolling_volatility": {
+      "window": 500
+    },
+    "rolling_mean": {
+      "window": 100
+    },
+    "rolling_std": {
+      "window": 100
+    },
+    "granger": {
+      "max_lag": 10
+    },
+    "manifold": {
+      "n_components": 3
+    }
+  }
+}
