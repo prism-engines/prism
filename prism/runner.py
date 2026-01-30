@@ -211,7 +211,7 @@ class ManifestRunner:
         obs_enriched_path = self.output_dir / 'observations_enriched.parquet'
 
         try:
-            from prism.engines.signal.physics import compute_physics_for_all_entities
+            from prism.engines.signal.physics_stack import compute_physics_for_all_entities
 
             physics_params = self.params.get('physics', {})
 

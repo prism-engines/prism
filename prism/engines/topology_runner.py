@@ -49,7 +49,7 @@ def run_topology(obs: pl.DataFrame, output_dir: Path, params: Dict[str, Any] = N
                 entity_obs
                 .filter(pl.col('signal_id') == signal_id)
                 .sort('I')
-                .select('value')
+                .select('y')
                 .to_series()
                 .to_numpy()
             )
