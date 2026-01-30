@@ -292,7 +292,8 @@ class PythonRunner:
         if 'manifold' in engines_to_run:
             try:
                 from prism.engines.rolling import manifold
-                self.manifold_df = manifold.compute(self.obs)
+                manifold_params = self.params.get('manifold', {})
+                self.manifold_df = manifold.compute(self.obs, manifold_params)
                 print(f"  Manifold: {len(self.manifold_df):,} points")
             except Exception as e:
                 print(f"  Manifold failed: {e}")
@@ -305,7 +306,8 @@ class PythonRunner:
             if func:
                 engine_funcs[name] = func
 
-        for (entity, signal), data in self.signal_data.items():
+        total_signals = len(self.signal_data)
+        for idx, ((entity, signal), data) in enumerate(self.signal_data.items()):
             y = data['y']
             I = data['I']
             df = data['df'].copy()
@@ -313,22 +315,26 @@ class PythonRunner:
             if len(y) < 10:
                 continue
 
+            # Progress update every 10%
+            if idx % max(1, total_signals // 10) == 0:
+                print(f"    Progress: {idx}/{total_signals} signals ({100*idx/total_signals:.0f}%)", flush=True)
+
             for name, func in engine_funcs.items():
                 try:
-                    params = self.params.get(name, {})
+                    engine_params = self.params.get(name, {})
 
                     # Derivatives needs I
                     if name == 'derivatives':
-                        result = func(y, I)
+                        result = func(y, I, engine_params)
                     # Stability needs derivatives first
                     elif name == 'stability':
                         from prism.engines.rolling import derivatives
-                        deriv = derivatives.compute(y, I)
-                        result = func(y, deriv['dy'], deriv['d2y'])
-                    elif params:
-                        result = func(y, **params)
+                        deriv_params = self.params.get('derivatives', {})
+                        deriv = derivatives.compute(y, I, deriv_params)
+                        result = func(y, deriv['dy'], deriv['d2y'], engine_params)
                     else:
-                        result = func(y)
+                        # All other windowed engines: func(y, params)
+                        result = func(y, engine_params)
 
                     for col, vals in result.items():
                         df[col] = vals

@@ -2,32 +2,41 @@
 Rolling Crest Factor Engine.
 
 Crest factor over sliding window - detects impulsive events.
+All parameters from manifest via params dict.
 """
 
 import numpy as np
+from typing import Dict, Any
 
 
-def compute(y: np.ndarray, window: int = 100) -> dict:
+def compute(y: np.ndarray, params: Dict[str, Any] = None) -> dict:
     """
     Compute rolling crest factor.
 
     Args:
         y: Signal values
-        window: Window size
+        params: Parameters from manifest:
+            - window: Window size
+            - stride: Step size between windows
 
     Returns:
         dict with 'rolling_crest_factor' array
     """
+    params = params or {}
+    window = params.get('window', 100)
+    # Cheap engine (O(n)): stride=1 is acceptable default
+    stride = params.get('stride', 1)
+
     n = len(y)
     result = np.full(n, np.nan)
 
     if n < window:
         return {'rolling_crest_factor': result}
 
-    for i in range(window, n):
-        chunk = y[i-window:i]
+    for i in range(0, n - window + 1, stride):
+        chunk = y[i:i + window]
         rms = np.sqrt(np.mean(chunk ** 2))
         peak = np.max(np.abs(chunk))
-        result[i] = peak / (rms + 1e-10)
+        result[i + window - 1] = peak / (rms + 1e-10)
 
     return {'rolling_crest_factor': result}

@@ -2,24 +2,30 @@
 Manifold Engine.
 
 Computes PCA projection at every time slice (cross-signal).
+All parameters from manifest via params dict.
 """
 
 import numpy as np
 import pandas as pd
+from typing import Dict, Any
 from sklearn.decomposition import PCA
 
 
-def compute(observations: pd.DataFrame, n_components: int = 3) -> pd.DataFrame:
+def compute(observations: pd.DataFrame, params: Dict[str, Any] = None) -> pd.DataFrame:
     """
     Compute manifold projection at each time slice.
 
     Args:
         observations: DataFrame with entity_id, signal_id, I, y columns
-        n_components: Number of PCA components
+        params: Parameters from manifest:
+            - n_components: Number of PCA components (default: 3)
 
     Returns:
         DataFrame with manifold_x, manifold_y, manifold_z, manifold_velocity, manifold_acceleration
     """
+    params = params or {}
+    n_components = params.get('n_components', 3)
+
     results = []
 
     for entity_id, group in observations.groupby('entity_id'):
