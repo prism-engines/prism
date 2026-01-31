@@ -2,7 +2,7 @@
 -- Correlation Engine (SQL)
 -- =============================================================================
 -- Computes pairwise Pearson correlation between all signal pairs per entity.
--- Input: observations table with (entity_id, signal_id, I, y)
+-- Input: observations table with (entity_id, signal_id, I, value)
 -- Output: correlation matrix as (entity_id, signal_a, signal_b, correlation)
 -- =============================================================================
 
@@ -22,8 +22,8 @@ aligned AS (
         sp.signal_a,
         sp.signal_b,
         a.I,
-        a.y AS y_a,
-        b.y AS y_b
+        a.value AS value_a,
+        b.value AS value_b
     FROM signal_pairs sp
     INNER JOIN observations a
         ON sp.entity_id = a.entity_id
@@ -37,7 +37,7 @@ SELECT
     entity_id,
     signal_a,
     signal_b,
-    CORR(y_a, y_b) AS correlation,
+    CORR(value_a, value_b) AS correlation,
     COUNT(*) AS n_points
 FROM aligned
 GROUP BY entity_id, signal_a, signal_b

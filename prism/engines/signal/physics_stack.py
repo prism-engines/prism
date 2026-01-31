@@ -23,7 +23,7 @@ warnings.filterwarnings('ignore', category=RuntimeWarning)
 # METRIC DETECTION
 # ============================================================
 
-EXCLUDE_COLUMNS = {'entity_id', 'signal_id', 'I', 'y', 'unit', 'timestamp'}
+EXCLUDE_COLUMNS = {'entity_id', 'signal_id', 'I', 'value', 'unit', 'timestamp'}
 
 PREFERRED_STATE_METRICS = [
     'rolling_hurst', 'rolling_entropy', 'rolling_kurtosis',

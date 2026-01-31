@@ -58,7 +58,7 @@ def process_entity_information_flow(
             entity_obs
             .filter(pl.col('signal_id') == signal_id)
             .sort('I')
-            .select('y')
+            .select('value')
             .to_series()
             .to_numpy()
         )
@@ -169,7 +169,7 @@ def run_information_flow(
     For parallel execution, use process_entity_information_flow with joblib from orchestrator.
 
     Args:
-        obs: Observations with entity_id, signal_id, I, y
+        obs: Observations with entity_id, signal_id, I, value
         output_dir: Where to write information_flow.parquet
         params: Optional parameters (max_lag, te_bins, etc.)
 
