@@ -1,9 +1,15 @@
 # PRISM Canonical Schema v2.0.0
 # ==============================
 #
-# BREAKING CHANGE: entity_id → unit_id (now OPTIONAL)
-#
 # THIS IS THE SINGLE SOURCE OF TRUTH.
+#
+# BREAKING CHANGE: entity_id → unit_id (OPTIONAL)
+#
+# All validators read from this file:
+# - ORTHON: data_confirmation.py
+# - PRISM: data_check.py
+# - Website: AI upload validation
+# - Claude: Integration instructions
 
 version: "2.0.0"
 name: "PRISM Observations Schema"
@@ -61,7 +67,7 @@ columns:
     constraints:
       - "Sequential integers starting at 0"
       - "Resets for each unit+signal combination"
-      - "No gaps (0,1,2,3... not 0,10,20,30...)"
+      - "No gaps"
     examples: [0, 1, 2, 3, 4]
 
   value:
@@ -108,25 +114,25 @@ validation_rules:
     severity: "error"
     check: "Columns have correct types"
     rules:
-      unit_id: "string (if present)"
       signal_id: "string"
       I: "integer (uint32, uint64, int32, int64)"
       value: "float (float32, float64)"
+      unit_id: "string (if present)"
 
-  - id: "NO_NULLS_IN_KEYS"
+  - id: "NO_NULLS_IN_REQUIRED"
     severity: "error"
-    check: "No null values in signal_id or I"
+    check: "No null values in signal_id, I"
     columns: ["signal_id", "I"]
 
   - id: "I_SEQUENTIAL"
     severity: "error"
-    check: "I is sequential 0,1,2,3... per unit/signal"
-    test: "max(I) - min(I) + 1 == count(I) for each unit/signal group"
+    check: "I is sequential 0,1,2,3... per unit+signal"
+    test: "max(I) - min(I) + 1 == count(I) for each group"
 
   - id: "I_STARTS_ZERO"
     severity: "error"
-    check: "I starts at 0 for each unit"
-    test: "min(I) == 0 for each unit"
+    check: "I starts at 0 for each unit+signal group"
+    test: "min(I) == 0 for each group"
 
   - id: "MIN_SIGNALS"
     severity: "error"
@@ -136,53 +142,70 @@ validation_rules:
 
   - id: "MIN_OBSERVATIONS"
     severity: "warning"
-    check: "Each unit/signal has >= 50 observations"
-    test: "count(*) >= 50 for each unit/signal group"
+    check: "Each signal has >=50 observations"
+    test: "count(*) >= 50 for each signal group"
     message: "Some engines may produce NaN with insufficient data"
 
 # =============================================================================
-# EXAMPLES
+# EXAMPLE VALID DATA
 # =============================================================================
 
 example_valid:
   description: "Correctly formatted observations"
   data: |
-    unit_id | signal_id | I | value
-    --------|-----------|---|------
-    pump_1  | temp      | 0 | 25.3
-    pump_1  | temp      | 1 | 25.4
-    pump_1  | pressure  | 0 | 101.2
-    pump_1  | pressure  | 1 | 101.3
-            | temp      | 0 | 30.1    ← blank unit_id is fine
-            | pressure  | 0 | 99.8
+    unit_id   | signal_id | I | value
+    ----------|-----------|---|------
+    pump_1    | temp      | 0 | 25.3
+    pump_1    | temp      | 1 | 25.4
+    pump_1    | pressure  | 0 | 101.2
+    pump_1    | pressure  | 1 | 101.3
 
-example_invalid:
-  - problem: "Sparse I values"
-    fix: "Reindex I to be sequential 0,1,2,3..."
-
-  - problem: "Only 1 signal"
-    fix: "Include additional signals for pair engines"
-
-  - problem: "I doesn't start at 0"
-    fix: "Subtract min(I) per unit to start at 0"
+    # unit_id can also be blank:
+              | temp      | 0 | 25.3
+              | temp      | 1 | 25.4
+              | pressure  | 0 | 101.2
+              | pressure  | 1 | 101.3
 
 # =============================================================================
-# SUMMARY
+# OUTPUTS
+# =============================================================================
+
+outputs:
+  description: "PRISM produces these files when given valid input"
+  files:
+    - name: "primitives.parquet"
+      description: "Signal-level metrics"
+    - name: "primitives_pairs.parquet"
+      description: "Directed pair metrics"
+    - name: "geometry.parquet"
+      description: "Symmetric pair metrics"
+    - name: "topology.parquet"
+      description: "Betti numbers, persistence"
+    - name: "dynamics.parquet"
+      description: "Lyapunov, RQA, Hurst"
+    - name: "information_flow.parquet"
+      description: "Transfer entropy, Granger"
+    - name: "observations_enriched.parquet"
+      description: "Rolling window metrics"
+    - name: "physics.parquet"
+      description: "Energy, entropy metrics"
+
+# =============================================================================
+# HUMAN READABLE SUMMARY
 # =============================================================================
 
 summary: |
-  PRISM expects observations.parquet with columns:
+  PRISM expects observations.parquet with these columns:
 
   REQUIRED:
-  - signal_id (string): What signal? (temp, pressure, acc_x)
-  - I (integer): Observation number 0,1,2,3... per unit/signal
+  - signal_id (string): What is being measured
+  - I (integer): Index 0,1,2,3... per signal
   - value (float): The measurement
 
   OPTIONAL:
-  - unit_id (string): A label for grouping. Blank is fine.
+  - unit_id (string): A label for grouping (blank is fine)
 
   Rules:
   - I must be sequential (0,1,2,3...) not sparse
-  - Need at least 2 signals for pair calculations
-  - No nulls in signal_id or I
-  - unit_id can be anything or blank - it's just a tag
+  - At least 2 signals for pair calculations
+  - unit_id is OPTIONAL - just a tag for SQL later
