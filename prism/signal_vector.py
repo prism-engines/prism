@@ -189,6 +189,10 @@ class SignalVectorRunner:
         obs_pd = self.observations.to_pandas()
 
         for (unit_id, signal_id), group in obs_pd.groupby(['unit_id', 'signal_id']):
+            # Skip null signal_id (unit_id can be null, signal_id cannot)
+            if signal_id is None or pd.isna(signal_id):
+                continue
+
             if signal_id not in active_signals:
                 continue  # Skip constant signals
 

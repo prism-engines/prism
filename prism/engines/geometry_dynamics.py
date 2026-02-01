@@ -588,6 +588,10 @@ def compute_signal_dynamics(
 
     processed = 0
     for (unit_id, signal_name), group in groups:
+        # Skip null signal_id (unit_id can be null, signal_id cannot)
+        if signal_name is None:
+            continue
+
         # Sort by I
         group = group.sort('I')
 

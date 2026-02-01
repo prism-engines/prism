@@ -143,6 +143,10 @@ class PythonRunner:
     def _index_signals(self):
         """Index all signals by (unit_id, signal_id)."""
         for (entity, signal), group in self.obs.groupby(['unit_id', 'signal_id']):
+            # Skip null signal_id (unit_id can be null, signal_id cannot)
+            if signal is None or pd.isna(signal):
+                continue
+
             sorted_group = group.sort_values('I')
             self.signal_data[(entity, signal)] = {
                 'I': sorted_group['I'].values,
