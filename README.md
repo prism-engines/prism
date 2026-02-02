@@ -107,19 +107,19 @@ observations.parquet (raw signals)
 
 ---
 
-## Input Schema (v2.0)
+## Input Schema (v2.1)
 
 ```
 observations.parquet
-├── signal_id  (str)     # Required: signal name
-├── I          (UInt32)  # Required: sequential index 0,1,2... per signal_id
+├── cohort     (str)     # Optional: grouping key (engine_1, pump_A) - cargo only
+├── signal_id  (str)     # Required: signal name (temp, pressure, sensor_01)
+├── I          (UInt32)  # Required: sequential index 0,1,2... per (cohort, signal_id)
 ├── value      (Float64) # Required: measurement
-└── unit_id    (str)     # Optional: pass-through label (cargo only)
 ```
 
-**I is canonical.** Sequential integers per signal_id. Not timestamps.
+**I is canonical.** Sequential integers per (cohort, signal_id). Not timestamps.
 
-**unit_id is cargo.** Passes through, has ZERO effect on compute.
+**cohort is cargo.** Passes through, has ZERO effect on compute. Unique time series = (cohort, signal_id).
 
 ---
 
@@ -241,8 +241,8 @@ prism/
 2. **Typology lives in ORTHON** - PRISM receives manifest.yaml
 3. **state_vector = centroid, state_geometry = eigenvalues** - separate concerns
 4. **Scale-invariant features only** - no absolute values
-5. **I is canonical** - sequential per signal_id, not timestamps
-6. **unit_id is cargo** - never in groupby
+5. **I is canonical** - sequential per (cohort, signal_id), not timestamps
+6. **cohort is cargo** - never in groupby, unique series = (cohort, signal_id)
 
 ---
 
@@ -251,7 +251,7 @@ prism/
 - Put classification logic in PRISM
 - Compute eigenvalues in state_vector (they belong in state_geometry)
 - Use deprecated scale-dependent engines
-- Include unit_id in groupby operations
+- Include cohort in groupby operations
 - Create typology in PRISM (ORTHON's job)
 
 ---

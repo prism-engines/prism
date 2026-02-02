@@ -103,29 +103,30 @@ observations.parquet
 
 ---
 
-## Input: observations.parquet (Schema v2.0)
+## Input: observations.parquet (Schema v2.1)
 
 ### Required Columns
 | Column | Type | Description |
 |--------|------|-------------|
-| signal_id | str | What signal (temp, pressure, etc.) |
-| I | UInt32 | Sequential index 0,1,2,3... per signal_id |
+| signal_id | str | What signal (temp, pressure, sensor_01) |
+| I | UInt32 | Sequential index 0,1,2,3... per (cohort, signal_id) |
 | value | Float64 | The measurement |
 
 ### Optional Columns
 | Column | Type | Description |
 |--------|------|-------------|
-| unit_id | str | Pass-through label (cargo only) |
+| cohort | str | Grouping key (engine_1, pump_A) - pass-through cargo |
 
 ### I is Canonical
 
 ```
 CORRECT:
-signal_id | I | value
-----------|---|------
-temp      | 0 | 45.2
-temp      | 1 | 45.4
-temp      | 2 | 45.6
+cohort   | signal_id | I | value
+---------|-----------|---|------
+engine_1 | temp      | 0 | 45.2
+engine_1 | temp      | 1 | 45.4
+engine_1 | pressure  | 0 | 101.3
+engine_2 | temp      | 0 | 45.8
 
 WRONG (timestamps):
 signal_id | I          | value
@@ -133,13 +134,14 @@ signal_id | I          | value
 temp      | 1596760568 | 45.2
 ```
 
-### unit_id is Cargo
+### cohort is Cargo
 
-**unit_id has ZERO effect on compute.**
+**cohort has ZERO effect on compute.**
 
-- DO NOT include unit_id in groupby operations
+- DO NOT include cohort in groupby operations
 - Group by I or signal_id only
-- unit_id passes through for ORTHON reporting
+- cohort passes through for ORTHON reporting
+- Unique time series = (cohort, signal_id) tuple
 
 ---
 
@@ -203,7 +205,7 @@ python -m prism sql data/cmapss
 3. **state_vector = centroid, state_geometry = eigenvalues**
 4. **Scale-invariant features only**
 5. **I is canonical** (sequential, not timestamps)
-6. **unit_id is cargo** (never in groupby)
+6. **cohort is cargo** (never in groupby)
 7. **No classification in PRISM** (no labels, no thresholds)
 
 ---
@@ -213,7 +215,7 @@ python -m prism sql data/cmapss
 - Compute eigenvalues in state_vector.py
 - Put classification logic in PRISM
 - Create typology in PRISM
-- Include unit_id in groupby
+- Include cohort in groupby
 - Use scale-dependent engines (rms, peak, mean, std)
 - Return labels from PRISM ("chaotic", "stable", etc.)
 
