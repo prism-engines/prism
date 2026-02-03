@@ -1,43 +1,82 @@
 """
-PRISM Engines — DEPRECATED
-===========================
+PRISM Engines
+=============
 
-This module is a backward-compatibility redirect.
-Use the pipeline-stage modules directly:
+Flat directory containing all compute engines.
 
-    prism.signal_vector.signal    — per-signal engines
-    prism.signal_vector.rolling   — rolling window engines
-    prism.signal_vector.sql       — SQL engines
-    prism.state_vector            — state + geometry
-    prism.geometry_pairwise       — pair engines
-    prism.geometry_laplace        — dynamics engines
+Stage 1 - Signal Vector:
+    signal/      - Per-signal engines (kurtosis, entropy, lyapunov, etc.)
+    rolling/     - Rolling window engines
+    sql/         - SQL-based engines
 
-This redirect will be removed in a future version.
+Stage 2 - State Vector:
+    state_vector.py      - Centroid computation (WHERE)
+    state_geometry.py    - Eigenvalue computation (SHAPE)
+    signal_geometry.py   - Signal-to-centroid distances
+
+Stage 3 - Pairwise:
+    signal_pairwise.py   - Signal-to-signal relationships
+    granger.py           - Granger causality
+    transfer_entropy.py  - Transfer entropy
+    correlation.py       - Correlation computation
+    mutual_info.py       - Mutual information
+    cointegration.py     - Cointegration tests
+
+Stage 4 - Dynamics:
+    geometry_dynamics.py         - Derivatives of geometry
+    lyapunov_engine.py           - Lyapunov exponents
+    dynamics_runner.py           - RQA, attractor reconstruction
+    information_flow_runner.py   - Transfer entropy networks
 """
 
-import warnings
+# Stage 2 - State Vector
+from prism.engines.state_vector import compute_state_vector, compute_centroid
+from prism.engines.state_geometry import compute_state_geometry, compute_eigenvalues
+from prism.engines.signal_geometry import compute_signal_geometry
 
-warnings.warn(
-    "prism.engines is deprecated. "
-    "Use prism.signal_vector, prism.state_vector, "
-    "prism.geometry_pairwise, prism.geometry_laplace instead.",
-    DeprecationWarning,
-    stacklevel=2,
+# Stage 3 - Pairwise
+from prism.engines.signal_pairwise import compute_signal_pairwise
+
+# Stage 4 - Dynamics
+from prism.engines.geometry_dynamics import (
+    compute_geometry_dynamics,
+    compute_signal_dynamics,
+    compute_pairwise_dynamics,
+    compute_all_dynamics,
+    compute_derivatives,
 )
+from prism.engines.lyapunov_engine import compute_lyapunov, compute_lyapunov_for_signal_vector
+from prism.engines.dynamics_runner import run_dynamics, process_entity_dynamics
+from prism.engines.information_flow_runner import run_information_flow, process_entity_information_flow
 
+# Submodules
+from prism.engines import signal
+from prism.engines import rolling
+from prism.engines import sql
 
-def __getattr__(name):
-    """Redirect old imports to new locations."""
-    if name == 'signal':
-        from prism.signal_vector import signal
-        return signal
-    elif name == 'rolling':
-        from prism.signal_vector import rolling
-        return rolling
-    elif name == 'sql':
-        from prism.signal_vector import sql
-        return sql
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-__all__ = ['signal', 'rolling', 'sql']
+__all__ = [
+    # State Vector
+    'compute_state_vector',
+    'compute_centroid',
+    'compute_state_geometry',
+    'compute_eigenvalues',
+    'compute_signal_geometry',
+    # Pairwise
+    'compute_signal_pairwise',
+    # Dynamics
+    'compute_geometry_dynamics',
+    'compute_signal_dynamics',
+    'compute_pairwise_dynamics',
+    'compute_all_dynamics',
+    'compute_derivatives',
+    'compute_lyapunov',
+    'compute_lyapunov_for_signal_vector',
+    'run_dynamics',
+    'process_entity_dynamics',
+    'run_information_flow',
+    'process_entity_information_flow',
+    # Submodules
+    'signal',
+    'rolling',
+    'sql',
+]

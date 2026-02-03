@@ -19,12 +19,7 @@ from . import garch
 from . import attractor
 from . import dmd
 from . import spectral
-from . import granger
-from . import transfer_entropy
-from . import cointegration
-from . import mutual_info
-from . import correlation
-# New engines
+from . import physics_stack
 from . import pulsation_index
 from . import rate_of_change
 from . import time_constant
@@ -48,12 +43,7 @@ __all__ = [
     'attractor',
     'dmd',
     'spectral',
-    'granger',
-    'transfer_entropy',
-    'cointegration',
-    'mutual_info',
-    'correlation',
-    # New engines
+    'physics_stack',
     'pulsation_index',
     'rate_of_change',
     'time_constant',

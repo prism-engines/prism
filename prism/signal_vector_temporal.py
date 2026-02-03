@@ -269,9 +269,18 @@ def compute_signal_vector_temporal(
         print(f"Value column: {value_col}")
 
     # Get active signals (not constant)
-    active_signals = typology.filter(
-        ~pl.col('is_constant')
-    )[typology_signal_col].unique().to_list()
+    # Check which column identifies constant signals
+    if 'is_constant' in typology.columns:
+        active_signals = typology.filter(
+            ~pl.col('is_constant')
+        )[typology_signal_col].unique().to_list()
+    elif 'signal_std' in typology.columns:
+        active_signals = typology.filter(
+            pl.col('signal_std') > 1e-10
+        )[typology_signal_col].unique().to_list()
+    else:
+        # No filter available, include all
+        active_signals = typology[typology_signal_col].unique().to_list()
 
     if verbose:
         print(f"Active signals: {len(active_signals)}")
@@ -415,17 +424,40 @@ def compute_signal_vector_temporal_sql(
     signal_col = 'signal_id' if 'signal_id' in cols else 'signal_id'
     value_col = 'value' if 'value' in cols else 'y'
 
+    # Detect unit_id column (optional per CLAUDE.md - may be 'cohort' or absent)
+    if 'unit_id' in cols:
+        unit_col = 'unit_id'
+    elif 'cohort' in cols:
+        unit_col = 'cohort'
+    else:
+        unit_col = None
+
+    # Check which column identifies constant signals
+    typology_cols = con.execute("SELECT * FROM typology LIMIT 1").pl().columns
+
+    # Build filter for active (non-constant) signals
+    if 'is_constant' in typology_cols:
+        constant_filter = "is_constant = FALSE"
+    elif 'signal_std' in typology_cols:
+        constant_filter = "signal_std > 1e-10"  # Non-zero variance = not constant
+    else:
+        constant_filter = "1=1"  # No filter available, include all
+
+    # Build unit_id select and partition clauses
+    unit_select = f"o.{unit_col} AS unit_id," if unit_col else "'default' AS unit_id,"
+    unit_partition = f"o.{unit_col}, " if unit_col else ""
+
     # SQL with window functions
     sql = f"""
     WITH active_signals AS (
-        SELECT DISTINCT {signal_col} as signal_id
+        SELECT DISTINCT signal_id
         FROM typology
-        WHERE is_constant = FALSE
+        WHERE {constant_filter}
     ),
 
     windowed AS (
         SELECT
-            o.unit_id,
+            {unit_select}
             o.I,
             o.{signal_col} AS signal_id,
             o.{value_col} AS value,
@@ -445,7 +477,7 @@ def compute_signal_vector_temporal_sql(
         FROM observations o
         INNER JOIN active_signals a ON o.{signal_col} = a.signal_id
         WINDOW w AS (
-            PARTITION BY o.unit_id, o.{signal_col}
+            PARTITION BY {unit_partition}o.{signal_col}
             ORDER BY o.I
             ROWS BETWEEN {window_size // 2} PRECEDING AND {window_size // 2} FOLLOWING
         )

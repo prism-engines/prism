@@ -41,7 +41,7 @@ def run_signal_vector(data_dir: Path, temporal: bool = True) -> dict:
     output_path = data_dir / 'signal_vector.parquet'
 
     if temporal:
-        from prism.signal_vector.runner import compute_signal_vector_temporal_sql
+        from prism.signal_vector_temporal import compute_signal_vector_temporal_sql
         print(f"[SIGNAL VECTOR] → {output_path}")
         result = compute_signal_vector_temporal_sql(
             str(obs_path), str(typology_path), str(output_path)
@@ -57,7 +57,7 @@ def run_signal_vector(data_dir: Path, temporal: bool = True) -> dict:
 
 def run_state_vector(data_dir: Path) -> dict:
     """Run state vector."""
-    from prism.state_vector.state_vector import compute_state_vector
+    from prism.engines.state_vector import compute_state_vector
 
     signal_vector_path = data_dir / 'signal_vector.parquet'
     typology_path = data_dir / 'typology.parquet'
@@ -79,7 +79,7 @@ def run_geometry(data_dir: Path) -> dict:
 
     # State geometry (eigenvalues)
     print(f"[STATE GEOMETRY]")
-    from prism.state_vector.state_geometry import compute_state_geometry
+    from prism.engines.state_geometry import compute_state_geometry
     try:
         state_geom = compute_state_geometry(
             str(signal_vector_path), str(state_vector_path),
@@ -92,7 +92,7 @@ def run_geometry(data_dir: Path) -> dict:
 
     # Signal geometry
     print(f"[SIGNAL GEOMETRY]")
-    from prism.state_vector.signal_geometry import compute_signal_geometry
+    from prism.engines.signal_geometry import compute_signal_geometry
     try:
         sig_geom = compute_signal_geometry(
             str(signal_vector_path), str(state_vector_path),
@@ -105,7 +105,7 @@ def run_geometry(data_dir: Path) -> dict:
 
     # Signal pairwise
     print(f"[SIGNAL PAIRWISE]")
-    from prism.geometry_pairwise.signal_pairwise import compute_signal_pairwise
+    from prism.engines.signal_pairwise import compute_signal_pairwise
     try:
         sig_pair = compute_signal_pairwise(
             str(signal_vector_path), str(state_vector_path),
@@ -121,7 +121,7 @@ def run_geometry(data_dir: Path) -> dict:
 
 def run_geometry_dynamics(data_dir: Path) -> dict:
     """Run geometry dynamics pipeline."""
-    from prism.geometry_laplace.geometry_dynamics import compute_all_dynamics
+    from prism.engines.geometry_dynamics import compute_all_dynamics
 
     state_geometry_path = data_dir / 'state_geometry.parquet'
     signal_geometry_path = data_dir / 'signal_geometry.parquet'
@@ -152,7 +152,7 @@ def run_geometry_dynamics(data_dir: Path) -> dict:
 
 def run_lyapunov(data_dir: Path) -> dict:
     """Run Lyapunov engine."""
-    from prism.geometry_laplace.lyapunov_engine import compute_lyapunov_for_signal_vector
+    from prism.engines.lyapunov_engine import compute_lyapunov_for_signal_vector
 
     signal_vector_path = data_dir / 'signal_vector.parquet'
     observations_path = data_dir / 'observations.parquet'
@@ -175,8 +175,8 @@ def run_lyapunov(data_dir: Path) -> dict:
 def run_dynamics(data_dir: Path) -> dict:
     """Run dynamics engines."""
     import polars as pl
-    from prism.geometry_laplace.dynamics_runner import run_dynamics
-    from prism.geometry_laplace.information_flow_runner import run_information_flow
+    from prism.engines.dynamics_runner import run_dynamics
+    from prism.engines.information_flow_runner import run_information_flow
 
     obs = pl.read_parquet(data_dir / 'observations.parquet')
 

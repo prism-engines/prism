@@ -125,13 +125,26 @@ def compute_state_vector(
     typology = pl.read_parquet(typology_path)
 
     # Get active signals (non-constant)
-    active_signals = (
-        typology
-        .filter(pl.col('is_constant') == False)
-        .select('signal_id')
-        .to_series()
-        .to_list()
-    )
+    # Check which column identifies constant signals
+    if 'is_constant' in typology.columns:
+        active_signals = (
+            typology
+            .filter(pl.col('is_constant') == False)
+            .select('signal_id')
+            .to_series()
+            .to_list()
+        )
+    elif 'signal_std' in typology.columns:
+        active_signals = (
+            typology
+            .filter(pl.col('signal_std') > 1e-10)
+            .select('signal_id')
+            .to_series()
+            .to_list()
+        )
+    else:
+        # No filter available, include all
+        active_signals = typology['signal_id'].unique().to_list()
 
     # Filter to active signals
     signal_col = 'signal_id' if 'signal_id' in signal_vector.columns else 'signal_name'
