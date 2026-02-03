@@ -109,34 +109,28 @@ def validate_engine_can_run(engine_name: str, window_size: int) -> bool:
 
 
 def group_engines_by_window(
-    engines: Dict[str, Callable],
+    engines: List[str],
     overrides: Dict[str, int],
     default_window: int,
-) -> Dict[int, Dict[str, Callable]]:
+) -> Dict[int, List[str]]:
     """
     Group engines by their required window size.
 
     Args:
-        engines: Dict of {engine_name: engine_function}
+        engines: List of engine names
         overrides: Dict of {engine_name: window_size} from manifest
         default_window: System default window size
 
     Returns:
-        dict: {window_size: {engine_name: engine_function}}
+        dict: {window_size: [engine_list]}
     """
-    groups: Dict[int, Dict[str, Callable]] = {}
+    groups: Dict[int, List[str]] = {}
 
-    for engine_name, engine_fn in engines.items():
-        # Check manifest override first, then engine requirements, then default
-        if engine_name in overrides:
-            window = overrides[engine_name]
-        else:
-            min_required = get_engine_min_samples(engine_name)
-            window = max(default_window, min_required)
-
+    for engine in engines:
+        window = overrides.get(engine, default_window)
         if window not in groups:
-            groups[window] = {}
-        groups[window][engine_name] = engine_fn
+            groups[window] = []
+        groups[window].append(engine)
 
     return groups
 
@@ -221,6 +215,81 @@ def _load_engine_registry() -> Dict[str, Callable]:
     }
 
 
+# Global engine registry (loaded once)
+_ENGINE_REGISTRY: Dict[str, Callable] = None
+
+
+def _get_engine_registry() -> Dict[str, Callable]:
+    """Get or load the engine registry."""
+    global _ENGINE_REGISTRY
+    if _ENGINE_REGISTRY is None:
+        _ENGINE_REGISTRY = _load_engine_registry()
+    return _ENGINE_REGISTRY
+
+
+def get_signal_data(
+    observations: pl.DataFrame,
+    cohort_name: str,
+    signal_id: str,
+) -> np.ndarray:
+    """
+    Extract signal data from observations.
+
+    Args:
+        observations: Observations DataFrame
+        cohort_name: Cohort name (unused, signals identified by signal_id)
+        signal_id: Signal identifier
+
+    Returns:
+        numpy array of signal values sorted by I
+    """
+    signal_data = (
+        observations
+        .filter(pl.col('signal_id') == signal_id)
+        .sort('I')
+    )
+    return signal_data['value'].to_numpy()
+
+
+def run_engine(engine_name: str, window_data: np.ndarray) -> Dict[str, Any]:
+    """
+    Run a single engine on window data.
+
+    Args:
+        engine_name: Name of the engine
+        window_data: numpy array of window values
+
+    Returns:
+        Dict of {output_key: value}
+    """
+    registry = _get_engine_registry()
+    if engine_name not in registry:
+        return {}
+    return registry[engine_name](window_data)
+
+
+def null_output_for_engine(engine_name: str) -> Dict[str, float]:
+    """
+    Get NaN output for an engine that can't run (insufficient data).
+
+    Args:
+        engine_name: Name of the engine
+
+    Returns:
+        Dict of {output_key: np.nan}
+    """
+    registry = _get_engine_registry()
+    if engine_name not in registry:
+        return {}
+
+    try:
+        # Call with minimal data to get output structure
+        sample_output = registry[engine_name](np.array([0.0, 0.0, 0.0, 0.0]))
+        return {k: np.nan for k in sample_output.keys()}
+    except Exception:
+        return {}
+
+
 def _validate_engines(
     engine_names: List[str],
     registry: Dict[str, Callable]
@@ -253,6 +322,76 @@ def _diagnose_manifest_engines(
     }
 
 
+def compute_signal_vector(
+    observations: pl.DataFrame,
+    manifest: Dict[str, Any],
+) -> pl.DataFrame:
+    """
+    Compute signal vector with per-engine window support.
+
+    This is the core computation function that processes observations
+    according to the manifest specification.
+
+    Args:
+        observations: Observations DataFrame with signal_id, I, value columns
+        manifest: Manifest dict with system, cohorts, engine_windows sections
+
+    Returns:
+        DataFrame with computed features per signal per window
+    """
+    system_window = manifest['system']['window']
+    system_stride = manifest['system']['stride']
+    engine_windows = manifest.get('engine_windows', {})
+
+    results = []
+
+    for cohort_name, cohort_config in manifest['cohorts'].items():
+        for signal_id, signal_config in cohort_config.items():
+            if not isinstance(signal_config, dict):
+                continue
+
+            signal_data = get_signal_data(observations, cohort_name, signal_id)
+            engines = signal_config.get('engines', [])
+            overrides = signal_config.get('engine_window_overrides', {})
+
+            if not engines or len(signal_data) == 0:
+                continue
+
+            # Group engines by window requirement
+            engine_groups = group_engines_by_window(engines, overrides, system_window)
+
+            # Compute windows at system stride
+            for window_end in range(system_window - 1, len(signal_data), system_stride):
+                row = {
+                    'signal_id': signal_id,
+                    'I': window_end,
+                }
+
+                # Run each engine group with appropriate window
+                for window_size, engine_list in engine_groups.items():
+                    window_start = max(0, window_end - window_size + 1)
+
+                    # Skip if not enough data for this window
+                    if window_end - window_start + 1 < window_size:
+                        # Fill with NaN for these engines
+                        for engine in engine_list:
+                            row.update(null_output_for_engine(engine))
+                        continue
+
+                    window_data = signal_data[window_start:window_end + 1]
+
+                    for engine in engine_list:
+                        try:
+                            engine_output = run_engine(engine, window_data)
+                            row.update(engine_output)
+                        except Exception:
+                            row.update(null_output_for_engine(engine))
+
+                results.append(row)
+
+    return pl.DataFrame(results) if results else pl.DataFrame()
+
+
 def run(
     observations_path: str,
     output_path: str,
@@ -276,13 +415,8 @@ def run(
     """
     _validate_manifest(manifest)
 
-    # Get defaults from params
-    params = manifest.get('params', {})
-    default_window = params.get('default_window')
-    default_stride = params.get('default_stride')
-
-    # Load engine registry
-    engine_registry = _load_engine_registry()
+    # Load engine registry for validation
+    engine_registry = _get_engine_registry()
 
     # Validate engines upfront (PR13)
     diagnosis = _diagnose_manifest_engines(manifest, engine_registry)
@@ -300,95 +434,11 @@ def run(
         n_signals = obs['signal_id'].n_unique()
         n_obs = len(obs)
         print(f"Loaded {n_obs:,} observations across {n_signals} signals")
+        system = manifest.get('system', {})
+        print(f"System window={system.get('window')}, stride={system.get('stride')}")
 
-    # Process each signal according to its manifest config
-    results = []
-    error_summary: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-
-    for cohort_name, cohort_signals in manifest['cohorts'].items():
-        for signal_id, signal_config in cohort_signals.items():
-            # Get per-signal config from manifest
-            window_size = signal_config.get('window_size') or default_window
-            stride = signal_config.get('stride') or default_stride
-            engine_names = signal_config.get('engines', [])
-            engine_window_overrides = signal_config.get('engine_window_overrides', {})
-
-            if window_size is None:
-                raise ValueError(f"No window_size for signal '{signal_id}' and no default_window in params")
-            if stride is None:
-                raise ValueError(f"No stride for signal '{signal_id}' and no default_stride in params")
-            if not engine_names:
-                if verbose:
-                    print(f"  Skipping {signal_id}: no engines specified")
-                continue
-
-            # Validate engines for this signal (PR13)
-            valid_engines, unknown_engines = _validate_engines(engine_names, engine_registry)
-
-            if unknown_engines and verbose:
-                print(f"  {signal_id}: skipping unknown engines: {unknown_engines}")
-
-            # Get engine functions
-            active_engines = {
-                name: engine_registry[name]
-                for name in valid_engines
-            }
-
-            if verbose:
-                print(f"  {signal_id}: window={window_size}, stride={stride}, engines={list(active_engines.keys())}")
-
-            # Get signal data
-            signal_data = (
-                obs
-                .filter(pl.col('signal_id') == signal_id)
-                .sort('I')
-            )
-
-            if len(signal_data) == 0:
-                if verbose:
-                    print(f"    Warning: no data for signal '{signal_id}'")
-                continue
-
-            values = signal_data['value'].to_numpy()
-            indices = signal_data['I'].to_numpy()
-
-            # Compute features at each window (PR2: per-engine window expansion)
-            signal_results, signal_errors = _compute_signal_features(
-                signal_id=signal_id,
-                values=values,
-                indices=indices,
-                engines=active_engines,
-                window_size=window_size,
-                stride=stride,
-                engine_window_overrides=engine_window_overrides,
-            )
-
-            # Track errors (PR13)
-            for engine_name, count in signal_errors.items():
-                error_summary[signal_id][engine_name] += count
-
-            # Convert to DataFrame immediately to preserve column schema
-            if signal_results:
-                signal_df = pl.DataFrame(signal_results)
-                results.append(signal_df)
-
-    # Report error summary (PR13)
-    if verbose and error_summary:
-        print("\nEngine errors:")
-        engine_totals: Dict[str, int] = defaultdict(int)
-        for signal_id, engines in error_summary.items():
-            for engine, count in engines.items():
-                engine_totals[engine] += count
-        for engine, count in sorted(engine_totals.items()):
-            print(f"  {engine}: {count} failures")
-
-    # Concat all signal DataFrames (handles different column sets properly)
-    if not results:
-        df = pl.DataFrame()
-    elif len(results) == 1:
-        df = results[0]
-    else:
-        df = pl.concat(results, how='diagonal')
+    # Compute signal vector using core function
+    df = compute_signal_vector(obs, manifest)
 
     # Write output
     df.write_parquet(output_path)
@@ -401,105 +451,20 @@ def run(
 
 def _validate_manifest(manifest: Dict[str, Any]) -> None:
     """Validate manifest has required structure."""
+    if 'system' not in manifest:
+        raise ValueError("Manifest missing 'system' section.")
+
+    system = manifest['system']
+    if 'window' not in system:
+        raise ValueError("Manifest 'system' section missing 'window'.")
+    if 'stride' not in system:
+        raise ValueError("Manifest 'system' section missing 'stride'.")
+
     if 'cohorts' not in manifest:
         raise ValueError("Manifest missing 'cohorts' section.")
 
     if not manifest['cohorts']:
         raise ValueError("Manifest 'cohorts' is empty.")
-
-
-def _compute_signal_features(
-    signal_id: str,
-    values: np.ndarray,
-    indices: np.ndarray,
-    engines: Dict[str, Callable],
-    window_size: int,
-    stride: int,
-    engine_window_overrides: Dict[str, int] = None,
-) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
-    """
-    Compute features for one signal with per-engine window support.
-
-    Per-engine window expansion (PR2):
-    - Engines may require larger windows than the system default
-    - Each engine gets the window size it needs, but all share the same I (end index)
-    - Early observations may have NaN for engines requiring larger windows
-
-    Args:
-        signal_id: Signal identifier
-        values: Signal values array
-        indices: I indices array
-        engines: Dict of {engine_name: engine_function}
-        window_size: System default window size
-        stride: Window stride
-        engine_window_overrides: Optional manifest overrides {engine: window_size}
-
-    Returns:
-        (results_list, error_counts) - PR13: track errors instead of silent pass
-    """
-    n = len(values)
-    results = []
-    error_counts: Dict[str, int] = defaultdict(int)
-
-    if engine_window_overrides is None:
-        engine_window_overrides = {}
-
-    # Group engines by their required window size
-    engine_groups = group_engines_by_window(engines, engine_window_overrides, window_size)
-
-    # Find the maximum window size needed (determines when we start)
-    max_window = max(engine_groups.keys()) if engine_groups else window_size
-
-    # Track which engines need NaN for early windows
-    # (when not enough data for their required window)
-    def _get_null_output(engine_name: str, engine_fn: Callable) -> Dict[str, float]:
-        """Get NaN output for an engine that can't run."""
-        # Try to call with minimal data to get output keys, then replace with NaN
-        try:
-            # Call with small array to get structure
-            sample_output = engine_fn(np.array([0.0, 0.0, 0.0, 0.0]))
-            return {k: np.nan for k in sample_output.keys()}
-        except Exception:
-            return {}
-
-    # Iterate at system stride, starting when at least system window is available
-    for window_end_pos in range(window_size - 1, n, stride):
-        idx = indices[window_end_pos]
-
-        row = {
-            'signal_id': signal_id,
-            'I': int(idx),
-        }
-
-        # Run each engine group with appropriate window
-        for req_window_size, engine_dict in engine_groups.items():
-            # Calculate window start for this window size
-            # All windows END at window_end_pos, but start at different positions
-            window_start_pos = window_end_pos - req_window_size + 1
-
-            # Check if we have enough data for this window
-            if window_start_pos < 0:
-                # Not enough data yet - fill with NaN for these engines
-                for name, engine_fn in engine_dict.items():
-                    null_output = _get_null_output(name, engine_fn)
-                    row.update(null_output)
-                continue
-
-            # Extract window for this group
-            window = values[window_start_pos:window_end_pos + 1]
-
-            # Run engines in this group
-            for name, engine_fn in engine_dict.items():
-                try:
-                    output = engine_fn(window)
-                    for key, val in output.items():
-                        row[key] = val
-                except Exception:
-                    error_counts[name] += 1
-
-        results.append(row)
-
-    return results, dict(error_counts)
 
 
 def run_from_manifest(
