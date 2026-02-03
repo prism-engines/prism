@@ -300,18 +300,36 @@ def compute_signal_vector_temporal(
         print(f"Engines: {list(engine_funcs.keys())}")
         print()
 
-    # Process each (unit_id, signal)
+    # Detect unit_id column (optional per CLAUDE.md - may be 'cohort' or absent)
+    if 'unit_id' in observations.columns:
+        unit_col = 'unit_id'
+    elif 'cohort' in observations.columns:
+        unit_col = 'cohort'
+    else:
+        unit_col = None
+
+    # Process each (unit, signal) group
     results = []
 
-    groups = observations.group_by(['unit_id', signal_col])
-    n_groups = observations.select(['unit_id', signal_col]).unique().height
+    if unit_col:
+        groups = observations.group_by([unit_col, signal_col])
+        n_groups = observations.select([unit_col, signal_col]).unique().height
+    else:
+        groups = observations.group_by([signal_col])
+        n_groups = observations.select([signal_col]).unique().height
 
     if verbose:
         print(f"Processing {n_groups} signal groups...")
 
     processed = 0
-    for (unit_id, signal_id), group in groups:
-        # Skip null signal_id (unit_id can be null, signal_id cannot)
+    for group_key, group in groups:
+        if unit_col:
+            unit_id, signal_id = group_key
+        else:
+            signal_id = group_key[0] if isinstance(group_key, tuple) else group_key
+            unit_id = 'default'
+
+        # Skip null signal_id
         if signal_id is None:
             continue
 
