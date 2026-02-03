@@ -7,7 +7,8 @@ Architecture:
 
 Usage:
     python -m prism <data_dir>                    # Run full pipeline
-    python -m prism signal-vector <data_dir>      # Run signal vector
+    python -m prism signal-vector <data_dir>      # Run signal vector (aggregate)
+    python -m prism signal-vector-temporal <data_dir>  # Run signal vector (temporal)
     python -m prism state-vector <data_dir>       # Run state vector
     python -m prism geometry <data_dir>           # Run geometry (state + signal + pairwise)
     python -m prism geometry-dynamics <data_dir>  # Run geometry dynamics
@@ -33,29 +34,23 @@ def check_typology(data_dir: Path) -> bool:
     return True
 
 
-def run_signal_vector(data_dir: Path) -> dict:
-    """Run signal vector computation using manifest."""
-    manifest_path = data_dir / 'manifest.yaml'
+def run_signal_vector(data_dir: Path, temporal: bool = True) -> dict:
+    """Run signal vector (temporal by default - includes I column)."""
+    typology_path = data_dir / 'typology.parquet'
+    obs_path = data_dir / 'observations.parquet'
     output_path = data_dir / 'signal_vector.parquet'
 
-    from prism.signal_vector import run_signal_vector as sv_run
-
-    print(f"[SIGNAL VECTOR] → {output_path}")
-
-    # Use manifest if available, otherwise fall back to legacy
-    if manifest_path.exists():
-        result = sv_run(
-            str(manifest_path),
-            output_path=str(output_path)
-        )
-    else:
-        # Legacy fallback for datasets without manifest
-        from prism.entry_points.signal_vector import compute_signal_vector_temporal_sql
-        obs_path = data_dir / 'observations.parquet'
-        typology_path = data_dir / 'typology.parquet'
+    if temporal:
+        from prism.signal_vector_temporal import compute_signal_vector_temporal_sql
+        print(f"[SIGNAL VECTOR] → {output_path}")
         result = compute_signal_vector_temporal_sql(
             str(obs_path), str(typology_path), str(output_path)
         )
+    else:
+        # Deprecated: aggregate mode loses I column
+        from prism.signal_vector.runner_legacy import run_signal_vector as run_sv
+        print(f"[SIGNAL VECTOR (aggregate - deprecated)] → {output_path}")
+        result = run_sv(str(data_dir))
 
     return {'signal_vector': output_path, 'rows': len(result)}
 
@@ -208,7 +203,7 @@ def run_dynamics(data_dir: Path) -> dict:
 
 def run_sql(data_dir: Path) -> dict:
     """Run SQL engines (no classification - that's ORTHON's job)."""
-    from prism.entry_points.sql_runner import SQLRunner
+    from prism.sql_runner import SQLRunner
 
     obs_path = data_dir / 'observations.parquet'
 
@@ -235,8 +230,8 @@ def run_full_pipeline(data_dir: Path) -> dict:
 
     results = {}
 
-    # 1. Signal Vector
-    results['signal_vector'] = run_signal_vector(data_dir)
+    # 1. Signal Vector (temporal - includes I column)
+    results['signal_vector'] = run_signal_vector(data_dir, temporal=True)
 
     # 2. State Vector
     results['state_vector'] = run_state_vector(data_dir)
@@ -272,7 +267,8 @@ def main():
 
     # Command mode
     commands = {
-        'signal-vector': lambda d: run_signal_vector(d),
+        'signal-vector': lambda d: run_signal_vector(d, temporal=False),
+        'signal-vector-temporal': lambda d: run_signal_vector(d, temporal=True),
         'state-vector': lambda d: run_state_vector(d),
         'geometry': lambda d: run_geometry(d),
         'geometry-dynamics': lambda d: run_geometry_dynamics(d),
