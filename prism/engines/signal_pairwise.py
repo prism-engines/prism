@@ -28,14 +28,18 @@ from itertools import combinations
 
 
 # ============================================================
-# DEFAULT ENGINE FEATURE GROUPS
+# DEFAULT ENGINE FEATURE GROUPS - imported from config
 # ============================================================
 
-DEFAULT_FEATURE_GROUPS = {
-    'shape': ['kurtosis', 'skewness', 'crest_factor'],
-    'complexity': ['entropy', 'hurst', 'autocorr'],
-    'spectral': ['spectral_entropy', 'spectral_centroid', 'band_ratio_low', 'band_ratio_mid', 'band_ratio_high'],
-}
+try:
+    from prism.engines.geometry.config import DEFAULT_FEATURE_GROUPS
+except ImportError:
+    # Fallback if config not available
+    DEFAULT_FEATURE_GROUPS = {
+        'shape': ['kurtosis', 'skewness', 'crest_factor'],
+        'complexity': ['permutation_entropy', 'hurst', 'acf_lag1'],
+        'spectral': ['spectral_entropy', 'spectral_centroid', 'band_low_rel', 'band_mid_rel', 'band_high_rel'],
+    }
 
 
 # ============================================================
@@ -223,20 +227,37 @@ def compute_signal_pairwise(
         print(f"Estimated rows: {n_pairs * n_indices * n_engines:,}")
         print()
 
-    # Process each I (unit_id is pass-through, not for compute)
+    # Determine grouping columns - include cohort if present
+    has_cohort = 'cohort' in signal_vector.columns
+    group_cols = ['cohort', 'I'] if has_cohort else ['I']
+
+    # Process each (cohort, I) or just I
     results = []
-    groups = signal_vector.group_by(['I'], maintain_order=True)
-    n_groups = signal_vector.select(['I']).unique().height
+    groups = signal_vector.group_by(group_cols, maintain_order=True)
+    n_groups = signal_vector.select(group_cols).unique().height
 
     if verbose:
-        print(f"Processing {n_groups} time points...")
+        if has_cohort:
+            n_cohorts = signal_vector['cohort'].n_unique()
+            print(f"Processing {n_groups} (cohort, I) groups across {n_cohorts} cohorts...")
+        else:
+            print(f"Processing {n_groups} time points...")
 
     for i, (group_key, group) in enumerate(groups):
-        I = group_key[0] if isinstance(group_key, tuple) else group_key
+        if has_cohort:
+            cohort, I = group_key if isinstance(group_key, tuple) else (None, group_key)
+        else:
+            cohort = None
+            I = group_key[0] if isinstance(group_key, tuple) else group_key
         unit_id = group['unit_id'].to_list()[0] if 'unit_id' in group.columns else ''
 
-        # Get state vector for this I
-        state_row = state_vector.filter(pl.col('I') == I)
+        # Get state vector for this (cohort, I) or just I
+        if has_cohort and cohort:
+            state_row = state_vector.filter(
+                (pl.col('cohort') == cohort) & (pl.col('I') == I)
+            )
+        else:
+            state_row = state_vector.filter(pl.col('I') == I)
 
         signal_ids = group['signal_id'].to_list()
 
@@ -264,7 +285,6 @@ def compute_signal_pairwise(
             # Build result rows
             for pair in pairs:
                 row = {
-                    'unit_id': unit_id,
                     'I': I,
                     'signal_a': pair['signal_a'],
                     'signal_b': pair['signal_b'],
@@ -277,6 +297,11 @@ def compute_signal_pairwise(
                     'same_side_of_state': pair['same_side_of_state'],
                     'state_distance_diff': pair['state_distance_diff'],
                 }
+                # Include cohort if available
+                if cohort:
+                    row['cohort'] = cohort
+                if unit_id:
+                    row['unit_id'] = unit_id
                 results.append(row)
 
         if verbose and (i + 1) % 500 == 0:

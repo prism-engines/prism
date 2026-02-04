@@ -265,13 +265,23 @@ def compute_geometry_dynamics(
         print(f"Loaded: {len(state_geometry)} rows")
         print(f"Columns: {state_geometry.columns}")
 
-    # Process each engine (unit_id is cargo, not a compute key)
-    results = []
+    # Determine grouping columns - include cohort if present
+    has_cohort = 'cohort' in state_geometry.columns
+    group_cols = ['cohort', 'engine'] if has_cohort else ['engine']
 
-    groups = state_geometry.group_by(['engine'], maintain_order=True)
+    # Process each (cohort, engine) or just engine
+    results = []
+    groups = state_geometry.group_by(group_cols, maintain_order=True)
 
     for group_key, group in groups:
-        engine = group_key[0] if isinstance(group_key, tuple) else group_key
+        if has_cohort:
+            if isinstance(group_key, tuple):
+                cohort, engine = group_key
+            else:
+                cohort, engine = None, group_key
+        else:
+            cohort = None
+            engine = group_key[0] if isinstance(group_key, tuple) else group_key
         unit_id = group['unit_id'][0] if 'unit_id' in group.columns else ''
         # Sort by I
         group = group.sort('I')
@@ -298,7 +308,6 @@ def compute_geometry_dynamics(
         # Build result rows - computed values only, NO classification
         for i in range(n):
             row = {
-                'unit_id': unit_id,
                 'I': int(I_values[i]),
                 'engine': engine,
 
@@ -321,6 +330,11 @@ def compute_geometry_dynamics(
                 'collapse_onset_idx': collapse['collapse_onset_idx'],
                 'collapse_onset_fraction': collapse['collapse_onset_fraction'],
             }
+            # Include cohort if available
+            if cohort:
+                row['cohort'] = cohort
+            if unit_id:
+                row['unit_id'] = unit_id
             results.append(row)
 
     # Build DataFrame
@@ -387,19 +401,33 @@ def compute_signal_dynamics(
         print(f"Distance columns: {distance_cols}")
         print(f"Coherence columns: {coherence_cols}")
 
-    # Process each signal_id (unit_id is cargo, not a compute key)
-    results = []
+    # Determine grouping columns - include cohort if present
+    has_cohort = 'cohort' in signal_geometry.columns
+    signal_col = 'signal_id'
+    group_cols = ['cohort', signal_col] if has_cohort else [signal_col]
 
-    signal_col = 'signal_id' if 'signal_id' in signal_geometry.columns else 'signal_id'
-    groups = signal_geometry.group_by([signal_col], maintain_order=True)
-    n_groups = signal_geometry.select([signal_col]).unique().height
+    # Process each (cohort, signal_id) or just signal_id
+    results = []
+    groups = signal_geometry.group_by(group_cols, maintain_order=True)
+    n_groups = signal_geometry.select(group_cols).unique().height
 
     if verbose:
-        print(f"Processing {n_groups} signal groups...")
+        if has_cohort:
+            n_cohorts = signal_geometry['cohort'].n_unique()
+            print(f"Processing {n_groups} (cohort, signal_id) groups across {n_cohorts} cohorts...")
+        else:
+            print(f"Processing {n_groups} signal groups...")
 
     processed = 0
     for group_key, group in groups:
-        signal_id = group_key[0] if isinstance(group_key, tuple) else group_key
+        if has_cohort:
+            if isinstance(group_key, tuple):
+                cohort, signal_id = group_key
+            else:
+                cohort, signal_id = None, group_key
+        else:
+            cohort = None
+            signal_id = group_key[0] if isinstance(group_key, tuple) else group_key
         # Skip null signal_id
         if signal_id is None:
             continue
@@ -436,7 +464,6 @@ def compute_signal_dynamics(
             # Build result rows - computed values only, NO classification
             for i in range(n):
                 row = {
-                    'unit_id': unit_id,
                     'I': int(I_values[i]),
                     'signal_id': signal_id,
                     'engine': engine,
@@ -452,6 +479,11 @@ def compute_signal_dynamics(
                     'coherence_velocity': coh_deriv['velocity'][i],
                     'coherence_acceleration': coh_deriv['acceleration'][i],
                 }
+                # Include cohort if available
+                if cohort:
+                    row['cohort'] = cohort
+                if unit_id:
+                    row['unit_id'] = unit_id
                 results.append(row)
 
         processed += 1
@@ -505,13 +537,24 @@ def compute_pairwise_dynamics(
     if verbose:
         print(f"Loaded: {len(pairwise)} rows")
 
-    # Process each (signal_a, signal_b, engine) - unit_id is cargo
-    results = []
+    # Determine grouping columns - include cohort if present
+    has_cohort = 'cohort' in pairwise.columns
+    base_group_cols = ['signal_a', 'signal_b', 'engine']
+    group_cols = ['cohort'] + base_group_cols if has_cohort else base_group_cols
 
-    groups = pairwise.group_by(['signal_a', 'signal_b', 'engine'], maintain_order=True)
+    # Process each (cohort, signal_a, signal_b, engine) or just (signal_a, signal_b, engine)
+    results = []
+    groups = pairwise.group_by(group_cols, maintain_order=True)
 
     for group_key, group in groups:
-        sig_a, sig_b, engine = group_key if isinstance(group_key, tuple) else (group_key, None, None)
+        if has_cohort:
+            if isinstance(group_key, tuple):
+                cohort, sig_a, sig_b, engine = group_key
+            else:
+                cohort, sig_a, sig_b, engine = None, group_key, None, None
+        else:
+            cohort = None
+            sig_a, sig_b, engine = group_key if isinstance(group_key, tuple) else (group_key, None, None)
         unit_id = group['unit_id'][0] if 'unit_id' in group.columns else ''
         group = group.sort('I')
 
@@ -534,7 +577,6 @@ def compute_pairwise_dynamics(
 
         for i in range(n):
             row = {
-                'unit_id': unit_id,
                 'I': int(I_values[i]),
                 'signal_a': sig_a,
                 'signal_b': sig_b,
@@ -546,14 +588,15 @@ def compute_pairwise_dynamics(
                 'distance': distance[i],
                 'distance_velocity': dist_deriv['velocity'][i],
 
-                # Coupling dynamics
-                'coupling_strengthening': (
-                    (np.abs(correlation[i]) > 0.5 and corr_deriv['velocity'][i] * np.sign(correlation[i]) > 0) or
-                    dist_deriv['velocity'][i] < 0
-                ),
-                'synchronizing': corr_deriv['velocity'][i] > 0.01,
-                'desynchronizing': corr_deriv['velocity'][i] < -0.01,
+                # Coupling dynamics - COMPUTED VALUES ONLY (no classification)
+                # ORTHON interprets: WHERE coupling_velocity > 0.01 THEN 'STRENGTHENING'
+                'coupling_velocity': corr_deriv['velocity'][i] * np.sign(correlation[i]) if np.abs(correlation[i]) > 1e-10 else 0.0,
             }
+            # Include cohort if available
+            if cohort:
+                row['cohort'] = cohort
+            if unit_id:
+                row['unit_id'] = unit_id
             results.append(row)
 
     result = pl.DataFrame(results)

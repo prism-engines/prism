@@ -26,14 +26,18 @@ from typing import List, Dict, Optional, Any
 
 
 # ============================================================
-# DEFAULT ENGINE FEATURE GROUPS
+# DEFAULT ENGINE FEATURE GROUPS - imported from config
 # ============================================================
 
-DEFAULT_FEATURE_GROUPS = {
-    'shape': ['kurtosis', 'skewness', 'crest_factor'],
-    'complexity': ['entropy', 'hurst', 'autocorr'],
-    'spectral': ['spectral_entropy', 'spectral_centroid', 'band_ratio_low', 'band_ratio_mid', 'band_ratio_high'],
-}
+try:
+    from prism.engines.geometry.config import DEFAULT_FEATURE_GROUPS
+except ImportError:
+    # Fallback if config not available
+    DEFAULT_FEATURE_GROUPS = {
+        'shape': ['kurtosis', 'skewness', 'crest_factor'],
+        'complexity': ['permutation_entropy', 'hurst', 'acf_lag1'],
+        'spectral': ['spectral_entropy', 'spectral_centroid', 'band_low_rel', 'band_mid_rel', 'band_high_rel'],
+    }
 
 # ============================================================
 # SVD NORMALIZATION
@@ -237,20 +241,37 @@ def compute_signal_geometry(
     if 'I' not in signal_vector.columns:
         raise ValueError("Missing required column 'I'. Use temporal signal_vector.")
 
-    # Process each I (unit_id is pass-through, not for compute)
+    # Determine grouping columns - include cohort if present
+    has_cohort = 'cohort' in signal_vector.columns
+    group_cols = ['cohort', 'I'] if has_cohort else ['I']
+
+    # Process each (cohort, I) or just I
     results = []
-    groups = signal_vector.group_by(['I'], maintain_order=True)
-    n_groups = signal_vector.select(['I']).unique().height
+    groups = signal_vector.group_by(group_cols, maintain_order=True)
+    n_groups = signal_vector.select(group_cols).unique().height
 
     if verbose:
-        print(f"Processing {n_groups} time points...")
+        if has_cohort:
+            n_cohorts = signal_vector['cohort'].n_unique()
+            print(f"Processing {n_groups} (cohort, I) groups across {n_cohorts} cohorts...")
+        else:
+            print(f"Processing {n_groups} time points...")
 
     for i, (group_key, group) in enumerate(groups):
-        I = group_key[0] if isinstance(group_key, tuple) else group_key
+        if has_cohort:
+            cohort, I = group_key if isinstance(group_key, tuple) else (None, group_key)
+        else:
+            cohort = None
+            I = group_key[0] if isinstance(group_key, tuple) else group_key
         unit_id = group['unit_id'].to_list()[0] if 'unit_id' in group.columns else ''
 
-        # Get state vector for this I
-        state_row = state_vector.filter(pl.col('I') == I)
+        # Get state vector for this (cohort, I) or just I
+        if has_cohort and cohort:
+            state_row = state_vector.filter(
+                (pl.col('cohort') == cohort) & (pl.col('I') == I)
+            )
+        else:
+            state_row = state_vector.filter(pl.col('I') == I)
 
         if len(state_row) == 0:
             continue
@@ -304,7 +325,6 @@ def compute_signal_geometry(
             # Build result rows
             for geom in geom_results:
                 row = {
-                    'unit_id': unit_id,
                     'I': I,
                     'signal_id': geom['signal_id'],
                     'engine': engine_name,
@@ -314,6 +334,11 @@ def compute_signal_geometry(
                     f'residual_{engine_name}': geom['residual'],
                     f'magnitude_{engine_name}': geom['signal_magnitude'],
                 }
+                # Include cohort if available
+                if cohort:
+                    row['cohort'] = cohort
+                if unit_id:
+                    row['unit_id'] = unit_id
                 results.append(row)
 
         if verbose and (i + 1) % 1000 == 0:
@@ -322,12 +347,16 @@ def compute_signal_geometry(
     # Build DataFrame
     result = pl.DataFrame(results)
 
-    # Pivot to have one row per (I, signal_id, engine) with all columns
-    # unit_id is pass-through only
+    # Pivot to have one row per (cohort, I, signal_id, engine) with all columns
     if len(result) > 0:
-        result = result.group_by(['I', 'signal_id', 'engine']).agg([
+        # Determine grouping columns
+        agg_group_cols = ['I', 'signal_id', 'engine']
+        if 'cohort' in result.columns:
+            agg_group_cols = ['cohort'] + agg_group_cols
+
+        result = result.group_by(agg_group_cols).agg([
             pl.col(c).first() for c in result.columns
-            if c not in ['I', 'signal_id', 'engine']
+            if c not in agg_group_cols
         ])
 
     result.write_parquet(output_path)

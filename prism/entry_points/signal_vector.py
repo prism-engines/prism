@@ -290,15 +290,20 @@ def get_signal_data(
 
     Args:
         observations: Observations DataFrame
-        cohort_name: Cohort name (unused, signals identified by signal_id)
+        cohort_name: Cohort identifier (filters data to this cohort)
         signal_id: Signal identifier
 
     Returns:
         numpy array of signal values sorted by I
     """
+    # Filter by BOTH cohort and signal_id to get per-engine data
+    filters = pl.col('signal_id') == signal_id
+    if 'cohort' in observations.columns:
+        filters = filters & (pl.col('cohort') == cohort_name)
+
     signal_data = (
         observations
-        .filter(pl.col('signal_id') == signal_id)
+        .filter(filters)
         .sort('I')
     )
     return signal_data['value'].to_numpy()
@@ -415,6 +420,7 @@ def _compute_single_signal(
     system_window: int,
     system_stride: int,
     window_factor: float = 1.0,
+    cohort: str = None,
 ) -> List[Dict[str, Any]]:
     """
     Compute all windows for one signal.
@@ -428,6 +434,7 @@ def _compute_single_signal(
         system_window: System window size
         system_stride: System stride
         window_factor: Signal-specific window multiplier from typology
+        cohort: Cohort/unit identifier (passed through for grouping)
 
     Returns:
         List of row dicts for this signal
@@ -449,6 +456,9 @@ def _compute_single_signal(
             'signal_id': signal_id,
             'I': window_end,
         }
+        # Include cohort if provided (for per-unit grouping in downstream stages)
+        if cohort:
+            row['cohort'] = cohort
 
         # Run each engine group with appropriate window
         for window_size, engine_list in engine_groups.items():
@@ -479,9 +489,9 @@ def _prepare_signal_tasks(
     observations: pl.DataFrame,
     manifest: Dict[str, Any],
     window_factors: Dict[str, float] = None,
-) -> List[Tuple[str, np.ndarray, Dict[str, Any], float]]:
+) -> List[Tuple[str, np.ndarray, Dict[str, Any], float, str]]:
     """
-    Prepare (signal_id, signal_data, signal_config, window_factor) tuples for parallel dispatch.
+    Prepare (signal_id, signal_data, signal_config, window_factor, cohort) tuples for parallel dispatch.
 
     Args:
         observations: Observations DataFrame
@@ -489,7 +499,7 @@ def _prepare_signal_tasks(
         window_factors: Dict mapping signal_id to window_factor (from typology)
 
     Returns:
-        List of (signal_id, signal_data, signal_config, window_factor) tuples
+        List of (signal_id, signal_data, signal_config, window_factor, cohort) tuples
     """
     if window_factors is None:
         window_factors = {}
@@ -512,7 +522,7 @@ def _prepare_signal_tasks(
             # Get window factor for this signal (default 1.0)
             factor = window_factors.get(signal_id, 1.0)
 
-            tasks.append((signal_id, signal_data, signal_config, factor))
+            tasks.append((signal_id, signal_data, signal_config, factor, cohort_name))
 
     return tasks
 
@@ -557,7 +567,7 @@ def compute_signal_vector(
 
     # Count total windows for progress
     total_windows = 0
-    for signal_id, signal_data, signal_config, factor in tasks:
+    for signal_id, signal_data, signal_config, factor, cohort in tasks:
         n_windows = max(0, (len(signal_data) - system_window) // system_stride + 1)
         total_windows += n_windows
 
@@ -567,17 +577,17 @@ def compute_signal_vector(
 
     if len(tasks) == 1:
         # Single signal - no parallelism overhead
-        signal_id, signal_data, signal_config, factor = tasks[0]
+        signal_id, signal_data, signal_config, factor, cohort = tasks[0]
         all_rows = _compute_single_signal(
-            signal_id, signal_data, signal_config, system_window, system_stride, factor
+            signal_id, signal_data, signal_config, system_window, system_stride, factor, cohort
         )
     else:
         # Parallel across signals - always
         results = Parallel(n_jobs=_N_WORKERS, prefer="processes")(
             delayed(_compute_single_signal)(
-                signal_id, signal_data, signal_config, system_window, system_stride, factor
+                signal_id, signal_data, signal_config, system_window, system_stride, factor, cohort
             )
-            for signal_id, signal_data, signal_config, factor in tasks
+            for signal_id, signal_data, signal_config, factor, cohort in tasks
         )
 
         # Flatten results
