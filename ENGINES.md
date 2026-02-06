@@ -391,7 +391,7 @@ $$D_{eff} = \frac{(\sum_k \lambda_k)^2}{\sum_k \lambda_k^2}$$
 | $D_{eff} = D$ | Uniform variance (isotropic) |
 | $D_{eff} = 1$ | One dominant direction (collapsed) |
 
-> **Key insight**: $D_{eff}$ shows 63% importance in RUL prediction (Avery Rudder).
+> **Key insight**: $D_{eff}$ shows 63% importance in RUL prediction.
 
 #### Eigenvalue Entropy
 **Stage**: `03_state_geometry`
@@ -452,6 +452,8 @@ Model-free information flow.
 $$TE_{X \to Y} = I(Y_{t+1}; X_t \mid Y_t)$$
 
 $$TE_{normalized} = \frac{TE}{H(Y)}$$
+
+> **Note**: Transfer function analysis (Laplace domain) is in ORTHON SQL: `orthon/sql/transfer_function.sql`
 
 ---
 

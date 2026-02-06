@@ -116,7 +116,7 @@ Plus a `manifest.yaml` specifying window size, stride, and engines per signal.
 ```bibtex
 @software{prism2026,
   title = {PRISM: Signal Computation},
-  author = {Rudder, Jason and Rudder, Avery},
+  author = {Rudder, Jason},
   year = {2026},
   url = {https://github.com/prism-engines/prism}
 }

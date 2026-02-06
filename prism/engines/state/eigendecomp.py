@@ -7,9 +7,9 @@ This is HOW the system is distributed around its centroid.
 state_vector = centroid (WHERE)
 state_geometry = eigenvalues (SHAPE)
 
-Key insight (Avery Rudder): effective_dim shows 63% importance
-in predicting remaining useful life (RUL). Systems collapse
-dimensionally before failure.
+Key insight: effective_dim shows 63% importance in predicting
+remaining useful life (RUL). Systems collapse dimensionally
+before failure.
 """
 
 import numpy as np
