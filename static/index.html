@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>orthon engines</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #0e1117;
+    --surface2: #151921;
+    --border: #1c2030;
+    --border-hi: #2a3045;
+    --text: #c9d1d9;
+    --dim: #546178;
+    --faint: #2a3045;
+    --blue: #4493f8;
+    --blue-bg: #0d1b2a;
+    --green: #3fb950;
+    --green-bg: #0a1f0d;
+    --red: #f85149;
+    --amber: #d29922;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* ── Container ── */
+  .wrap { max-width: 680px; margin: 0 auto; padding: 48px 20px 100px; }
+
+  /* ── Header ── */
+  .head { margin-bottom: 48px; }
+  .mark {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+  }
+  .mark em {
+    font-style: normal;
+    color: var(--text);
+  }
+  .desc {
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--dim);
+    max-width: 500px;
+  }
+
+  /* ── Sections ── */
+  .sec { margin-bottom: 36px; }
+  .sec-head {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--faint);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+  }
+
+  /* ── Inputs ── */
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+
+  input[type="email"], input[type="text"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+  }
+  input:focus { border-color: var(--blue); }
+  input::placeholder { color: var(--faint); }
+
+  /* ── Buttons ── */
+  btn, button {
+    font-family: var(--mono);
+    font-size: 12px;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    border: 1px solid var(--border-hi);
+    background: var(--surface2);
+    color: var(--text);
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  button:hover { background: var(--border); border-color: var(--dim); }
+  button:disabled { opacity: 0.3; cursor: default; }
+  button.primary { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); }
+  button.primary:hover { background: var(--blue); color: #fff; }
+
+  /* ── Messages ── */
+  .msg {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    display: none;
+  }
+  .msg.err { display: block; background: rgba(248,81,73,0.08); border: 1px solid var(--red); color: var(--red); }
+  .msg.ok { display: block; background: rgba(63,185,80,0.08); border: 1px solid var(--green); color: var(--green); }
+
+  /* ── Registration steps ── */
+  .step { display: none; }
+  .step.on { display: block; }
+
+  .keybox {
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: var(--green-bg);
+    border: 1px solid var(--green);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .keybox .lbl { color: var(--green); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+  .keybox .val { color: var(--text); word-break: break-all; user-select: all; }
+  .badge {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+  .badge.acad { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+  .badge.trial { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue); }
+
+  .active-key {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .active-key .info {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .active-key .dot { color: var(--green); }
+  .active-key .email { color: var(--dim); margin-left: 8px; }
+
+  /* ── Upload ── */
+  .dropzone {
+    border: 1px dashed var(--border-hi);
+    border-radius: 6px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .dropzone:hover, .dropzone.over {
+    border-color: var(--blue);
+    background: rgba(68, 147, 248, 0.02);
+  }
+  .dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .dropzone .icon { font-size: 24px; color: var(--faint); margin-bottom: 8px; }
+  .dropzone .main { font-size: 14px; color: var(--dim); }
+  .dropzone .sub { font-size: 11px; color: var(--faint); font-family: var(--mono); margin-top: 4px; }
+
+  /* ── Progress ── */
+  .prog { display: none; margin-top: 16px; }
+  .prog-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .prog-fill {
+    height: 100%;
+    background: var(--blue);
+    width: 30%;
+    border-radius: 2px;
+    animation: slide 1.2s ease-in-out infinite;
+  }
+  @keyframes slide { 0% { transform: translateX(-120%); } 100% { transform: translateX(450%); } }
+  .prog-text { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-top: 8px; }
+
+  /* ── Results ── */
+  .results { display: none; margin-top: 20px; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .stat {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat .n { font-family: var(--mono); font-size: 22px; font-weight: 500; }
+  .stat .l { font-size: 11px; color: var(--dim); margin-top: 2px; }
+
+  .files { list-style: none; }
+  .files li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+    border-bottom: 1px solid var(--border);
+  }
+  .files li:last-child { border: none; }
+  .files a { color: var(--blue); text-decoration: none; font-size: 11px; }
+  .files a:hover { text-decoration: underline; }
+
+  .dlall {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 10px 24px;
+    background: var(--green-bg);
+    border: 1px solid var(--green);
+    border-radius: 4px;
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 12px;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .dlall:hover { background: var(--green); color: #fff; }
+
+  /* ── Pricing ── */
+  .tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tier {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px;
+    text-align: center;
+  }
+  .tier .name {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .tier .price { font-size: 24px; font-weight: 600; }
+  .tier .price span { font-size: 12px; color: var(--dim); }
+  .tier .info { font-size: 11px; color: var(--dim); margin-top: 6px; line-height: 1.6; }
+
+  /* ── Footer ── */
+  .foot {
+    margin-top: 64px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--faint);
+  }
+
+  @media (max-width: 600px) {
+    .stats, .tiers { grid-template-columns: 1fr; }
+    .row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="head">
+    <div class="mark"><em>orthon</em> engines</div>
+    <p class="desc">
+      Domain-agnostic dynamical systems analysis.
+      Upload signals. Get geometry, stability, velocity, causality.
+      No training data. No domain knowledge. No configuration.
+    </p>
+  </div>
+
+  <!-- ── Register ── -->
+  <div class="sec">
+    <div class="sec-head">register</div>
+    <div class="card">
+
+      <div id="s1" class="step on">
+        <div style="font-size:13px;color:var(--dim)">
+          Email for API key.
+          <strong style="color:var(--green)">.edu = unlimited free.</strong>
+        </div>
+        <div class="row">
+          <input type="email" id="email" placeholder="you@university.edu">
+          <button class="primary" id="btn1" onclick="sendCode()">send code</button>
+        </div>
+        <div id="m1" class="msg"></div>
+      </div>
+
+      <div id="s2" class="step">
+        <div style="font-size:13px;color:var(--dim)">
+          6-digit code sent to <strong id="showEmail"></strong>
+        </div>
+        <div class="row">
+          <input type="text" id="code" placeholder="000000" maxlength="6"
+                 style="max-width:140px;text-align:center;letter-spacing:0.3em;font-size:16px">
+          <button class="primary" onclick="verify()">verify</button>
+        </div>
+        <div id="m2" class="msg"></div>
+      </div>
+
+      <div id="s3" class="step">
+        <div class="keybox">
+          <div class="lbl">api key</div>
+          <div class="val" id="keyVal"></div>
+        </div>
+        <div id="tierBadge"></div>
+        <div style="font-size:11px;color:var(--dim);margin-top:8px;font-family:var(--mono)">
+          Saved to browser. Ready to upload.
+        </div>
+      </div>
+
+      <div id="s4" class="step">
+        <div class="active-key">
+          <div class="info">
+            <span class="dot">&#9679;</span> registered
+            <span class="email" id="curEmail"></span>
+          </div>
+          <button onclick="reset()" style="padding:6px 12px;font-size:10px">change</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Upload ── -->
+  <div class="sec">
+    <div class="sec-head">upload</div>
+    <div class="card">
+
+      <div class="dropzone" id="drop">
+        <input type="file" accept=".csv,.tsv" onchange="upload(this.files[0])">
+        <div class="icon">&#8593;</div>
+        <div class="main">Drop CSV here or click to browse</div>
+        <div class="sub">wide (cols = signals) or long (I, signal_id, value)</div>
+      </div>
+
+      <div class="prog" id="prog">
+        <div class="prog-bar"><div class="prog-fill"></div></div>
+        <div class="prog-text" id="progText">uploading...</div>
+      </div>
+
+      <div id="umsg" class="msg"></div>
+
+      <div class="results" id="res">
+        <div class="stats">
+          <div class="stat"><div class="n" id="nSig">&mdash;</div><div class="l">signals</div></div>
+          <div class="stat"><div class="n" id="nSamp">&mdash;</div><div class="l">samples</div></div>
+          <div class="stat"><div class="n" id="nFile">&mdash;</div><div class="l">parquets</div></div>
+        </div>
+        <ul class="files" id="flist"></ul>
+        <a class="dlall" id="dllink" href="#">&#8595; download atlas (.zip)</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Pricing ── -->
+  <div class="sec">
+    <div class="sec-head">access</div>
+    <div class="tiers">
+      <div class="tier">
+        <div class="name" style="color:var(--green)">academic</div>
+        <div class="price">free</div>
+        <div class="info">.edu email<br>unlimited<br>citation required</div>
+      </div>
+      <div class="tier">
+        <div class="name" style="color:var(--blue)">pro</div>
+        <div class="price">$99<span>/mo</span></div>
+        <div class="info">unlimited<br>priority<br>API access</div>
+      </div>
+      <div class="tier">
+        <div class="name" style="color:var(--amber)">enterprise</div>
+        <div class="price">custom</div>
+        <div class="info">streaming<br>fleet monitoring<br>dedicated support</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>&copy; 2026 orthon</span>
+    <span>geometry leads &mdash; orthon</span>
+  </div>
+
+</div>
+
+<script>
+let apiKey = localStorage.getItem('orth_key');
+let apiEmail = localStorage.getItem('orth_email');
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (apiKey) { show('s4'); document.getElementById('curEmail').textContent = apiEmail || ''; }
+
+  const d = document.getElementById('drop');
+  d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+  d.addEventListener('dragleave', () => d.classList.remove('over'));
+  d.addEventListener('drop', e => { e.preventDefault(); d.classList.remove('over'); if (e.dataTransfer.files.length) upload(e.dataTransfer.files[0]); });
+});
+
+function show(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+}
+
+function msg(id, txt, type) {
+  const el = document.getElementById(id);
+  el.textContent = txt;
+  el.className = 'msg ' + type;
+}
+
+function clearMsg(id) {
+  document.getElementById(id).className = 'msg';
+  document.getElementById(id).style.display = 'none';
+}
+
+async function sendCode() {
+  const email = document.getElementById('email').value.trim();
+  if (!email || !email.includes('@')) { msg('m1', 'enter valid email', 'err'); return; }
+
+  const b = document.getElementById('btn1');
+  b.disabled = true; b.textContent = 'sending...';
+
+  try {
+    const r = await fetch('/v1/register?email=' + encodeURIComponent(email), { method: 'POST' });
+    const d = await r.json();
+    if (r.ok) {
+      apiEmail = email;
+      document.getElementById('showEmail').textContent = email;
+      show('s2');
+      if (d.dev_code) document.getElementById('code').value = d.dev_code;
+    } else {
+      msg('m1', d.detail || 'error', 'err');
+    }
+  } catch (e) { msg('m1', 'network error', 'err'); }
+
+  b.disabled = false; b.textContent = 'send code';
+}
+
+async function verify() {
+  const code = document.getElementById('code').value.trim();
+  if (code.length !== 6) { msg('m2', 'enter 6-digit code', 'err'); return; }
+
+  try {
+    const r = await fetch('/v1/verify?email=' + encodeURIComponent(apiEmail) + '&code=' + code, { method: 'POST' });
+    const d = await r.json();
+    if (r.ok) {
+      apiKey = d.api_key;
+      localStorage.setItem('orth_key', apiKey);
+      localStorage.setItem('orth_email', apiEmail);
+      document.getElementById('keyVal').textContent = apiKey;
+
+      const badge = document.createElement('div');
+      badge.className = 'badge ' + (d.tier === 'academic' ? 'acad' : 'trial');
+      badge.textContent = d.tier === 'academic' ? 'academic - citation required' : 'trial - 10 runs';
+      document.getElementById('tierBadge').appendChild(badge);
+
+      show('s3');
+    } else {
+      msg('m2', d.detail || 'wrong code', 'err');
+    }
+  } catch (e) { msg('m2', 'network error', 'err'); }
+}
+
+function reset() {
+  apiKey = null; apiEmail = null;
+  localStorage.removeItem('orth_key');
+  localStorage.removeItem('orth_email');
+  document.getElementById('email').value = '';
+  document.getElementById('code').value = '';
+  show('s1');
+}
+
+async function upload(file) {
+  if (!file) return;
+  if (!apiKey) { msg('umsg', 'register first', 'err'); return; }
+  if (!file.name.match(/\.(csv|tsv)$/i)) { msg('umsg', '.csv or .tsv only', 'err'); return; }
+
+  clearMsg('umsg');
+  const prog = document.getElementById('prog');
+  const res = document.getElementById('res');
+  prog.style.display = 'block';
+  res.style.display = 'none';
+  document.getElementById('progText').textContent = 'uploading ' + file.name + '...';
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  try {
+    document.getElementById('progText').textContent = 'computing atlas...';
+
+    const r = await fetch('/v1/atlas', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      body: fd,
+    });
+    const d = await r.json();
+
+    if (r.ok) {
+      prog.style.display = 'none';
+
+      document.getElementById('nSig').textContent = d.summary.n_signals;
+      document.getElementById('nSamp').textContent = d.summary.n_samples.toLocaleString();
+      document.getElementById('nFile').textContent = d.summary.files_generated;
+
+      const fl = document.getElementById('flist');
+      fl.innerHTML = '';
+      for (const [name, url] of Object.entries(d.files)) {
+        const li = document.createElement('li');
+        li.innerHTML = '<span>' + name + '</span><a href="' + url + '" download>download</a>';
+        fl.appendChild(li);
+      }
+
+      document.getElementById('dllink').href = d.download;
+      res.style.display = 'block';
+    } else {
+      prog.style.display = 'none';
+      msg('umsg', d.detail || 'pipeline error', 'err');
+    }
+  } catch (e) {
+    prog.style.display = 'none';
+    msg('umsg', e.message, 'err');
+  }
+}
+</script>
+
+</body>
+</html>

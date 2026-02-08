@@ -315,4 +315,6 @@ pip install orthon-engines[all]     # everything
 
 ## License
 
-MIT
+Free for academic and noncommercial use.
+Citation required for publications.
+Commercial license: [orthon.io/licensing](https://orthon.io/licensing)

@@ -1,0 +1,11 @@
+data/
+__pycache__/
+*.pyc
+.git/
+.env
+venv/
+tests/
+_legacy/
+_deprecated/
+*.egg-info/
+.pytest_cache/

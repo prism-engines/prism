@@ -7,7 +7,7 @@ name = "orthon-engines"
 version = "1.0.0"
 description = "Domain-agnostic dynamical systems analysis — eigendecomposition, FTLE, velocity fields, and urgency metrics"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "PolyForm-Noncommercial-1.0.0"}
 authors = [
     {name = "Jason Rudder"}
 ]
