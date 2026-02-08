@@ -226,7 +226,7 @@ engines/
 │   ├── stage_16-23_*.py          Atlas engines
 │   └── run_pipeline.py          Full pipeline orchestrator
 │
-├── engines/                  Computation (numpy arrays -> dicts)
+├── manifold/                 Computation (numpy arrays -> dicts)
 │   ├── signal/               Per-signal feature engines
 │   ├── state/                Eigendecomposition, centroids
 │   ├── dynamics/             FTLE, RQA, stability
@@ -239,7 +239,7 @@ engines/
     └── pairwise/             Correlation, Granger, transfer entropy
 ```
 
-**Design principle:** Entry points orchestrate. Engines compute. Primitives do math. Each layer only calls the layer below it.
+**Design principle:** Entry points orchestrate. Manifold computes. Primitives do math. Each layer only calls the layer below it.
 
 ---
 
