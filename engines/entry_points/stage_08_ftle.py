@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Optional
 
 from engines.manifold.dynamics.ftle import compute as compute_ftle
+from engines.manifold.dynamics.formal_definitions import classify_stability
 
 
 def run(
@@ -133,10 +134,17 @@ def run(
 
                     # Use appropriate column prefix for forward/backward
                     prefix = 'ftle_bwd' if backward else 'ftle'
+                    ftle_val = ftle_full['ftle']
+                    if ftle_val is not None:
+                        stability = classify_stability(ftle_val).value
+                    elif len(values) < min_samples:
+                        stability = 'insufficient_data'
+                    else:
+                        stability = 'unknown'
                     results.append({
                         'signal_id': signal_id,
                         'cohort': cohort,
-                        prefix: ftle_full['ftle'],
+                        prefix: ftle_val,
                         f'{prefix}_std': ftle_full['ftle_std'],
                         f'{prefix}_pre': ftle_pre.get('ftle'),
                         f'{prefix}_post': ftle_post.get('ftle'),
@@ -153,6 +161,7 @@ def run(
                         'n_post': len(post_values),
                         'event_index': event_index,
                         'direction': direction,
+                        'stability': stability,
                     })
                 else:
                     # For backward FTLE, reverse the time series
@@ -164,10 +173,17 @@ def run(
                     )
 
                     prefix = 'ftle_bwd' if backward else 'ftle'
+                    ftle_val = ftle_result['ftle']
+                    if ftle_val is not None:
+                        stability = classify_stability(ftle_val).value
+                    elif len(values) < min_samples:
+                        stability = 'insufficient_data'
+                    else:
+                        stability = 'unknown'
                     results.append({
                         'signal_id': signal_id,
                         'cohort': cohort,
-                        prefix: ftle_result['ftle'],
+                        prefix: ftle_val,
                         f'{prefix}_std': ftle_result['ftle_std'],
                         'embedding_dim': ftle_result['embedding_dim'],
                         'embedding_tau': ftle_result['embedding_tau'],
@@ -178,6 +194,7 @@ def run(
                         'confidence': ftle_result['confidence'],
                         'n_samples': len(values),
                         'direction': direction,
+                        'stability': stability,
                     })
         else:
             values = signal_data['value'].to_numpy()
@@ -191,9 +208,16 @@ def run(
             )
 
             prefix = 'ftle_bwd' if backward else 'ftle'
+            ftle_val = ftle_result['ftle']
+            if ftle_val is not None:
+                stability = classify_stability(ftle_val).value
+            elif len(values) < min_samples:
+                stability = 'insufficient_data'
+            else:
+                stability = 'unknown'
             results.append({
                 'signal_id': signal_id,
-                prefix: ftle_result['ftle'],
+                prefix: ftle_val,
                 f'{prefix}_std': ftle_result['ftle_std'],
                 'embedding_dim': ftle_result['embedding_dim'],
                 'embedding_tau': ftle_result['embedding_tau'],
@@ -204,6 +228,7 @@ def run(
                 'confidence': ftle_result['confidence'],
                 'n_samples': len(values),
                 'direction': direction,
+                'stability': stability,
             })
 
     # Build DataFrame

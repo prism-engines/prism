@@ -417,41 +417,70 @@ def run(
         
         # For now, treat each unique cohort as a "centroid"
         cohorts = sv['cohort'].unique().to_list() if 'cohort' in sv.columns else []
-        
+
         if len(cohorts) < 2:
             if verbose:
                 print(f"  Need at least 2 cohorts for ridge detection, got {len(cohorts)}")
             continue
-        
-        # Get mean position for each cohort (centroid)
-        numeric_cols = [c for c in sv.columns if sv[c].dtype in [pl.Float64, pl.Float32]][:3]
-        
+
+        # Use eigenvalue columns from state_geometry as position coordinates
+        # These are the meaningful reduced-space positions, not arbitrary state_vector numerics
+        numeric_cols = [c for c in eigen_cols if c in geo.columns]
+
         if not numeric_cols:
             if verbose:
-                print(f"  No numeric columns for centroid positions")
+                print(f"  No eigenvalue columns for centroid positions")
+            continue
+
+        # Check sufficient data: need at least 10 cohorts with valid eigenvalue data
+        valid_cohort_count = 0
+        for cohort in cohorts:
+            cohort_geo = geo.filter(pl.col('cohort') == cohort) if 'cohort' in geo.columns else geo
+            if len(cohort_geo) > 0:
+                vals = cohort_geo.select(numeric_cols).to_numpy()
+                if np.isfinite(vals).all():
+                    valid_cohort_count += 1
+
+        if valid_cohort_count < 10:
+            if verbose:
+                print(f"  Skipping engine {engine}: only {valid_cohort_count} cohorts with valid eigenvalue data (need 10)")
             continue
         
         centroid_positions = []
         for cohort in cohorts:
-            cohort_data = sv.filter(pl.col('cohort') == cohort)
-            pos = [cohort_data[c].mean() for c in numeric_cols]
+            cohort_geo = geo.filter(pl.col('cohort') == cohort) if 'cohort' in geo.columns else geo
+            if len(cohort_geo) == 0:
+                centroid_positions.append([np.nan] * len(numeric_cols))
+                continue
+            pos = [cohort_geo[c].mean() for c in numeric_cols]
             centroid_positions.append(pos)
         
         centroid_positions = np.array(centroid_positions)
-        
+
+        # Filter out cohorts with NaN positions
+        valid_mask = np.isfinite(centroid_positions).all(axis=1)
+        valid_indices = np.where(valid_mask)[0]
+        centroid_positions = centroid_positions[valid_mask]
+        cohorts = [cohorts[i] for i in valid_indices]
+
+        if len(cohorts) < 2:
+            if verbose:
+                print(f"  Need at least 2 valid centroids, got {len(cohorts)}")
+            continue
+
         if verbose:
-            print(f"  Found {len(cohorts)} centroids in {len(numeric_cols)}D space")
-        
+            print(f"  Found {len(cohorts)} centroids in {len(numeric_cols)}D eigenvalue space")
+
         # Find adjacent pairs
         pairs = find_adjacent_pairs(centroid_positions)
-        
+
         if verbose:
             print(f"  Adjacent pairs: {len(pairs)}")
-        
-        # Build trajectory array from state_vector
-        # Each row is a point in the reduced trajectory
-        trajectories = sv.select(numeric_cols).to_numpy()
-        trajectory_ids = sv['cohort'].to_numpy() if 'cohort' in sv.columns else np.zeros(len(sv))
+
+        # Build trajectory array from state_geometry eigenvalue space
+        # Each row is a point in the eigenvalue-reduced trajectory
+        trajectories = geo.select(numeric_cols).to_numpy()
+        trajectory_ids = geo['cohort'].to_numpy() if 'cohort' in geo.columns else np.zeros(len(geo))
         
         # Compute ridge between each pair
         for i, j in pairs:
@@ -474,14 +503,16 @@ def run(
             
             metrics = compute_ridge_metrics(ftle_field, grid, axis_unit)
             
-            # Find ridge location
+            # Skip if FTLE field is all zeros (insufficient neighbors)
             valid = ~np.isnan(ftle_field) & (ftle_field != 0)
-            if np.any(valid):
-                ridge_idx = np.argmax(ftle_field[valid])
-                ridge_location = grid[valid][ridge_idx].tolist()
-            else:
-                ridge_location = ((pos_a + pos_b) / 2).tolist()
-            
+            if not np.any(valid):
+                if verbose:
+                    print(f"    Pair ({cohorts[i]}, {cohorts[j]}): all-zero FTLE, skipping")
+                continue
+
+            ridge_idx = np.argmax(ftle_field[valid])
+            ridge_location = grid[valid][ridge_idx].tolist()
+
             ridge_results.append({
                 'engine': engine,
                 'centroid_a': cohorts[i],

@@ -112,10 +112,15 @@ def kl_divergence(
     if not np.any(mask):
         return 0.0
 
-    # Check for infinite KL (q=0 where p>0)
-    if np.any((p_dist > 0) & (q_dist == 0)):
-        return np.inf
+    # Laplace smoothing: add epsilon to avoid q=0 where p>0, then renormalize
+    epsilon = 1e-10
+    q_dist = q_dist + epsilon
+    q_dist = q_dist / q_dist.sum()
+    p_dist = p_dist + epsilon
+    p_dist = p_dist / p_dist.sum()
 
+    # Recompute mask after smoothing
+    mask = p_dist > 0
     p_safe = p_dist[mask]
     q_safe = q_dist[mask]
 

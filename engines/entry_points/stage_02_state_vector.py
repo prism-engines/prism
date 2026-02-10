@@ -182,10 +182,6 @@ def compute_state_vector(
         if unit_id:
             row['unit_id'] = unit_id
 
-        # Centroid per feature
-        for j, feat in enumerate(available_composite):
-            row[f'state_{feat}'] = state['centroid'][j]
-
         # Dispersion metrics
         row['mean_distance'] = state['mean_distance']
         row['max_distance'] = state['max_distance']

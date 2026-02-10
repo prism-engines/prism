@@ -77,9 +77,17 @@ def compute(
     n = len(y1_clean)
 
     if n < 20:
+        import logging
+        logging.getLogger(__name__).debug(
+            f"Copula skipped: insufficient_data (n={n}, need 20)"
+        )
         return _empty_result(n, reason="insufficient_data")
 
     if np.std(y1_clean) < 1e-10 or np.std(y2_clean) < 1e-10:
+        import logging
+        logging.getLogger(__name__).debug(
+            f"Copula skipped: constant_signal (std_y1={np.std(y1_clean):.2e}, std_y2={np.std(y2_clean):.2e}, n={n})"
+        )
         return _empty_result(n, reason="constant_signal")
 
     # Step 1: Transform to pseudo-observations (uniform marginals)

@@ -231,7 +231,16 @@ def run(
     # that may be null in early rows)
     result = pl.DataFrame(results, infer_schema_length=len(results)) if results else pl.DataFrame()
 
+    # Post-process: replace all inf values with null in float columns
     if len(result) > 0:
+        float_cols = [c for c in result.columns if result[c].dtype in [pl.Float64, pl.Float32]]
+        for col in float_cols:
+            result = result.with_columns(
+                pl.when(pl.col(col).is_infinite())
+                .then(None)
+                .otherwise(pl.col(col))
+                .alias(col)
+            )
         result.write_parquet(output_path)
 
     if verbose:

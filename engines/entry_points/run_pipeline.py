@@ -246,11 +246,15 @@ def run(
                 )
 
             elif stage_num == '09':
-                # Dynamics - reads observations (like Lyapunov)
-                # TODO: This is redundant with stage_08. Stage_09 should do
-                # attractor metrics, RQA, etc. For now, just run it.
+                # Dynamics - thin wrapper that delegates to stage_08 (forward FTLE + stability)
                 obs_path = manifest_path.parent / manifest['paths']['observations']
-                module.run(str(obs_path), str(output_dir / 'dynamics.parquet'), verbose=verbose)
+                intervention = manifest.get('intervention')
+                module.run(
+                    str(obs_path),
+                    str(output_dir / 'dynamics.parquet'),
+                    verbose=verbose,
+                    intervention=intervention,
+                )
 
             elif stage_num == '10':
                 # Information flow - uses signal_pairwise for Granger gating + observations for time series
@@ -264,9 +268,11 @@ def run(
 
             elif stage_num == '11':
                 # Topology - current implementation takes signal_vector
+                pairwise_path = output_dir / 'signal_pairwise.parquet'
                 module.run(
                     str(output_dir / 'signal_vector.parquet'),
                     str(output_dir / 'topology.parquet'),
+                    signal_pairwise_path=str(pairwise_path) if pairwise_path.exists() else None,
                     verbose=verbose,
                 )
 

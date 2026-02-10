@@ -78,6 +78,7 @@ def run(
         print(f"Smoothing: {smooth}")
 
     results = []
+    component_rows = []  # Narrow sidecar for per-signal velocity components
 
     for cohort_idx, cohort in enumerate(cohorts):
         if verbose and cohort_idx % 10 == 0:
@@ -183,10 +184,15 @@ def run(
                 'motion_dimensionality': float(motion_dim),
             }
 
-            # Optionally include per-signal velocity components
+            # Collect per-signal velocity components into narrow sidecar
             if include_components:
                 for j, sig in enumerate(signal_cols):
-                    row[f'v_{sig}'] = float(v[i, j])
+                    component_rows.append({
+                        'I': int(i_values[i + 1]),
+                        'cohort': cohort,
+                        'signal_id': sig,
+                        'velocity': float(v[i, j]),
+                    })
 
             results.append(row)
 
@@ -209,6 +215,14 @@ def run(
         })
 
     result.write_parquet(output_path)
+
+    # Write velocity components sidecar (narrow schema)
+    if component_rows:
+        components_df = pl.DataFrame(component_rows)
+        components_path = str(Path(output_path).parent / 'velocity_field_components.parquet')
+        components_df.write_parquet(components_path)
+        if verbose:
+            print(f"Components sidecar: {components_df.shape} → {components_path}")
 
     if verbose:
         print(f"\nSaved: {output_path}")

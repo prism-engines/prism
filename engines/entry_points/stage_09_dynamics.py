@@ -2,27 +2,26 @@
 Stage 09: Dynamics Entry Point
 ==============================
 
-TODO: This stage is currently redundant with stage_08_ftle.
-It should be refactored to compute attractor metrics, RQA,
-correlation dimension, etc. - "everything else" in dynamics.
+DEPRECATED: This stage is now a thin wrapper around stage_08_ftle.
+Stage 08 now computes stability classification directly, making
+stage_09's redundant FTLE + classify_stability computation unnecessary.
 
-For now, it computes FTLE-based stability classification.
+For backward compatibility, this module delegates to stage_08 with
+stability classification included.
 
 Inputs:
     - observations.parquet
 
 Output:
-    - dynamics.parquet
+    - dynamics.parquet (same schema as ftle.parquet + stability column)
 """
 
 import argparse
 import polars as pl
-import numpy as np
 from pathlib import Path
 from typing import Optional
 
-from engines.manifold.dynamics.ftle import compute as compute_ftle
-from engines.manifold.dynamics.formal_definitions import classify_stability
+from engines.entry_points.stage_08_ftle import run as _ftle_run
 
 
 def run(
@@ -33,16 +32,20 @@ def run(
     index_column: str = 'I',
     min_samples: int = 200,
     verbose: bool = True,
+    intervention: Optional[dict] = None,
 ) -> pl.DataFrame:
     """
     Run dynamics computation for all signals, per-cohort.
 
+    DEPRECATED: Delegates to stage_08_ftle which now includes stability
+    classification. This wrapper exists for backward compatibility.
+
     Args:
         observations_path: Path to observations.parquet
         output_path: Output path for dynamics.parquet
-        signal_column: Column with signal IDs
-        value_column: Column with values
-        index_column: Column with time index
+        signal_column: Column with signal IDs (unused, kept for compat)
+        value_column: Column with values (unused, kept for compat)
+        index_column: Column with time index (unused, kept for compat)
         min_samples: Minimum samples for computation
         verbose: Print progress
 
@@ -51,98 +54,29 @@ def run(
     """
     if verbose:
         print("=" * 70)
-        print("STAGE 09: DYNAMICS")
+        print("STAGE 09: DYNAMICS (delegates to stage_08_ftle)")
         print("Per-signal per-cohort stability classification")
         print("=" * 70)
 
-    # Load observations
-    obs = pl.read_parquet(observations_path)
+    # Delegate to stage_08 which now includes stability column
+    result = _ftle_run(
+        observations_path=observations_path,
+        output_path=output_path,
+        min_samples=min_samples,
+        verbose=verbose,
+        direction='forward',
+        intervention=intervention,
+    )
 
-    signals = obs[signal_column].unique().to_list()
-
-    # Determine cohorts
-    has_cohort = 'cohort' in obs.columns
-    if has_cohort:
-        cohorts = obs['cohort'].unique().sort().to_list()
-    else:
-        cohorts = [None]
-
-    if verbose:
-        print(f"Loaded: {len(obs):,} observations, {len(signals)} signals, {len(cohorts)} cohorts")
-        print(f"Work: {len(signals)} signals × {len(cohorts)} cohorts = {len(signals) * len(cohorts)} items")
-
-    results = []
-    total_items = 0
-
-    for ci, cohort in enumerate(cohorts):
-        # Filter observations to this cohort
-        if cohort is not None:
-            cohort_obs = obs.filter(pl.col('cohort') == cohort)
-        else:
-            cohort_obs = obs
-
-        for signal in signals:
-            signal_data = cohort_obs.filter(pl.col(signal_column) == signal).sort(index_column)
-            values = signal_data[value_column].to_numpy()
-            values = values[~np.isnan(values)]
-
-            if len(values) < min_samples:
-                continue
-
-            # Compute FTLE
-            result = compute_ftle(values, min_samples=min_samples)
-
-            # Add stability classification based on FTLE
-            ftle_val = result.get('ftle')
-            if ftle_val is not None:
-                stability = classify_stability(ftle_val)
-                result['stability'] = stability.value
-                result['ftle'] = ftle_val
-            else:
-                result['stability'] = 'unknown'
-                result['ftle'] = np.nan
-
-            result['signal_id'] = signal
-            result['n_samples'] = len(values)
-            if cohort is not None:
-                result['cohort'] = cohort
-            results.append(result)
-            total_items += 1
-
-        if verbose and (ci + 1) % 10 == 0:
-            print(f"  Processed {ci + 1}/{len(cohorts)} cohorts ({total_items} items so far)...")
-
-    # Build DataFrame
-    df = pl.DataFrame(results, infer_schema_length=len(results)) if results else pl.DataFrame()
-    if len(df) > 0:
-        df.write_parquet(output_path)
-
-    if verbose:
-        print(f"\nShape: {df.shape}")
-
-        # Summary
-        stable_count = len([r for r in results
-                           if r.get('stability') in ['stable', 'asymptotically_stable']])
-        unstable_count = len([r for r in results
-                             if r.get('stability') in ['weakly_unstable', 'chaotic', 'unstable']])
-        print(f"Stable: {stable_count}, Unstable: {unstable_count}")
-        print()
-        print("─" * 50)
-        print(f"✓ {Path(output_path).absolute()}")
-        print("─" * 50)
-
-    return df
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Stage 09: Dynamics",
+        description="Stage 09: Dynamics (delegates to stage_08_ftle)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Computes per-signal dynamics metrics:
-  - ftle: Finite-Time Lyapunov Exponent
-  - stability: stable/marginal/unstable/chaotic
-  - embedding_dim, embedding_tau: Phase space parameters
+DEPRECATED: Now delegates to stage_08_ftle with stability classification.
 
 Example:
   python -m engines.entry_points.stage_09_dynamics \\

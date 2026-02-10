@@ -136,6 +136,7 @@ def compute_state_geometry(
 
     # Process each group
     results = []
+    loading_rows = []  # Narrow sidecar for signal loadings
     groups = signal_vector.group_by(group_cols, maintain_order=True)
     n_groups = signal_vector.select(group_cols).unique().height
 
@@ -272,18 +273,20 @@ def compute_state_geometry(
 
                 row['eigenvector_flip_count'] = flip_count
 
-                # Store per-signal loadings on PC1, PC2 (backward compat)
-                for sig_idx, sig_id in enumerate(signal_ids[:len(signal_loadings)]):
-                    if sig_idx < len(signal_loadings):
-                        row[f'pc1_signal_{sig_id}'] = float(signal_loadings[sig_idx, 0])
-                        if signal_loadings.shape[1] > 1:
-                            row[f'pc2_signal_{sig_id}'] = float(signal_loadings[sig_idx, 1])
-
-                # Eigenvector columns for visualization projection (top 3 PCs)
+                # Collect per-signal loadings into narrow sidecar (not wide columns)
                 n_pcs = min(3, signal_loadings.shape[1])
-                for pc in range(n_pcs):
-                    for sig_idx, sig_id in enumerate(signal_ids[:len(signal_loadings)]):
-                        row[f'ev{pc+1}_{sig_id}'] = float(signal_loadings[sig_idx, pc])
+                for sig_idx, sig_id in enumerate(signal_ids[:len(signal_loadings)]):
+                    loading_row = {
+                        'I': I,
+                        'engine': engine_name,
+                        'signal_id': sig_id,
+                        'pc1_loading': float(signal_loadings[sig_idx, 0]),
+                        'pc2_loading': float(signal_loadings[sig_idx, 1]) if signal_loadings.shape[1] > 1 else None,
+                        'pc3_loading': float(signal_loadings[sig_idx, 2]) if signal_loadings.shape[1] > 2 else None,
+                    }
+                    if cohort:
+                        loading_row['cohort'] = cohort
+                    loading_rows.append(loading_row)
 
                 # Store signal_ids list for reference
                 row['signal_ids'] = ','.join(signal_ids)
@@ -304,6 +307,14 @@ def compute_state_geometry(
     # Build DataFrame
     result = pl.DataFrame(results)
     result.write_parquet(output_path)
+
+    # Write loadings sidecar file (narrow schema)
+    if loading_rows:
+        loadings_df = pl.DataFrame(loading_rows)
+        loadings_path = str(Path(output_path).parent / 'state_geometry_loadings.parquet')
+        loadings_df.write_parquet(loadings_path)
+        if verbose:
+            print(f"Loadings sidecar: {loadings_df.shape} → {loadings_path}")
 
     if verbose:
         print(f"\nShape: {result.shape}")

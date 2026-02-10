@@ -472,12 +472,18 @@ def compute_signal_dynamics(
     # Load signal geometry
     signal_geometry = pl.read_parquet(signal_geometry_path)
 
-    # Detect column naming
-    distance_cols = [c for c in signal_geometry.columns if c.startswith('distance_')]
-    coherence_cols = [c for c in signal_geometry.columns if c.startswith('coherence_')]
+    # Detect column naming - support both narrow (distance, coherence) and legacy wide (distance_*, coherence_*)
+    has_narrow_schema = 'distance' in signal_geometry.columns and 'engine' in signal_geometry.columns
+    if has_narrow_schema:
+        distance_cols = ['distance']
+        coherence_cols = ['coherence']
+    else:
+        distance_cols = [c for c in signal_geometry.columns if c.startswith('distance_')]
+        coherence_cols = [c for c in signal_geometry.columns if c.startswith('coherence_')]
 
     if verbose:
         print(f"Loaded: {len(signal_geometry)} rows")
+        print(f"Schema: {'narrow' if has_narrow_schema else 'legacy wide'}")
         print(f"Distance columns: {distance_cols}")
         print(f"Coherence columns: {coherence_cols}")
 
@@ -523,15 +529,34 @@ def compute_signal_dynamics(
             continue
 
         # Process each engine's metrics
-        for dist_col in distance_cols:
-            engine = dist_col.replace('distance_', '')
-            coh_col = f'coherence_{engine}'
+        if has_narrow_schema:
+            # Narrow schema: group already has 'engine' column, process each engine within signal
+            engines_in_group = group['engine'].unique().to_list()
+            engine_entries = [(eng, 'distance', 'coherence') for eng in engines_in_group]
+        else:
+            # Legacy wide schema: distance_shape, coherence_shape, etc.
+            engine_entries = []
+            for dist_col in distance_cols:
+                engine = dist_col.replace('distance_', '')
+                coh_col = f'coherence_{engine}'
+                if coh_col in group.columns:
+                    engine_entries.append((engine, dist_col, coh_col))
 
-            if coh_col not in group.columns:
-                continue
-
-            distance = group[dist_col].to_numpy()
-            coherence = group[coh_col].to_numpy()
+        for engine, dist_col, coh_col in engine_entries:
+            if has_narrow_schema:
+                # Filter to this engine within the group
+                engine_group = group.filter(pl.col('engine') == engine).sort('I')
+                if len(engine_group) < 3:
+                    continue
+                I_values_eng = engine_group['I'].to_numpy()
+                distance = engine_group[dist_col].to_numpy()
+                coherence = engine_group[coh_col].to_numpy()
+            else:
+                I_values_eng = I_values
+                if coh_col not in group.columns:
+                    continue
+                distance = group[dist_col].to_numpy()
+                coherence = group[coh_col].to_numpy()
 
             # Skip if all NaN
             if np.all(np.isnan(distance)) or np.all(np.isnan(coherence)):
@@ -542,9 +567,10 @@ def compute_signal_dynamics(
             coh_deriv = compute_derivatives(coherence, dt, smooth_window)
 
             # Build result rows - computed values only, NO classification
-            for i in range(n):
+            n_eng = len(I_values_eng)
+            for i in range(n_eng):
                 row = {
-                    'I': int(I_values[i]),
+                    'I': int(I_values_eng[i]),
                     'signal_id': signal_id,
                     'engine': engine,
 

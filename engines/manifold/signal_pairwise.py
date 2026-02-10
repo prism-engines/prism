@@ -238,21 +238,33 @@ def compute_signal_pairwise(
     eigenvector_gating = {}
     if state_geometry_path is not None:
         try:
-            sg = pl.read_parquet(state_geometry_path)
-            # Extract PC1 signal loadings for each (cohort, I)
-            pc1_cols = [c for c in sg.columns if c.startswith('pc1_signal_')]
-            if pc1_cols and verbose:
-                print(f"Eigenvector gating enabled: {len(pc1_cols)} signal loadings found")
-                # Build lookup: (cohort, I, engine) -> {signal_id: pc1_loading}
-                for row in sg.iter_rows(named=True):
+            # Try narrow loadings sidecar first (new format)
+            loadings_path = str(Path(state_geometry_path).parent / 'state_geometry_loadings.parquet')
+            if Path(loadings_path).exists():
+                loadings_df = pl.read_parquet(loadings_path)
+                if verbose:
+                    print(f"Eigenvector gating from loadings sidecar: {len(loadings_df)} rows")
+                for row in loadings_df.iter_rows(named=True):
                     key = (row.get('cohort'), row.get('I'), row.get('engine'))
-                    loadings = {}
-                    for col in pc1_cols:
-                        sig_id = col.replace('pc1_signal_', '')
-                        if row[col] is not None:
-                            loadings[sig_id] = row[col]
-                    if loadings:
-                        eigenvector_gating[key] = loadings
+                    if key not in eigenvector_gating:
+                        eigenvector_gating[key] = {}
+                    if row.get('pc1_loading') is not None:
+                        eigenvector_gating[key][row['signal_id']] = row['pc1_loading']
+            else:
+                # Backward compat: read wide pc1_signal_* columns from state_geometry
+                sg = pl.read_parquet(state_geometry_path)
+                pc1_cols = [c for c in sg.columns if c.startswith('pc1_signal_')]
+                if pc1_cols and verbose:
+                    print(f"Eigenvector gating (legacy wide format): {len(pc1_cols)} signal loadings found")
+                    for row in sg.iter_rows(named=True):
+                        key = (row.get('cohort'), row.get('I'), row.get('engine'))
+                        loadings = {}
+                        for col in pc1_cols:
+                            sig_id = col.replace('pc1_signal_', '')
+                            if row[col] is not None:
+                                loadings[sig_id] = row[col]
+                        if loadings:
+                            eigenvector_gating[key] = loadings
         except Exception as e:
             if verbose:
                 print(f"Warning: Could not load eigenvector gating: {e}")

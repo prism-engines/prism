@@ -260,13 +260,13 @@ def _half_life(residuals: np.ndarray) -> float:
     x = residuals[:-1]
 
     if len(x) < 5:
-        return float("inf")
+        return float("nan")
 
     x_mean = np.mean(x)
     phi = np.sum((x - x_mean) * (y - np.mean(y))) / np.sum((x - x_mean) ** 2)
 
     if phi <= 0 or phi >= 1:
-        return float("inf")
+        return float("nan")
 
     half_life = -np.log(2) / np.log(phi)
     return float(half_life)
@@ -281,7 +281,7 @@ def _empty_result(n: int, reason: str = "unknown") -> dict:
         "hedge_ratio": float("nan"),
         "intercept": float("nan"),
         "residual_std": float("nan"),
-        "half_life": float("inf"),
+        "half_life": float("nan"),
         "residual_adf_critical_1pct": -3.90,
         "residual_adf_critical_5pct": -3.34,
         "residual_adf_critical_10pct": -3.04,

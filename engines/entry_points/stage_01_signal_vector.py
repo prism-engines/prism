@@ -509,6 +509,10 @@ def _compute_single_signal(
             window_data = signal_data[window_start:window_end + 1]
 
             for engine in engine_list:
+                min_required = get_engine_min_samples(engine)
+                if len(window_data) < min_required:
+                    row.update(null_output_for_engine(engine))
+                    continue
                 try:
                     engine_output = run_engine(engine, window_data)
                     row.update(engine_output)

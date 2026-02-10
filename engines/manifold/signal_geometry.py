@@ -362,17 +362,17 @@ def compute_signal_geometry(
                 matrix, signal_ids, centroid, principal_components
             )
 
-            # Build result rows
+            # Build result rows (narrow schema: one row per signal per engine)
             for geom in geom_results:
                 row = {
                     'I': I,
                     'signal_id': geom['signal_id'],
                     'engine': engine_name,
-                    f'distance_{engine_name}': geom['distance'],
-                    f'coherence_{engine_name}': geom['coherence'],
-                    f'contribution_{engine_name}': geom['contribution'],
-                    f'residual_{engine_name}': geom['residual'],
-                    f'magnitude_{engine_name}': geom['signal_magnitude'],
+                    'distance': geom['distance'],
+                    'coherence': geom['coherence'],
+                    'contribution': geom['contribution'],
+                    'residual': geom['residual'],
+                    'magnitude': geom['signal_magnitude'],
                 }
                 # Include cohort if available
                 if cohort:
@@ -384,20 +384,8 @@ def compute_signal_geometry(
         if verbose and (i + 1) % 1000 == 0:
             print(f"  Processed {i + 1}/{n_groups}...")
 
-    # Build DataFrame
+    # Build DataFrame (already one row per signal per engine per I — no pivot needed)
     result = pl.DataFrame(results)
-
-    # Pivot to have one row per (cohort, I, signal_id, engine) with all columns
-    if len(result) > 0:
-        # Determine grouping columns
-        agg_group_cols = ['I', 'signal_id', 'engine']
-        if 'cohort' in result.columns:
-            agg_group_cols = ['cohort'] + agg_group_cols
-
-        result = result.group_by(agg_group_cols).agg([
-            pl.col(c).first() for c in result.columns
-            if c not in agg_group_cols
-        ])
 
     result.write_parquet(output_path)
 

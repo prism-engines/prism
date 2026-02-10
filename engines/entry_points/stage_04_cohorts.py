@@ -139,12 +139,15 @@ def compute_cohorts(
 
         # === GEOMETRY SUMMARY ===
         if len(sg) > 0 and 'effective_dim' in sg.columns:
-            eff_dims = sg['effective_dim'].to_numpy()
-            result['eff_dim_mean'] = float(np.mean(eff_dims))
-            result['eff_dim_std'] = float(np.std(eff_dims))
-            result['eff_dim_min'] = float(np.min(eff_dims))
-            result['eff_dim_max'] = float(np.max(eff_dims))
-            result['eff_dim_trend'] = compute_trend(eff_dims)
+            # Filter to rows with non-null effective_dim
+            sg_valid = sg.filter(pl.col('effective_dim').is_not_null())
+            if len(sg_valid) > 0:
+                eff_dims = sg_valid['effective_dim'].to_numpy()
+                result['eff_dim_mean'] = float(np.nanmean(eff_dims))
+                result['eff_dim_std'] = float(np.nanstd(eff_dims))
+                result['eff_dim_min'] = float(np.nanmin(eff_dims))
+                result['eff_dim_max'] = float(np.nanmax(eff_dims))
+                result['eff_dim_trend'] = compute_trend(eff_dims)
 
         # === MASS SUMMARY ===
         if 'total_variance' in sv.columns:
@@ -168,7 +171,10 @@ def compute_cohorts(
                 result['max_autocorr_1'] = float(np.max(autocorrs))
 
         # === HEALTH SCORE ===
-        result['health_score'] = compute_health_score(result)
+        if 'eff_dim_mean' in result:
+            result['health_score'] = compute_health_score(result)
+        else:
+            result['health_score'] = None
 
         results.append(result)
 
@@ -258,6 +264,13 @@ def run(
 
     if state_geometry_path:
         state_geometry_df = pl.read_parquet(state_geometry_path)
+        # Validate that effective_dim column exists
+        if 'effective_dim' not in state_geometry_df.columns:
+            if verbose:
+                print(f"WARNING: state_geometry at {state_geometry_path} missing 'effective_dim' column.")
+                print(f"  Available columns: {state_geometry_df.columns}")
+            # Fall back to minimal geometry df
+            state_geometry_df = state_vector_df.select(['I', 'cohort'] if 'cohort' in state_vector_df.columns else ['I'])
     else:
         # Create minimal geometry df if not provided
         state_geometry_df = state_vector_df.select(['I', 'cohort'] if 'cohort' in state_vector_df.columns else ['I'])

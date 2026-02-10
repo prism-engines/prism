@@ -60,18 +60,18 @@ def run(
         print("=" * 70)
 
     if segments is None or len(segments) < 2:
-        if verbose:
-            print("Warning: Need at least 2 segments for comparison. Using default split at I=20.")
-        segments = [
-            {'name': 'pre', 'range': [0, 19]},
-            {'name': 'post', 'range': [20, None]},
-        ]
+        # Use percentage-based split: 20% pre, 80% post (computed per-cohort below)
+        segments = None  # Signal to use per-cohort percentage split
 
-    if verbose:
-        print(f"Segments: {len(segments)}")
-        for seg in segments:
-            end = seg['range'][1] if seg['range'][1] is not None else 'end'
-            print(f"  {seg['name']}: I in [{seg['range'][0]}, {end}]")
+    if segments is not None:
+        if verbose:
+            print(f"Segments: {len(segments)}")
+            for seg in segments:
+                end = seg['range'][1] if seg['range'][1] is not None else 'end'
+                print(f"  {seg['name']}: I in [{seg['range'][0]}, {end}]")
+    else:
+        if verbose:
+            print("Using percentage-based split: 20% pre, 80% post (per-cohort)")
 
     # Load observations
     obs = pl.read_parquet(observations_path)
@@ -98,9 +98,19 @@ def run(
         # Get I range for this cohort
         i_max = cohort_data['I'].max()
 
+        # Compute per-cohort segments if using percentage-based split
+        if segments is None:
+            split_i = int(i_max * 0.20)
+            cohort_segments_def = [
+                {'name': 'pre', 'range': [0, split_i]},
+                {'name': 'post', 'range': [split_i + 1, None]},
+            ]
+        else:
+            cohort_segments_def = segments
+
         cohort_segments = {}
 
-        for seg in segments:
+        for seg in cohort_segments_def:
             seg_name = seg['name']
             start_i = seg['range'][0]
             end_i = seg['range'][1] if seg['range'][1] is not None else i_max
@@ -141,6 +151,10 @@ def run(
             if len(matrix) < 5:
                 continue
 
+            # Guard: skip eigendecomp if n_samples < 2 * n_signals (invalid decomposition)
+            if len(matrix) < 2 * len(signal_cols):
+                continue
+
             # Compute eigendecomp
             eigen_result = compute_eigendecomp(matrix)
             eigenvalues = eigen_result.get('eigenvalues', [])
@@ -157,7 +171,7 @@ def run(
             }
 
         # Compute deltas between consecutive segments
-        seg_names = [s['name'] for s in segments if s['name'] in cohort_segments]
+        seg_names = [s['name'] for s in cohort_segments_def if s['name'] in cohort_segments]
 
         for i in range(len(seg_names) - 1):
             seg_a = seg_names[i]

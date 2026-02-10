@@ -96,6 +96,8 @@ def run(
         common_i = sorted(ftle_i & vel_i)
 
         if len(common_i) < 3:
+            if verbose:
+                print(f"  Skipping cohort {cohort}: only {len(common_i)} common I values between ftle_rolling and velocity_field")
             continue
 
         # Process each signal
@@ -168,7 +170,7 @@ def run(
                     'ftle_acceleration': float(ftle_accel),
                     'speed': float(speed),
                     'urgency': float(urgency),
-                    'time_to_ridge': min(float(time_to_ridge), 99999),
+                    'time_to_ridge': float(time_to_ridge) if np.isfinite(time_to_ridge) else None,
                     'urgency_class': urgency_class,
                 })
 

@@ -146,7 +146,7 @@ def compute_mutual_info(
     valid = ~(np.isnan(x) | np.isnan(y))
     x, y = x[valid], y[valid]
     
-    if len(x) < n_bins * 2:
+    if len(x) < n_bins + 2:
         return {
             'mutual_info': np.nan,
             'normalized_mi': np.nan,

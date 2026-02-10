@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 
-def compute_basic_topology(signal_matrix: np.ndarray) -> Dict[str, Any]:
+def compute_basic_topology(signal_matrix: np.ndarray, threshold: float = None) -> Dict[str, Any]:
     """
     Compute basic topological features.
 
@@ -31,6 +31,8 @@ def compute_basic_topology(signal_matrix: np.ndarray) -> Dict[str, Any]:
 
     Args:
         signal_matrix: N x D matrix of signals
+        threshold: Correlation threshold for adjacency. If None, uses
+                   90th percentile of abs(correlation) from the data.
 
     Returns:
         Dict with topological metrics
@@ -39,13 +41,23 @@ def compute_basic_topology(signal_matrix: np.ndarray) -> Dict[str, Any]:
         return {'topology_computed': False}
 
     # Basic connectivity analysis
-    # Correlation-based adjacency
-    corr = np.corrcoef(signal_matrix.T)
+    # Correlation-based adjacency (fill NaN with 0 before corrcoef)
+    signal_matrix_filled = np.where(np.isfinite(signal_matrix), signal_matrix, 0.0)
+    corr = np.corrcoef(signal_matrix_filled.T)
     np.fill_diagonal(corr, 0)
 
-    # Threshold for connectivity
-    threshold = 0.5
-    adjacency = np.abs(corr) > threshold
+    # Adaptive threshold: use 90th percentile of abs(correlation) if not specified
+    if threshold is None:
+        upper_tri = np.abs(corr[np.triu_indices_from(corr, k=1)])
+        finite_vals = upper_tri[np.isfinite(upper_tri)]
+        if len(finite_vals) > 0:
+            threshold = float(np.percentile(finite_vals, 90))
+        else:
+            threshold = 0.5
+
+    # Replace NaN correlations with 0 for adjacency computation
+    corr_clean = np.where(np.isfinite(corr), corr, 0.0)
+    adjacency = np.abs(corr_clean) > threshold
 
     # Connected components (simplified)
     n_signals = signal_matrix.shape[1]
@@ -71,6 +83,7 @@ def compute_basic_topology(signal_matrix: np.ndarray) -> Dict[str, Any]:
 def run(
     signal_vector_path: str,
     output_path: str = "topology.parquet",
+    signal_pairwise_path: str = None,
     verbose: bool = True,
 ) -> pl.DataFrame:
     """
@@ -79,6 +92,7 @@ def run(
     Args:
         signal_vector_path: Path to signal_vector.parquet
         output_path: Output path for topology.parquet
+        signal_pairwise_path: Optional path to signal_pairwise.parquet for adaptive threshold
         verbose: Print progress
 
     Returns:
@@ -92,6 +106,11 @@ def run(
 
     # Load signal vector
     sv = pl.read_parquet(signal_vector_path)
+
+    # Adaptive threshold: None means compute_basic_topology will use 90th
+    # percentile of its own internal abs(correlation) matrix per group.
+    # This adapts to each group's correlation structure automatically.
+    adaptive_threshold = None
 
     if verbose:
         print(f"Loaded signal vector: {len(sv)} rows")
@@ -120,7 +139,7 @@ def run(
         for group_key, group in groups:
             matrix = group.select(feature_cols).to_numpy()
 
-            result = compute_basic_topology(matrix.T)  # Transpose for signals x features
+            result = compute_basic_topology(matrix.T, threshold=adaptive_threshold)  # Transpose for signals x features
 
             if isinstance(group_key, tuple):
                 for i, col in enumerate(group_cols):
@@ -131,7 +150,7 @@ def run(
             results.append(result)
     else:
         matrix = sv.select(feature_cols).to_numpy()
-        result = compute_basic_topology(matrix.T)
+        result = compute_basic_topology(matrix.T, threshold=adaptive_threshold)
         results.append(result)
 
     # Build DataFrame
