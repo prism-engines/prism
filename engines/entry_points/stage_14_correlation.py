@@ -64,57 +64,49 @@ def run(
     has_cohort = 'cohort' in sv.columns
     results = []
 
+    def _pairwise_correlations(matrix, feature_cols, extra_fields=None):
+        """Compute pairwise correlations using only rows where both features are finite."""
+        rows = []
+        for i in range(len(feature_cols)):
+            xi = matrix[:, i]
+            for j in range(i + 1, len(feature_cols)):
+                xj = matrix[:, j]
+                mask = np.isfinite(xi) & np.isfinite(xj)
+                n_valid = mask.sum()
+                if n_valid < 2:
+                    continue
+                r = np.corrcoef(xi[mask], xj[mask])[0, 1]
+                if np.isfinite(r):
+                    row = {
+                        'feature_a': feature_cols[i],
+                        'feature_b': feature_cols[j],
+                        'correlation': float(r),
+                        'n_valid': int(n_valid),
+                    }
+                    if extra_fields:
+                        row.update(extra_fields)
+                    rows.append(row)
+        return rows
+
     if has_cohort:
         cohorts = sv['cohort'].unique().to_list()
         if verbose:
-            print(f"Computing per-cohort correlations ({len(cohorts)} cohorts)...")
+            print(f"Computing per-cohort correlations ({len(cohorts)} cohorts, pairwise NaN handling)...")
 
-        for cohort in cohorts:
+        for ci, cohort in enumerate(cohorts):
             cohort_data = sv.filter(pl.col('cohort') == cohort)
             matrix = cohort_data.select(feature_cols).to_numpy()
+            results.extend(_pairwise_correlations(matrix, feature_cols, {'cohort': cohort}))
 
-            # Remove rows with NaN
-            valid_mask = np.isfinite(matrix).all(axis=1)
-            matrix = matrix[valid_mask]
-
-            if len(matrix) < 2:
-                continue
-
-            # Compute correlation matrix
-            corr_matrix = np.corrcoef(matrix.T)
-
-            # Store upper triangle
-            for i in range(len(feature_cols)):
-                for j in range(i + 1, len(feature_cols)):
-                    if np.isfinite(corr_matrix[i, j]):
-                        results.append({
-                            'cohort': cohort,
-                            'feature_a': feature_cols[i],
-                            'feature_b': feature_cols[j],
-                            'correlation': float(corr_matrix[i, j]),
-                        })
+            if verbose and (ci + 1) % 20 == 0:
+                print(f"  Processed {ci + 1}/{len(cohorts)} cohorts ({len(results)} pairs so far)...")
     else:
         matrix = sv.select(feature_cols).to_numpy()
 
-        # Remove rows with NaN
-        valid_mask = np.isfinite(matrix).all(axis=1)
-        matrix = matrix[valid_mask]
-
         if verbose:
-            print(f"Computing global correlation ({len(matrix)} samples)...")
+            print(f"Computing global correlation ({len(matrix)} samples, pairwise NaN handling)...")
 
-        if len(matrix) >= 2:
-            corr_matrix = np.corrcoef(matrix.T)
-
-            # Store upper triangle
-            for i in range(len(feature_cols)):
-                for j in range(i + 1, len(feature_cols)):
-                    if np.isfinite(corr_matrix[i, j]):
-                        results.append({
-                            'feature_a': feature_cols[i],
-                            'feature_b': feature_cols[j],
-                            'correlation': float(corr_matrix[i, j]),
-                        })
+        results.extend(_pairwise_correlations(matrix, feature_cols))
 
     # Build DataFrame
     result = pl.DataFrame(results) if results else pl.DataFrame()

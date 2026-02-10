@@ -19,7 +19,6 @@ import argparse
 import os
 import polars as pl
 import numpy as np
-from multiprocessing import Pool
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
@@ -126,14 +125,12 @@ def run(
     """
     Run information flow computation for Granger-flagged pairs only.
 
-    Uses multiprocessing Pool to parallelize across all CPU cores.
+    Runs sequentially to keep memory under control (~1GB vs ~6GB with multiprocessing).
     """
-    n_workers = min(os.cpu_count() or 4, 4)
-
     if verbose:
         print("=" * 70)
         print("STAGE 10: INFORMATION FLOW")
-        print(f"Causality for eigenvector-gated pairs ({n_workers} workers)")
+        print("Causality for eigenvector-gated pairs (sequential)")
         print("=" * 70)
 
     # Load observations
@@ -168,53 +165,71 @@ def run(
         result.write_parquet(output_path)
         return result
 
-    # Build signal time series lookup
-    signals = obs[signal_column].unique().to_list()
-    signal_data = {}
+    # Determine cohorts
+    has_cohort = 'cohort' in obs.columns
+    if has_cohort:
+        cohorts = obs['cohort'].unique().sort().to_list()
+    else:
+        cohorts = [None]
 
-    for signal in signals:
-        sig = obs.filter(pl.col(signal_column) == signal).sort(index_column)
-        values = sig[value_column].to_numpy()
-        values = values[~np.isnan(values)]
-        if len(values) >= min_samples:
-            signal_data[signal] = values
-
-    if verbose:
-        print(f"Signals with sufficient data: {len(signal_data)}/{len(signals)}")
-
-    # Build work items — each is (signal_a, signal_b, x_array, y_array)
-    work_items = []
     pairs_list = granger_pairs.to_dicts()
-
-    for pair in pairs_list:
-        signal_a = pair['signal_a']
-        signal_b = pair['signal_b']
-
-        if signal_a not in signal_data or signal_b not in signal_data:
-            continue
-
-        x = signal_data[signal_a]
-        y = signal_data[signal_b]
-
-        min_len = min(len(x), len(y))
-        x = x[:min_len]
-        y = y[:min_len]
-
-        if len(x) < min_samples:
-            continue
-
-        work_items.append((signal_a, signal_b, x, y))
+    signals = obs[signal_column].unique().to_list()
 
     if verbose:
-        print(f"Work items: {len(work_items)} pairs to compute")
-        print(f"Launching {n_workers} workers...")
+        print(f"Signals: {len(signals)}")
+        print(f"Cohorts: {len(cohorts)}")
+        print(f"Work: {len(pairs_list)} pairs × {len(cohorts)} cohorts = {len(pairs_list) * len(cohorts)} items")
 
-    # Parallel computation
-    with Pool(processes=n_workers) as pool:
-        results = pool.map(_compute_pair, work_items)
+    # Sequential per-cohort computation
+    results = []
+    total_items = 0
 
-    # Build DataFrame
-    result = pl.DataFrame(results) if results else pl.DataFrame()
+    for ci, cohort in enumerate(cohorts):
+        # Filter observations to this cohort
+        if cohort is not None:
+            cohort_obs = obs.filter(pl.col('cohort') == cohort)
+        else:
+            cohort_obs = obs
+
+        # Build signal lookup for this cohort only
+        signal_data = {}
+        for signal in signals:
+            sig = cohort_obs.filter(pl.col(signal_column) == signal).sort(index_column)
+            values = sig[value_column].to_numpy()
+            values = values[~np.isnan(values)]
+            if len(values) >= min_samples:
+                signal_data[signal] = values
+
+        # Compute pairs within this cohort
+        for pair in pairs_list:
+            signal_a = pair['signal_a']
+            signal_b = pair['signal_b']
+
+            if signal_a not in signal_data or signal_b not in signal_data:
+                continue
+
+            x = signal_data[signal_a]
+            y = signal_data[signal_b]
+
+            min_len = min(len(x), len(y))
+            x = x[:min_len]
+            y = y[:min_len]
+
+            if len(x) < min_samples:
+                continue
+
+            row = _compute_pair((signal_a, signal_b, x, y))
+            if cohort is not None:
+                row['cohort'] = cohort
+            results.append(row)
+            total_items += 1
+
+        if verbose and (ci + 1) % 10 == 0:
+            print(f"  Processed {ci + 1}/{len(cohorts)} cohorts ({total_items} pairs so far)...")
+
+    # Build DataFrame (high infer_schema_length because copula_best_family is str
+    # that may be null in early rows)
+    result = pl.DataFrame(results, infer_schema_length=len(results)) if results else pl.DataFrame()
 
     if len(result) > 0:
         result.write_parquet(output_path)

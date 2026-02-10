@@ -187,8 +187,26 @@ def compute_state_geometry(
             # Get signal matrix
             matrix = group.select(available).to_numpy()
 
+            # Guard: filter NaN rows
+            valid_rows = np.isfinite(matrix).all(axis=1)
+            matrix_clean = matrix[valid_rows]
+
+            # Guard: need more rows than features for meaningful eigendecomposition
+            if len(matrix_clean) < len(available) + 1:
+                if verbose and i == 0:
+                    print(f"  Skipping {engine_name} at I={I}: only {len(matrix_clean)} valid rows for {len(available)} features")
+                continue
+
+            # Guard: skip if any column is constant (zero variance → degenerate SVD)
+            col_std = np.std(matrix_clean, axis=0)
+            if np.any(col_std < 1e-12):
+                if verbose and i == 0:
+                    const_cols = [available[k] for k in range(len(available)) if col_std[k] < 1e-12]
+                    print(f"  Skipping {engine_name} at I={I}: constant columns {const_cols}")
+                continue
+
             # Compute eigenvalues
-            eigen_result = compute_eigenvalues(matrix, centroid)
+            eigen_result = compute_eigenvalues(matrix_clean, centroid)
 
             # Build result row
             unit_id = group['unit_id'][0] if 'unit_id' in group.columns else ''

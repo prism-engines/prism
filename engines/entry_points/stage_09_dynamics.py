@@ -35,7 +35,7 @@ def run(
     verbose: bool = True,
 ) -> pl.DataFrame:
     """
-    Run dynamics computation for all signals.
+    Run dynamics computation for all signals, per-cohort.
 
     Args:
         observations_path: Path to observations.parquet
@@ -52,46 +52,70 @@ def run(
     if verbose:
         print("=" * 70)
         print("STAGE 09: DYNAMICS")
-        print("Per-signal stability classification")
+        print("Per-signal per-cohort stability classification")
         print("=" * 70)
 
     # Load observations
     obs = pl.read_parquet(observations_path)
 
-    if verbose:
-        n_signals = obs[signal_column].n_unique()
-        print(f"Loaded: {len(obs):,} observations, {n_signals} signals")
-
     signals = obs[signal_column].unique().to_list()
+
+    # Determine cohorts
+    has_cohort = 'cohort' in obs.columns
+    if has_cohort:
+        cohorts = obs['cohort'].unique().sort().to_list()
+    else:
+        cohorts = [None]
+
+    if verbose:
+        print(f"Loaded: {len(obs):,} observations, {len(signals)} signals, {len(cohorts)} cohorts")
+        print(f"Work: {len(signals)} signals × {len(cohorts)} cohorts = {len(signals) * len(cohorts)} items")
+
     results = []
+    total_items = 0
 
-    for i, signal in enumerate(signals):
-        signal_data = obs.filter(pl.col(signal_column) == signal).sort(index_column)
-        values = signal_data[value_column].to_numpy()
-
-        # Compute FTLE
-        result = compute_ftle(values, min_samples=min_samples)
-
-        # Add stability classification based on FTLE
-        ftle_val = result.get('ftle')
-        if ftle_val is not None:
-            stability = classify_stability(ftle_val)
-            result['stability'] = stability.value
-            result['ftle'] = ftle_val
+    for ci, cohort in enumerate(cohorts):
+        # Filter observations to this cohort
+        if cohort is not None:
+            cohort_obs = obs.filter(pl.col('cohort') == cohort)
         else:
-            result['stability'] = 'unknown'
-            result['ftle'] = np.nan
+            cohort_obs = obs
 
-        result['signal_id'] = signal
-        result['n_samples'] = len(values)
-        results.append(result)
+        for signal in signals:
+            signal_data = cohort_obs.filter(pl.col(signal_column) == signal).sort(index_column)
+            values = signal_data[value_column].to_numpy()
+            values = values[~np.isnan(values)]
 
-        if verbose and (i + 1) % 10 == 0:
-            print(f"  Processed {i + 1}/{len(signals)} signals...")
+            if len(values) < min_samples:
+                continue
+
+            # Compute FTLE
+            result = compute_ftle(values, min_samples=min_samples)
+
+            # Add stability classification based on FTLE
+            ftle_val = result.get('ftle')
+            if ftle_val is not None:
+                stability = classify_stability(ftle_val)
+                result['stability'] = stability.value
+                result['ftle'] = ftle_val
+            else:
+                result['stability'] = 'unknown'
+                result['ftle'] = np.nan
+
+            result['signal_id'] = signal
+            result['n_samples'] = len(values)
+            if cohort is not None:
+                result['cohort'] = cohort
+            results.append(result)
+            total_items += 1
+
+        if verbose and (ci + 1) % 10 == 0:
+            print(f"  Processed {ci + 1}/{len(cohorts)} cohorts ({total_items} items so far)...")
 
     # Build DataFrame
-    df = pl.DataFrame(results)
-    df.write_parquet(output_path)
+    df = pl.DataFrame(results, infer_schema_length=len(results)) if results else pl.DataFrame()
+    if len(df) > 0:
+        df.write_parquet(output_path)
 
     if verbose:
         print(f"\nShape: {df.shape}")
