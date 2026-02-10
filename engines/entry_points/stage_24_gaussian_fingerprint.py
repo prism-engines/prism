@@ -68,6 +68,7 @@ def _build_fingerprint_sql(features: List[str]) -> str:
     select_cols.append(vol_line)
 
     all_agg = ",\n".join(mean_lines + std_lines + corr_lines)
+    select_block = ",\n".join(select_cols)
 
     sql = f"""
 WITH signal_stats AS (
@@ -80,7 +81,7 @@ WITH signal_stats AS (
     GROUP BY COALESCE(cohort, '_default'), signal_id
 )
 SELECT
-{",\n".join(select_cols)}
+{select_block}
 FROM signal_stats
 ORDER BY cohort, signal_id;
 """

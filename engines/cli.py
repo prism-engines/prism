@@ -669,8 +669,8 @@ def cmd_run(args):
     # Determine stages to run
     stage_list = None
     if args.atlas:
-        # Core + atlas stages
-        stage_list = [f'{i:02d}' for i in range(24)]
+        # Core + atlas stages (0-24 inclusive, stage_24 = gaussian_fingerprint)
+        stage_list = [f'{i:02d}' for i in range(25)]
     # else: default (core stages only)
 
     # Run pipeline

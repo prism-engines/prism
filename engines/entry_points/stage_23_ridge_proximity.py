@@ -176,7 +176,7 @@ def run(
 
     # Build output
     if results:
-        result = pl.DataFrame(results)
+        result = pl.DataFrame(results, infer_schema_length=None)
     else:
         result = pl.DataFrame(schema={
             'I': pl.Int64,

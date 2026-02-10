@@ -336,6 +336,8 @@ def generate_auto_manifest(
     stride = max(1, window // 2)
 
     # Base engines — inclusive philosophy (run everything that could be useful)
+    # NOTE: Do not expand this list without first adding min-sample guards to each engine.
+    # See PR #1, #3, #6, #7 for the history of broken engines producing null columns.
     base_engines = [
         'crest_factor', 'kurtosis', 'skewness',
         'spectral',
