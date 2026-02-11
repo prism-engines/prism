@@ -621,7 +621,7 @@ def cmd_run(args):
                 end = int(parts[2]) if parts[2] != '' else None
                 segments.append({'name': name, 'range': [start, end]})
 
-        manifest = generate_auto_manifest(chars, atlas=args.atlas, segments=segments)
+        manifest = generate_auto_manifest(chars, atlas=True, segments=segments)
         print(f"  Manifest: auto-generated (window={manifest['system']['window']}, "
               f"stride={manifest['system']['stride']})")
 
@@ -630,7 +630,7 @@ def cmd_run(args):
         print(f"  Warning: Very short signals ({chars['min_samples']} samples) — limited analysis")
     if not chars['ftle_viable']:
         print(f"  Warning: FTLE requires >=200 samples (have {chars['min_samples']})")
-    elif args.atlas and not chars['rolling_ftle_viable']:
+    elif not chars['rolling_ftle_viable']:
         print(f"  Warning: Rolling FTLE requires >=400 samples (have {chars['min_samples']})")
 
     # Save observations.parquet to output directory (skip if already there)
@@ -666,12 +666,8 @@ def cmd_run(args):
     with open(manifest_output, 'w') as f:
         yaml.dump(manifest, f, default_flow_style=False)
 
-    # Determine stages to run
-    stage_list = None
-    if args.atlas:
-        # Core + atlas stages (0-24 inclusive, stage_24 = gaussian_fingerprint)
-        stage_list = [f'{i:02d}' for i in range(25)]
-    # else: default (core stages only)
+    # Always run all stages (core + atlas, stages 0-24)
+    stage_list = [f'{i:02d}' for i in range(25)]
 
     # Run pipeline
     print(f"\nRunning pipeline...")
@@ -729,7 +725,6 @@ def cmd_inspect(args):
 
     print(f"\nRun pipeline:")
     print(f"  engines run {input_path}")
-    print(f"  engines run {input_path} --atlas")
 
     return 0
 
@@ -853,8 +848,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Quick start:
-    engines run sensor_data.csv              # Run core pipeline
-    engines run sensor_data.csv --atlas      # Run with full atlas
+    engines run sensor_data.csv              # Run full pipeline (core + atlas)
     engines inspect sensor_data.csv          # Analyze input data
     engines explore ./engines_output/        # Launch visualization
 
@@ -886,10 +880,6 @@ Pipeline commands:
     run_parser.add_argument(
         '--manifest', '-m', default=None,
         help='Path to manifest.yaml (auto-generated if not provided)',
-    )
-    run_parser.add_argument(
-        '--atlas', action='store_true',
-        help='Enable all atlas engines (velocity, FTLE rolling, ridge proximity)',
     )
     run_parser.add_argument(
         '--segments', '-s', action='append', default=None,

@@ -20,9 +20,6 @@ engines run data.csv
 # Inspect data before running
 engines inspect data.csv
 
-# Run with full dynamical atlas (velocity fields, FTLE ridges, urgency)
-engines run data.csv --atlas
-
 # Explore results in browser
 engines explore output/
 ```
@@ -81,7 +78,7 @@ Engines runs a 15-stage pipeline that transforms raw observations into a complet
 | 13 | `statistics.parquet` | Summary statistics per signal |
 | 14 | `correlation.parquet` | Feature correlation matrix |
 
-### Atlas Pipeline (stages 15-23, `--atlas` flag)
+### Atlas Pipeline (stages 15-23)
 
 The atlas adds system-level dynamics that reveal **where your system is going** and **how fast**:
 
@@ -185,7 +182,7 @@ state_geometry = run("signal_vector.parquet", "state_vector.parquet", "state_geo
 from engines.entry_points.stage_08_ftle import run
 ftle = run("observations.parquet", "ftle.parquet")
 
-# Velocity field (atlas)
+# Velocity field
 from engines.entry_points.stage_21_velocity_field import run
 velocity = run("observations.parquet", "velocity_field.parquet")
 ```
@@ -247,8 +244,8 @@ engines/
 ## CLI Reference
 
 ```bash
-# Run full pipeline on any input
-engines run <input> [--output DIR] [--atlas] [--manifest FILE] [--segments name:start:end]
+# Run full pipeline (core + atlas) on any input
+engines run <input> [--output DIR] [--manifest FILE] [--segments name:start:end]
 
 # Inspect data without running
 engines inspect <input>
@@ -256,7 +253,7 @@ engines inspect <input>
 # Launch browser-based explorer
 engines explore <output_dir> [--port 8080]
 
-# Run full atlas pipeline on existing output
+# Run atlas stages separately (if core pipeline already complete)
 engines atlas <data_dir> [--output DIR]
 
 # Individual atlas stages
@@ -295,7 +292,7 @@ pip install orthon-engines[all]     # everything
 3. **Signal features** — computes scale-invariant features per signal per window (kurtosis, spectral entropy, Hurst, etc.)
 4. **State geometry** — eigendecomposes the signal feature matrix via SVD. Tracks eigenvalue evolution, effective dimension, and eigenvector continuity across windows
 5. **Dynamics** — computes FTLE per signal using delay embedding (Cao's method for dimension, AMI for delay)
-6. **Atlas** (optional) — velocity fields, rolling FTLE, ridge proximity = "where is the system going and how urgent is it?"
+6. **Atlas** — velocity fields, rolling FTLE, ridge proximity = "where is the system going and how urgent is it?"
 7. **Output** — all results as Parquet files, queryable with DuckDB, Polars, or pandas
 
 ---

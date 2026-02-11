@@ -134,6 +134,8 @@ Orthon Engines is a domain-agnostic dynamical systems analysis platform.
 
 ### Pipeline (24 stages)
 
+The full pipeline always runs all stages (core + atlas).
+
 ```
 observations.parquet + typology.parquet + manifest.yaml  (from Orthon)
         │
@@ -145,7 +147,7 @@ observations.parquet + typology.parquet + manifest.yaml  (from Orthon)
     09 dynamics          10 information_flow  11 topology
     12 zscore            13 statistics        14 correlation
 
-  Atlas (stages 15-23, --atlas flag):
+  Atlas (stages 15-23):
     15 ftle_field         16 break_sequence    17 ftle_backward
     18 segment_comparison 19 info_flow_delta   20 geometry_full
     21 velocity_field     22 ftle_rolling      23 ridge_proximity

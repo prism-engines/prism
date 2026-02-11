@@ -335,32 +335,16 @@ def run(
 
             elif stage_num == '17':
                 # Backward FTLE - attracting structures
-                # Compute backward, merge into ftle.parquet (no separate ftle_backward file)
-                import polars as _pl
-                import tempfile as _tmpf
+                # Write to separate ftle_backward.parquet file
                 obs_path = manifest_path.parent / manifest['paths']['observations']
                 intervention = manifest.get('intervention')
-                # Write to temp file, then merge into ftle.parquet
-                with _tmpf.NamedTemporaryFile(suffix='.parquet', delete=False) as _tmp:
-                    _tmp_path = _tmp.name
-                bwd = module.run(
+                module.run(
                     str(obs_path),
-                    _tmp_path,
+                    str(output_dir / 'ftle_backward.parquet'),
                     verbose=verbose,
                     intervention=intervention,
                     direction='backward',
                 )
-                # Clean up temp file
-                Path(_tmp_path).unlink(missing_ok=True)
-                # Merge backward into ftle.parquet if forward exists
-                ftle_path = output_dir / 'ftle.parquet'
-                if ftle_path.exists() and len(bwd) > 0:
-                    fwd = _pl.read_parquet(str(ftle_path))
-                    common_cols = sorted(set(fwd.columns) & set(bwd.columns))
-                    merged = _pl.concat([fwd.select(common_cols), bwd.select(common_cols)], how='vertical')
-                    merged.write_parquet(str(ftle_path))
-                    if verbose:
-                        print(f"  Merged into ftle.parquet: {merged.shape} (forward + backward)")
 
             elif stage_num == '18':
                 # Segment comparison - per-segment geometry
@@ -553,6 +537,24 @@ def run(
 
         if verbose:
             print()
+
+    # Atlas assertion: verify all expected files are produced
+    ATLAS_FILES = [
+        'break_sequence', 'breaks', 'cohorts', 'correlation',
+        'ftle', 'ftle_backward', 'ftle_rolling',
+        'gaussian_fingerprint', 'gaussian_similarity',
+        'geometry_dynamics', 'info_flow_delta', 'information_flow',
+        'ridge_proximity', 'segment_comparison',
+        'signal_geometry', 'signal_pairwise', 'signal_vector',
+        'state_geometry', 'state_geometry_feature_loadings',
+        'state_geometry_loadings', 'state_vector', 'statistics',
+        'topology', 'velocity_field', 'velocity_field_components',
+        'zscore'
+    ]
+    produced = [f.stem for f in output_dir.glob('*.parquet')]
+    missing = set(ATLAS_FILES) - set(produced)
+    if missing:
+        raise RuntimeError(f'Incomplete atlas: missing {sorted(missing)}')
 
     if verbose:
         print("=" * 70)

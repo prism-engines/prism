@@ -310,7 +310,7 @@ def detect_data_characteristics(df: pl.DataFrame) -> Dict:
 
 def generate_auto_manifest(
     characteristics: Dict,
-    atlas: bool = False,
+    atlas: bool = True,
     segments: Optional[List[Dict]] = None,
 ) -> Dict:
     """
@@ -318,7 +318,7 @@ def generate_auto_manifest(
 
     Args:
         characteristics: Output from detect_data_characteristics()
-        atlas: Enable all atlas engines
+        atlas: Enable all atlas engines (default: True, full pipeline always runs)
         segments: Segment definitions [{'name': str, 'range': [start, end]}]
 
     Returns:
