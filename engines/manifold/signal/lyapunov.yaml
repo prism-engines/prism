@@ -8,9 +8,10 @@ requirements:
   scaling: linear
 
 outputs:
-  - lyapunov_max
-  - lyapunov_mean
-  - chaos_indicator
+  - lyapunov
+  - embedding_dim
+  - embedding_tau
+  - confidence
 
 dependencies: []
 
