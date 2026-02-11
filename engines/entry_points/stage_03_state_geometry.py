@@ -254,6 +254,10 @@ def compute_state_geometry(
                 row['eff_dim_std'] = bs['eff_dim_std']
                 row['eff_dim_ci_low'] = bs['eff_dim_ci_low']
                 row['eff_dim_ci_high'] = bs['eff_dim_ci_high']
+            else:
+                row['eff_dim_std'] = np.nan
+                row['eff_dim_ci_low'] = np.nan
+                row['eff_dim_ci_high'] = np.nan
 
             # Signal loadings on principal components (for pairwise gating)
             # signal_loadings: N_signals x k matrix (U from SVD)
