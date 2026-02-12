@@ -59,6 +59,8 @@ ADVANCED_STAGES = [
     'stage_30_cohort_ftle',            # FTLE on cohort trajectories
     'stage_31_cohort_velocity_field',  # Velocity of cohorts through feature space
     'stage_32_cohort_fingerprint',     # Gaussian fingerprints + Bhattacharyya similarity
+    # Signal stability (Hilbert + Wavelet — full-coverage FTLE replacement)
+    'stage_33_signal_stability',       # Rolling Hilbert + Wavelet per signal, aggregated
 ]
 
 # Stage dependencies for validation

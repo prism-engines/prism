@@ -1,0 +1,27 @@
+engine: hilbert_stability
+version: "1.0"
+
+requirements:
+  base_window: 16
+  min_window: 4
+  max_window: 512
+  scaling: linear
+
+outputs:
+  - inst_freq_mean
+  - inst_freq_std
+  - inst_freq_stability
+  - inst_freq_kurtosis
+  - inst_freq_skewness
+  - inst_freq_range
+  - inst_freq_drift
+  - inst_amp_cv
+  - inst_amp_trend
+  - phase_coherence
+  - am_fm_ratio
+
+dependencies: []
+
+metadata:
+  description: Instantaneous frequency and amplitude stability via Hilbert transform
+  category: stability

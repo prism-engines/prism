@@ -34,6 +34,8 @@ from . import fundamental_freq
 from . import phase_coherence
 from . import snr
 from . import thd
+from . import hilbert_stability
+from . import wavelet_stability
 
 __all__ = [
     'statistics',
@@ -65,4 +67,6 @@ __all__ = [
     'phase_coherence',
     'snr',
     'thd',
+    'hilbert_stability',
+    'wavelet_stability',
 ]
