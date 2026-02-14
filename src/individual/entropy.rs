@@ -90,18 +90,18 @@ pub fn permutation_entropy(
         *counts.entry(indices).or_insert(0) += 1;
     }
 
-    // Shannon entropy of permutation distribution
+    // Shannon entropy of permutation distribution (log2, matching Python)
     let total = n_patterns as f64;
     let mut entropy = 0.0;
     for &count in counts.values() {
         let p = count as f64 / total;
         if p > 0.0 {
-            entropy -= p * p.ln();
+            entropy -= p * p.log2();
         }
     }
 
     if normalize {
-        let max_entropy = (factorial(order) as f64).ln();
+        let max_entropy = (factorial(order) as f64).log2();
         if max_entropy > 0.0 {
             entropy /= max_entropy;
         }

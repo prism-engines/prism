@@ -7,6 +7,12 @@ ADF, KPSS, Phillips-Perron tests.
 import numpy as np
 from typing import Tuple, Optional
 
+try:
+    from rudder_primitives_rs.individual import adf_test as _adf_rs
+    _USE_RUST_ADF = True
+except ImportError:
+    _USE_RUST_ADF = False
+
 
 def adf_test(
     signal: np.ndarray,
@@ -56,7 +62,13 @@ def adf_test(
             result[4]          # critical values
         )
     except ImportError:
-        # Fallback: simple implementation
+        # Fallback: Rust or simple Python implementation
+        if _USE_RUST_ADF:
+            adf_stat, p_value, used_lag = _adf_rs(
+                np.asarray(signal, dtype=np.float64), max_lag, regression
+            )
+            crit_values = {'1%': -3.51, '5%': -2.89, '10%': -2.58}
+            return adf_stat, p_value, used_lag, crit_values
         return _adf_simple(signal, max_lag, regression)
 
 

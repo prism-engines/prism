@@ -19,6 +19,12 @@ import numpy as np
 from typing import Tuple, Dict, Any, Optional
 from scipy.spatial import KDTree
 
+try:
+    from rudder_primitives_rs.dynamical import ftle_local_linearization as _ftle_rs
+    _USE_RUST_FTLE = True
+except ImportError:
+    _USE_RUST_FTLE = False
+
 
 def ftle_local_linearization(
     trajectory: np.ndarray,
@@ -59,6 +65,25 @@ def ftle_local_linearization(
     The FTLE field identifies Lagrangian Coherent Structures (LCS)
     which are ridges of maximum stretching.
     """
+    if _USE_RUST_FTLE:
+        trajectory = np.asarray(trajectory, dtype=np.float64)
+        if trajectory.ndim == 1:
+            raise ValueError("Trajectory must be 2D (n_points, dimension)")
+        n_points, dim = trajectory.shape
+        n_valid = n_points - time_horizon
+        if n_valid < 10:
+            return np.full(n_points, np.nan), np.full(n_points, 0.0)
+        # Auto epsilon in Python (uses random sampling)
+        if epsilon is None:
+            sample_idx = np.random.choice(n_points, min(100, n_points), replace=False)
+            dists = []
+            for i in sample_idx:
+                for j in sample_idx:
+                    if i != j:
+                        dists.append(np.linalg.norm(trajectory[i] - trajectory[j]))
+            epsilon = np.percentile(dists, 20) if dists else 1.0
+        return _ftle_rs(trajectory, time_horizon, n_neighbors, epsilon)
+
     trajectory = np.asarray(trajectory)
     if trajectory.ndim == 1:
         raise ValueError("Trajectory must be 2D (n_points, dimension)")

@@ -7,6 +7,12 @@ Lyapunov exponent estimation.
 import numpy as np
 from typing import Tuple, Optional
 
+try:
+    from rudder_primitives_rs.dynamical import lyapunov_rosenstein as _lyapunov_rs
+    _USE_RUST_LYAP = True
+except ImportError:
+    _USE_RUST_LYAP = False
+
 
 def lyapunov_rosenstein(
     signal: np.ndarray,
@@ -51,6 +57,23 @@ def lyapunov_rosenstein(
     3. Track divergence over time
     4. Fit slope to log(divergence) vs time
     """
+    if _USE_RUST_LYAP:
+        signal = np.asarray(signal, dtype=np.float64).flatten()
+        n = len(signal)
+        if n < 50:
+            return np.nan, np.array([]), np.array([])
+        _delay = delay if delay is not None else _auto_delay(signal)
+        _dimension = dimension if dimension is not None else _auto_dimension(signal, _delay)
+        min_embed_points = max(50, n // 4)
+        is_valid, _dimension, _delay, msg = _validate_embedding_params(
+            n, _dimension, _delay, min_embed_points
+        )
+        if not is_valid:
+            return np.nan, np.array([]), np.array([])
+        _min_tsep = min_tsep if min_tsep is not None else _delay * _dimension
+        _max_iter = max_iter if max_iter is not None else min(n // 10, 500)
+        return _lyapunov_rs(signal, _dimension, _delay, _min_tsep, _max_iter)
+
     from scipy.spatial import KDTree
 
     signal = np.asarray(signal).flatten()

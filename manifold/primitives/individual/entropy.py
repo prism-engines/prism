@@ -9,6 +9,12 @@ from typing import Optional
 
 from manifold.primitives.config import PRIMITIVES_CONFIG as cfg
 
+try:
+    from rudder_primitives_rs.individual import permutation_entropy as _perm_entropy_rs
+    _USE_RUST_PERM = True
+except ImportError:
+    _USE_RUST_PERM = False
+
 
 def sample_entropy(
     signal: np.ndarray,
@@ -100,6 +106,10 @@ def permutation_entropy(
     Based on comparing ordinal patterns in the signal.
     Robust to noise and efficient to compute.
     """
+    if _USE_RUST_PERM:
+        return _perm_entropy_rs(np.asarray(signal, dtype=np.float64).flatten(),
+                                order, delay, normalize)
+
     signal = np.asarray(signal).flatten()
     n = len(signal)
 

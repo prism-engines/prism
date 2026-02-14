@@ -5,6 +5,7 @@ pub mod entropy;
 pub mod spectral;
 pub mod statistics;
 pub mod derivatives;
+pub mod stationarity;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // hurst
@@ -34,6 +35,9 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(statistics::crest_factor, m)?)?;
     m.add_function(wrap_pyfunction!(statistics::zero_crossings, m)?)?;
     m.add_function(wrap_pyfunction!(statistics::mean_crossings, m)?)?;
+
+    // stationarity
+    m.add_function(wrap_pyfunction!(stationarity::adf_test, m)?)?;
 
     // derivatives
     m.add_function(wrap_pyfunction!(derivatives::first_derivative, m)?)?;
