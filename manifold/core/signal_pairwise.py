@@ -35,9 +35,7 @@ from manifold.primitives.individual.similarity import (
 )
 
 # Import configuration
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from config import get_config
+from manifold.config import get_config
 
 
 # ============================================================

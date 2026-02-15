@@ -42,9 +42,7 @@ from manifold.primitives.individual.derivatives import first_derivative, second_
 from manifold.primitives.individual.dynamics import attractor_reconstruction
 
 # Import configuration
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from config import get_config
+from manifold.config import get_config
 
 
 # ============================================================

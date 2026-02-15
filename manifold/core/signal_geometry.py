@@ -31,9 +31,7 @@ from manifold.primitives.individual.similarity import euclidean_distance, cosine
 from manifold.primitives.individual.geometry import covariance_matrix, eigendecomposition
 
 # Import configuration
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from config import get_config
+from manifold.config import get_config
 
 
 # ============================================================

@@ -64,18 +64,6 @@ from manifold.core.state.eigendecomp import compute as compute_eigenvalues
 from manifold.core.signal_geometry import compute_signal_geometry
 from manifold.core.signal_pairwise import compute_signal_pairwise
 
-# Lazy import to avoid circular dependency
-def compute_state_vector(*args, **kwargs):
-    """Lazy wrapper - imports from entry_points on first call."""
-    import importlib
-    ep = importlib.import_module('manifold.stages.geometry.state_vector')
-    return ep.compute_state_vector(*args, **kwargs)
-
-def compute_state_geometry(*args, **kwargs):
-    """Lazy wrapper - imports from entry_points on first call."""
-    import importlib
-    ep = importlib.import_module('manifold.stages.geometry.state_geometry')
-    return ep.compute_state_geometry(*args, **kwargs)
 from manifold.core.geometry_dynamics import (
     compute_geometry_dynamics,
     compute_signal_dynamics,
@@ -108,9 +96,7 @@ __all__ = [
     'inverse_normalize',
     'NormMethod',
     # Legacy flat files
-    'compute_state_vector',
     'compute_centroid',
-    'compute_state_geometry',
     'compute_eigenvalues',
     'compute_signal_geometry',
     'compute_signal_pairwise',

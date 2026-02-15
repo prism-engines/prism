@@ -4,7 +4,7 @@ ENGINES Configuration Module
 Provides hierarchical configuration with defaults and domain/environment overrides.
 
 Usage:
-    from config import ConfigManager, get_config
+    from manifold.config import ConfigManager, get_config
 
     # Get global config (loads defaults)
     config = get_config()
