@@ -3,7 +3,7 @@
 Manifold is a domain-agnostic dynamical systems computation engine.
 It reads `observations.parquet` and produces 29 parquet files in 6 directories.
 
-**Design principle:** Entry points orchestrate. Manifold computes. Primitives do math.
+**Design principle:** Stages orchestrate. Engines compute. Primitives (standalone package) do math.
 Each layer only calls the layer below it.
 
 **Manifold computes. It never classifies, labels, or interprets.**
@@ -324,15 +324,16 @@ Before modifying any file:
 
 ```
 ~/domains/
-├── cmapss/           # C-MAPSS turbofan (FD001-FD004)
-├── calce/            # Battery calendar aging
-├── rossler/          # Chaotic system (Rossler attractor)
-├── battery/          # NASA battery degradation
-├── electrochemistry/ # Electrochemical data
-├── cwru/             # CWRU bearing fault
-├── hydraulic/        # Hydraulic condition monitoring
-├── industrial/       # SKAB, MetroPT
-└── secom/            # Semiconductor manufacturing
+├── Bearings_IMS/        # IMS bearing degradation
+├── Challenge_Data/      # Challenge dataset
+├── building_vibration/  # Building vibration monitoring
+├── calce/               # Battery calendar aging
+├── cmapss/              # C-MAPSS turbofan (FD001-FD004)
+├── hydraulic/           # Hydraulic condition monitoring
+├── lorenz/              # Chaotic system (Lorenz attractor)
+├── lumo/                # Lumo dataset
+├── pendulum/            # Pendulum dynamics
+└── rossler/             # Chaotic system (Rossler attractor)
 ```
 
 ---
