@@ -14,7 +14,6 @@ import numpy as np
 from typing import Dict, Any, Optional
 
 from manifold.primitives.embedding import (
-    time_delay_embedding,
     optimal_delay,
     optimal_dimension,
 )
@@ -57,21 +56,27 @@ def compute(
             emb_tau = optimal_delay(y, max_lag=min(100, n // 10))
         if emb_dim is None:
             emb_dim = optimal_dimension(y, emb_tau, max_dim=10)
-        
-        # Embed signal
-        embedded = time_delay_embedding(y, dimension=emb_dim, delay=emb_tau)
-        
-        if len(embedded) < 50:
+
+        # Check embedded length would be sufficient
+        n_embedded = n - (emb_dim - 1) * emb_tau
+        if n_embedded < 50:
             return _empty_result()
-        
-        # Compute Lyapunov
+
+        # Pass raw signal with pre-computed params to primitive
+        # (primitive handles embedding internally)
         if method == 'kantz':
-            lyap, divergence, iterations = lyapunov_kantz(embedded)
+            lyap, divergence = lyapunov_kantz(
+                y, dimension=emb_dim, delay=emb_tau,
+            )
+            iterations = len(divergence)
         else:
-            lyap, divergence, iterations = lyapunov_rosenstein(embedded)
-        
+            lyap, divergence, iterations = lyapunov_rosenstein(
+                y, dimension=emb_dim, delay=emb_tau,
+            )
+
         # Confidence based on iterations
-        confidence = min(1.0, iterations / 100) if iterations else 0.5
+        n_iters = len(iterations) if hasattr(iterations, '__len__') else iterations
+        confidence = min(1.0, n_iters / 100) if n_iters else 0.5
         
         return {
             'lyapunov': float(lyap) if not np.isnan(lyap) else None,
