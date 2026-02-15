@@ -34,8 +34,8 @@ Prime  Manifold
    └────┘    (Prime calls Manifold's pipeline)
 ```
 
-**Note:** `manifold/primitives/` still exists in-tree as the Python implementation.
-`~/primitives/` is the shared Rust+Python package. Both are active.
+**Note:** `manifold/primitives/` contains thin re-exports that delegate to the
+standalone `primitives` package. All math lives in `~/primitives/`.
 
 ---
 
@@ -69,8 +69,8 @@ All 29 stages run. No flags needed.
 
 **Virtual environment:** `./venv/` — always use it. Never create a new one.
 
-**Rust backend:** Controlled by `USE_RUST` env var (default: on).
-Set `USE_RUST=0` to force Python fallback.
+**Rust backend:** Controlled by `PRIMITIVES_USE_RUST` env var in the standalone
+primitives package (default: on). Manifold itself has no Rust code or toggle.
 
 **Parallel workers:** `MANIFOLD_WORKERS` env var (default: `0` = auto-detect).
 FD004 with 249 cohorts across 18 stages: ~3 minutes with Rust + 9 workers.
@@ -82,7 +82,7 @@ FD004 with 249 cohorts across 18 stages: ~3 minutes with Rust + 9 workers.
 ```
 manifold/stages/       RUNNERS — orchestrate I/O. Read parquet, call engines, write parquet.
 manifold/core/         ENGINES — compute. DataFrames in, DataFrames out. No file I/O.
-manifold/primitives/   MATH — pure functions. numpy in, numpy out. No DataFrames, no I/O.
+manifold/primitives/   RE-EXPORTS — thin wrappers delegating to standalone primitives package.
 ```
 
 Each layer ONLY calls the layer below it.
@@ -91,7 +91,7 @@ Each layer ONLY calls the layer below it.
 |-------|-------|---------|----------|
 | `stages/group/run.py` (runner) | manifest, file paths | writes parquet files | YES |
 | `core/*.py` (engine) | config dict, DataFrames | DataFrames | NO |
-| `primitives/*.py` | numpy arrays | numpy arrays | NO |
+| `primitives/*.py` | re-exports from `primitives` package | numpy arrays | NO |
 
 Also:
 - `manifold/io/` — reader.py, writer.py, manifest.py (all parquet I/O)
@@ -113,7 +113,7 @@ Nobody reaches up. Nobody skips a layer.
 ## Import Conventions
 
 ```python
-# Primitives: direct function imports
+# Primitives: direct function imports (re-exports chain to standalone package)
 from manifold.primitives.individual.spectral import psd
 from manifold.primitives.dynamical.ftle import compute_ftle
 
@@ -123,6 +123,13 @@ from manifold.core.state_geometry import compute_state_geometry
 # Stages import from core, never from other stages
 from manifold.core.geometry_dynamics import compute_geometry_dynamics
 ```
+
+**Re-export pattern:** Each file in `manifold/primitives/` contains only:
+```python
+"""Re-export from standalone primitives package."""
+from primitives.<category>.<module> import *  # noqa: F401,F403
+```
+All math implementation lives in the standalone `primitives` package.
 
 ---
 
@@ -298,7 +305,7 @@ Before modifying any file:
 
 | Type of Code | Location | Pattern |
 |--------------|----------|---------|
-| New primitive | `manifold/primitives/` | Pure function, numpy in/out |
+| New primitive | `~/primitives/` (standalone repo) | Pure function, numpy in/out. Add re-export in `manifold/primitives/`. |
 | New engine | `manifold/core/` | DataFrame in, DataFrame out, no I/O |
 | New stage runner | `manifold/stages/<group>/` | Follow existing runner pattern |
 | New I/O helper | `manifold/io/` | Reader or writer only |
