@@ -41,6 +41,22 @@ Prime  Manifold
 
 ## How to Run
 
+### Library API (how Prime calls Manifold)
+
+```python
+from manifold import run
+
+run(
+    observations_path="~/domains/rossler/observations.parquet",
+    manifest_path="~/domains/rossler/manifest.yaml",
+    output_dir="~/domains/rossler/output",
+)
+```
+
+Three explicit paths. No guessing. No path discovery.
+
+### CLI (debugging only)
+
 ```bash
 cd ~/manifold
 python -m manifold ~/domains/rossler           # Full pipeline on rossler
@@ -48,7 +64,8 @@ python -m manifold ~/domains/cmapss/FD_004/train  # Full pipeline on FD004
 python -m manifold ~/domains/calce             # Full pipeline on calce
 ```
 
-One command. All 29 stages run. No flags needed.
+The CLI resolves `data_path` into the three explicit paths and calls `run()`.
+All 29 stages run. No flags needed.
 
 **Virtual environment:** `./venv/` — always use it. Never create a new one.
 
