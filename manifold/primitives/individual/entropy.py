@@ -13,7 +13,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_PERM
 
 if _USE_RUST_PERM:
     try:
-        from rudder_primitives_rs.individual import permutation_entropy as _perm_entropy_rs
+        from manifold_rs.individual import permutation_entropy as _perm_entropy_rs
     except ImportError:
         _USE_RUST_PERM = False
 

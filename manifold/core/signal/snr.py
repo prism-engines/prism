@@ -11,7 +11,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_SNR
 
 if _USE_RUST_SNR:
     try:
-        from rudder_primitives_rs.individual import snr as _snr_rs
+        from manifold_rs.individual import snr as _snr_rs
     except ImportError:
         _USE_RUST_SNR = False
 

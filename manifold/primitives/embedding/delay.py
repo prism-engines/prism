@@ -11,7 +11,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_EMBEDDING
 
 if _USE_RUST_EMBEDDING:
     try:
-        from rudder_primitives_rs.embedding import (
+        from manifold_rs.embedding import (
             optimal_delay as _optimal_delay_rs,
         )
     except ImportError:

@@ -11,7 +11,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_LYAP
 
 if _USE_RUST_LYAP:
     try:
-        from rudder_primitives_rs.dynamical import lyapunov_rosenstein as _lyapunov_rs
+        from manifold_rs.dynamical import lyapunov_rosenstein as _lyapunov_rs
     except ImportError:
         _USE_RUST_LYAP = False
 

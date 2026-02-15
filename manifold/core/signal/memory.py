@@ -26,7 +26,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_ACF
 
 if _USE_RUST_ACF:
     try:
-        from rudder_primitives_rs.individual import acf_decay as _acf_decay_rs
+        from manifold_rs.individual import acf_decay as _acf_decay_rs
     except ImportError:
         _USE_RUST_ACF = False
 

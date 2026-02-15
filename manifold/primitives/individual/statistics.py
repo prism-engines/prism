@@ -12,7 +12,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_STATS
 
 if _USE_RUST_STATS:
     try:
-        from rudder_primitives_rs.individual import (
+        from manifold_rs.individual import (
             skewness as _skewness_rs,
             kurtosis as _kurtosis_rs,
             crest_factor as _crest_factor_rs,

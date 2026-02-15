@@ -23,8 +23,8 @@ fn register_submodule(
     register_fn(&sub)?;
     parent.add_submodule(&sub)?;
 
-    // Critical: register in sys.modules so `from rudder_primitives_rs.X import Y` works
-    let full_name = format!("rudder_primitives_rs.{}", name);
+    // Critical: register in sys.modules so `from manifold_rs.X import Y` works
+    let full_name = format!("manifold_rs.{}", name);
     py.import("sys")?
         .getattr("modules")?
         .set_item(full_name, &sub)?;
@@ -35,7 +35,7 @@ fn register_submodule(
 /// Rust-accelerated primitives for the Manifold pipeline.
 /// Drop-in replacements for manifold.primitives — same signatures, same outputs.
 #[pymodule]
-fn rudder_primitives_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn manifold_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     register_submodule(m, "individual", individual::register)?;
     register_submodule(m, "dynamical", dynamical::register)?;
     register_submodule(m, "pairwise", pairwise::register)?;

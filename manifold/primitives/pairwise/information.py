@@ -11,7 +11,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_INFO
 
 if _USE_RUST_INFO:
     try:
-        from rudder_primitives_rs.information import (
+        from manifold_rs.information import (
             mutual_information as _mutual_info_rs,
             transfer_entropy as _transfer_entropy_rs,
         )

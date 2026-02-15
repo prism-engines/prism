@@ -1,10 +1,10 @@
 [package]
-name = "rudder-primitives-rs"
+name = "manifold-rs"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "rudder_primitives_rs"
+name = "manifold_rs"
 crate-type = ["cdylib"]
 
 [dependencies]

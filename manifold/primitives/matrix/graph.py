@@ -11,7 +11,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_GRAPH
 
 if _USE_RUST_GRAPH:
     try:
-        from rudder_primitives_rs.matrix import (
+        from manifold_rs.matrix import (
             laplacian_matrix as _laplacian_matrix_rs,
             laplacian_eigenvalues as _laplacian_eigenvalues_rs,
         )

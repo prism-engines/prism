@@ -11,7 +11,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_TE
 
 if _USE_RUST_TE:
     try:
-        from rudder_primitives_rs.information import (
+        from manifold_rs.information import (
             transfer_entropy as _transfer_entropy_rs,
         )
     except ImportError:

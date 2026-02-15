@@ -23,7 +23,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_FTLE
 
 if _USE_RUST_FTLE:
     try:
-        from rudder_primitives_rs.dynamical import ftle_local_linearization as _ftle_rs
+        from manifold_rs.dynamical import ftle_local_linearization as _ftle_rs
     except ImportError:
         _USE_RUST_FTLE = False
 

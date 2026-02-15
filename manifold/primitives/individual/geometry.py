@@ -13,7 +13,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_MATRIX
 
 if _USE_RUST_MATRIX:
     try:
-        from rudder_primitives_rs.matrix import (
+        from manifold_rs.matrix import (
             eigendecomposition as _eigendecomp_rs,
             condition_number as _condition_number_rs,
             effective_dimension as _effective_dimension_rs,

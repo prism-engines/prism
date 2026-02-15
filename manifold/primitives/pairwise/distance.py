@@ -11,7 +11,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_DISTANCE
 
 if _USE_RUST_DISTANCE:
     try:
-        from rudder_primitives_rs.pairwise import (
+        from manifold_rs.pairwise import (
             dynamic_time_warping as _dtw_rs,
         )
     except ImportError:

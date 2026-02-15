@@ -41,7 +41,7 @@ def main():
 
     # Check Rust status
     try:
-        from rudder_primitives_rs import individual
+        from manifold_rs import individual
         rust_status = "LOADED"
     except ImportError:
         rust_status = "NOT AVAILABLE"

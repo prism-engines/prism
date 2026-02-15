@@ -13,7 +13,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST
 
 if _USE_RUST:
     try:
-        from rudder_primitives_rs.individual import hurst_exponent as _hurst_rs
+        from manifold_rs.individual import hurst_exponent as _hurst_rs
     except ImportError:
         _USE_RUST = False
 

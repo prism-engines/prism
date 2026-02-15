@@ -12,7 +12,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_SPECTRAL
 
 if _USE_RUST_SPECTRAL:
     try:
-        from rudder_primitives_rs.individual import (
+        from manifold_rs.individual import (
             psd as _psd_rs,
             spectral_entropy as _spectral_entropy_rs,
             spectral_centroid as _spectral_centroid_rs,

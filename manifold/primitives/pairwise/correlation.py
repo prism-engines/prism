@@ -11,7 +11,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_PAIRWISE
 
 if _USE_RUST_PAIRWISE:
     try:
-        from rudder_primitives_rs.pairwise import (
+        from manifold_rs.pairwise import (
             correlation as _correlation_rs,
             covariance as _covariance_rs,
             cross_correlation as _cross_correlation_rs,

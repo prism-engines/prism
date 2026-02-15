@@ -11,7 +11,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_ADF
 
 if _USE_RUST_ADF:
     try:
-        from rudder_primitives_rs.individual import adf_test as _adf_rs
+        from manifold_rs.individual import adf_test as _adf_rs
     except ImportError:
         _USE_RUST_ADF = False
 

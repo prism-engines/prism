@@ -12,7 +12,7 @@ from manifold.primitives._config import USE_RUST as _USE_RUST_CAUSALITY
 
 if _USE_RUST_CAUSALITY:
     try:
-        from rudder_primitives_rs.pairwise import (
+        from manifold_rs.pairwise import (
             granger_causality as _granger_rs,
         )
     except ImportError:
