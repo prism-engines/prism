@@ -22,6 +22,7 @@ Usage:
 import argparse
 import copy
 import os
+import shutil
 import time
 import yaml
 from pathlib import Path
@@ -310,6 +311,17 @@ def run(
 
     manifest['_manifest_path'] = str(manifest_path)
     manifest['_data_dir'] = str(data_path)
+
+    # Safety: refuse to wipe if this looks like a domain root
+    if (output_dir / 'observations.parquet').exists():
+        raise ValueError(
+            f"output_dir ({output_dir}) contains observations.parquet. "
+            f"Pass the output/ subdirectory, not the domain root."
+        )
+
+    # Fresh start — remove old outputs
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
