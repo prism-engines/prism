@@ -24,9 +24,7 @@ Engine Configuration:
     - scaling: How window scales with window_factor (linear, sqrt, log)
     - outputs: List of output column names
 
-Legacy (flat files, to be consolidated):
-    state_vector.py      - Centroid computation (WHERE)
-    state_geometry.py    - Eigenvalue computation (SHAPE)
+Standalone engines (DataFrame in, DataFrame out):
     signal_geometry.py   - Signal-to-centroid distances
     signal_pairwise.py   - Signal-to-signal relationships
     geometry_dynamics.py - Derivatives of geometry
@@ -57,8 +55,7 @@ from manifold.core.normalization import (
     NormMethod,
 )
 
-# Legacy flat files (for backwards compatibility)
-# Note: compute functions come from the actual engine implementations
+# Standalone engines (DataFrame in, DataFrame out)
 from manifold.core.state.centroid import compute as compute_centroid
 from manifold.core.state.eigendecomp import compute as compute_eigenvalues
 from manifold.core.signal_geometry import compute_signal_geometry
@@ -92,7 +89,7 @@ __all__ = [
     'recommend_method',
     'inverse_normalize',
     'NormMethod',
-    # Legacy flat files
+    # Standalone engines
     'compute_centroid',
     'compute_eigenvalues',
     'compute_signal_geometry',
