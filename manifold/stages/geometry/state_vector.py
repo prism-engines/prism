@@ -5,6 +5,12 @@
 Pure orchestration - calls centroid engine from engines/state/centroid.py.
 Computes WHERE the system is (centroid = mean position in feature space).
 
+Four views per system window:
+  1. Centroid  — mean feature values across signals (existing)
+  2. Fourier   — spectral analysis of per-signal feature trajectories
+  3. Hilbert   — envelope (amplitude modulation) of feature trajectories
+  4. Laplacian — graph coupling structure across signals
+
 Stages: signal_vector.parquet → state_vector.parquet
 
 The SHAPE (eigenvalues, effective_dim) is computed in 03_state_geometry.py.
@@ -18,6 +24,11 @@ from typing import List, Dict, Optional, Any
 # Import the actual computation from engine
 from manifold.core.state.centroid import compute as compute_centroid_engine
 from manifold.io.writer import write_output
+
+# Primitives for feature trajectory analysis
+from manifold.primitives.individual.spectral import spectral_profile
+from manifold.primitives.individual.hilbert import envelope
+from manifold.primitives.matrix.graph import laplacian_matrix, laplacian_eigenvalues
 
 
 # Feature groups for per-engine centroids
@@ -35,7 +46,7 @@ except ImportError:
 def compute_centroid(
     signal_matrix: np.ndarray,
     feature_names: List[str],
-    min_signals: int = 2
+    min_signals: int = 1
 ) -> Dict[str, Any]:
     """
     Wrapper - delegates entirely to engine.
@@ -51,6 +62,191 @@ def compute_centroid(
     return compute_centroid_engine(signal_matrix, min_signals=min_signals)
 
 
+# ═══════════════════════════════════════════════════════════════
+# Feature trajectory helpers (fourier, hilbert, laplacian views)
+# ═══════════════════════════════════════════════════════════════
+
+def _extract_trajectories(
+    window_rows: pl.DataFrame,
+    feature_cols: List[str],
+    signal_col: str = 'signal_id',
+) -> Dict[str, Dict[str, np.ndarray]]:
+    """
+    Extract per-signal feature trajectories from signal_vector rows
+    within a system window.
+
+    Groups by signal_id, sorts by signal_0_center, extracts each feature
+    as a 1D array.
+
+    Returns:
+        {signal_id: {feature_name: trajectory_array}}
+    """
+    trajectories = {}
+
+    for (sig_id,), sig_df in window_rows.group_by([signal_col]):
+        sig_sorted = sig_df.sort('signal_0_center')
+        traj = {}
+        for feat in feature_cols:
+            if feat in sig_sorted.columns:
+                arr = sig_sorted[feat].to_numpy().astype(np.float64)
+                # Drop NaNs from edges
+                valid = np.isfinite(arr)
+                if valid.sum() > 0:
+                    traj[feat] = arr[valid]
+        if traj:
+            trajectories[sig_id] = traj
+
+    return trajectories
+
+
+def _compute_fourier_view(
+    trajectories: Dict[str, Dict[str, np.ndarray]],
+    feature_cols: List[str],
+    min_length: int = 8,
+) -> Dict[str, float]:
+    """
+    Fourier view: run spectral_profile on each signal's feature trajectory.
+    Aggregate across signals via nanmedian.
+
+    Output keys: fourier_{feature}_dominant_freq, fourier_{feature}_spectral_flatness
+    """
+    result = {}
+
+    for feat in feature_cols:
+        dom_freqs = []
+        flatnesses = []
+
+        for sig_trajs in trajectories.values():
+            if feat not in sig_trajs:
+                continue
+            arr = sig_trajs[feat]
+            if len(arr) < min_length:
+                continue
+
+            sp = spectral_profile(arr)
+            dom_freqs.append(sp.get('dominant_frequency', np.nan))
+            flatnesses.append(sp.get('spectral_flatness', np.nan))
+
+        result[f'fourier_{feat}_dominant_freq'] = float(np.nanmedian(dom_freqs)) if dom_freqs else np.nan
+        result[f'fourier_{feat}_spectral_flatness'] = float(np.nanmedian(flatnesses)) if flatnesses else np.nan
+
+    return result
+
+
+def _compute_hilbert_view(
+    trajectories: Dict[str, Dict[str, np.ndarray]],
+    feature_cols: List[str],
+    min_length: int = 4,
+) -> Dict[str, float]:
+    """
+    Hilbert view: run envelope on each signal's feature trajectory.
+    Compute mean, trend, cv. Aggregate across signals via nanmedian.
+
+    Output keys: envelope_{feature}_mean, envelope_{feature}_trend, envelope_{feature}_cv
+    """
+    result = {}
+
+    for feat in feature_cols:
+        means = []
+        trends = []
+        cvs = []
+
+        for sig_trajs in trajectories.values():
+            if feat not in sig_trajs:
+                continue
+            arr = sig_trajs[feat]
+            if len(arr) < min_length:
+                continue
+
+            env = envelope(arr)
+            m = float(np.mean(env))
+            means.append(m)
+
+            if len(env) >= 2:
+                trend = np.polyfit(np.arange(len(env)), env, 1)[0]
+                trends.append(float(trend))
+            else:
+                trends.append(np.nan)
+
+            if m > 0:
+                cvs.append(float(np.std(env) / m))
+            else:
+                cvs.append(np.nan)
+
+        result[f'envelope_{feat}_mean'] = float(np.nanmedian(means)) if means else np.nan
+        result[f'envelope_{feat}_trend'] = float(np.nanmedian(trends)) if trends else np.nan
+        result[f'envelope_{feat}_cv'] = float(np.nanmedian(cvs)) if cvs else np.nan
+
+    return result
+
+
+def _compute_laplacian_view(
+    trajectories: Dict[str, Dict[str, np.ndarray]],
+    feature_cols: List[str],
+    min_signals: int = 2,
+) -> Dict[str, float]:
+    """
+    Laplacian view: build correlation-based adjacency from concatenated
+    feature trajectories, compute graph Laplacian spectrum.
+
+    Output keys: laplacian_algebraic_connectivity, laplacian_spectral_gap,
+                 laplacian_n_components, laplacian_max_eigenvalue
+    """
+    result = {
+        'laplacian_algebraic_connectivity': np.nan,
+        'laplacian_spectral_gap': np.nan,
+        'laplacian_n_components': np.nan,
+        'laplacian_max_eigenvalue': np.nan,
+    }
+
+    if len(trajectories) < min_signals:
+        return result
+
+    # For each signal, concatenate all feature trajectories into one vector
+    vectors = []
+    for sig_id in sorted(trajectories.keys()):
+        parts = []
+        for feat in feature_cols:
+            if feat in trajectories[sig_id]:
+                arr = trajectories[sig_id][feat]
+                arr = np.where(np.isfinite(arr), arr, 0.0)
+                parts.append(arr)
+        if parts:
+            vectors.append(np.concatenate(parts))
+
+    if len(vectors) < min_signals:
+        return result
+
+    # Pad to same length (signals may have different trajectory lengths)
+    max_len = max(len(v) for v in vectors)
+    padded = np.zeros((len(vectors), max_len))
+    for i, v in enumerate(vectors):
+        padded[i, :len(v)] = v
+
+    try:
+        # Build adjacency: |corrcoef|
+        corr = np.corrcoef(padded)
+        if corr.ndim < 2:
+            return result
+        adj = np.abs(corr)
+        np.fill_diagonal(adj, 0.0)
+        adj = np.where(np.isfinite(adj), adj, 0.0)
+
+        L = laplacian_matrix(adj, normalized=True)
+        eigs = laplacian_eigenvalues(L)
+
+        if len(eigs) >= 2 and np.any(np.isfinite(eigs)):
+            result['laplacian_algebraic_connectivity'] = float(eigs[1])
+            if eigs[-1] > 0:
+                result['laplacian_spectral_gap'] = float(eigs[1] / eigs[-1])
+            result['laplacian_n_components'] = float(np.sum(eigs < 1e-10))
+            result['laplacian_max_eigenvalue'] = float(eigs[-1])
+    except Exception:
+        pass
+
+    return result
+
+
 def compute_state_vector(
     signal_vector_path: str,
     typology_path: str,
@@ -60,25 +256,26 @@ def compute_state_vector(
     verbose: bool = True
 ) -> pl.DataFrame:
     """
-    Compute state vector (centroids) from signal vector.
+    Compute state vector (centroids + trajectory views) from signal vector.
 
-    The state vector captures WHERE the system is in feature space.
+    The state vector captures WHERE the system is in feature space (centroid)
+    plus HOW features are evolving (fourier, hilbert, laplacian views).
     The SHAPE (eigenvalues, effective_dim) is computed in 03_state_geometry.py.
 
     Args:
         signal_vector_path: Path to signal_vector.parquet
         typology_path: Path to typology.parquet
-        output_path: Output path
+        data_path: Root data directory
         feature_groups: Dict mapping engine names to feature lists
         compute_per_engine: Compute per-engine centroids
         verbose: Print progress
 
     Returns:
-        State vector DataFrame with centroids per I
+        State vector DataFrame with centroids and trajectory views per window
     """
     if verbose:
         print("=" * 70)
-        print("02: STATE VECTOR - Centroids (position in feature space)")
+        print("02: STATE VECTOR - Centroids + trajectory views")
         print("=" * 70)
 
     # Load data
@@ -172,14 +369,18 @@ def compute_state_vector(
 
         composite_matrix = group.select(available_composite).to_numpy()
 
-        # Skip groups with fewer than 2 signals (centroid is meaningless)
-        if composite_matrix.shape[0] < 2:
+        # Drop rows where ALL features are NaN (signals with no applicable engines)
+        valid_rows = np.isfinite(composite_matrix).any(axis=1)
+        composite_matrix = composite_matrix[valid_rows]
+
+        # Need at least 1 signal with data
+        if composite_matrix.shape[0] < 1:
             continue
 
-        state = compute_centroid(composite_matrix, available_composite)
+        state = compute_centroid(composite_matrix, available_composite, min_signals=1)
 
-        # Skip if centroid engine returned insufficient signals
-        if state['n_signals'] < 2:
+        # Skip if centroid engine returned zero valid signals
+        if state['n_signals'] < 1:
             continue
 
         # Pass through signal_0 columns from the group
@@ -212,6 +413,29 @@ def compute_state_vector(
                     engine_state = compute_centroid(matrix, available)
                     for j, feat in enumerate(available):
                         row[f'state_{engine_name}_{feat}'] = engine_state['centroid'][j]
+
+        # ── Trajectory views (per-window) ──────────────────────────
+        # Gather ALL signal_vector rows whose signal_0_center falls
+        # within this system window [s0_start, s0_end].
+        # This gives ~N rows per signal (N = window / stride).
+        if s0_start is not None and s0_end is not None:
+            if has_cohort and cohort is not None:
+                window_rows = signal_vector.filter(
+                    (pl.col('cohort') == cohort) &
+                    (pl.col('signal_0_center') >= s0_start) &
+                    (pl.col('signal_0_center') <= s0_end)
+                )
+            else:
+                window_rows = signal_vector.filter(
+                    (pl.col('signal_0_center') >= s0_start) &
+                    (pl.col('signal_0_center') <= s0_end)
+                )
+
+            trajectories = _extract_trajectories(window_rows, composite_features, signal_col)
+            if trajectories:
+                row.update(_compute_fourier_view(trajectories, composite_features))
+                row.update(_compute_hilbert_view(trajectories, composite_features))
+                row.update(_compute_laplacian_view(trajectories, composite_features))
 
         results.append(row)
 
