@@ -345,8 +345,12 @@ def run(
             if sid not in skip
         ]
 
-    # Determine parallelism — hardcoded to 2 to prevent resource exhaustion
-    n_workers = 2
+    # Determine parallelism from MANIFOLD_WORKERS env var (0 = auto-detect)
+    _env_workers = os.environ.get("MANIFOLD_WORKERS", "")
+    if _env_workers:
+        n_workers = int(_env_workers) or (os.cpu_count() or 2)
+    else:
+        n_workers = os.cpu_count() or 2
 
     if verbose:
         print("=" * 70)
