@@ -194,7 +194,7 @@ SELECT
 
     volatility_diff,
 
-    -- Per-feature distances (for diagnostics)
+    -- Per-feature distances (for inspection)
     db_spectral_entropy,
     db_hurst,
     db_sample_entropy,

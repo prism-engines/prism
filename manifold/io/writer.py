@@ -10,6 +10,30 @@ from pathlib import Path
 from manifold.io.reader import STAGE_DIRS
 
 
+def _safe_write(df: pl.DataFrame, path: Path, verbose: bool = True) -> bool:
+    """
+    Guard against writing invalid parquet files.
+
+    Returns True if a file was written, False if skipped.
+    """
+    if df is None:
+        return False
+
+    if len(df.columns) == 0:
+        if verbose:
+            print(f"  !! Skipped {path} (empty schema — 0 columns)")
+        return False
+
+    if df.height == 0:
+        # Schema-only parquet: columns defined, 0 rows.
+        # DuckDB/Polars can read this; downstream SQL won't crash.
+        df.head(0).write_parquet(str(path))
+        return True
+
+    df.write_parquet(str(path))
+    return True
+
+
 def write_output(
     df: pl.DataFrame,
     data_path: str,
@@ -20,19 +44,21 @@ def write_output(
     Write a stage output to the correct subdirectory.
 
     Args:
-        df: DataFrame to write
+        df: DataFrame to write (None or empty-schema → skip)
         data_path: Root data directory (e.g., domains/rossler)
         name: Output name (e.g., 'signal_vector', 'state_geometry')
         verbose: Print path on write
 
     Returns:
-        Path to written file
+        Path to written file, or None if skipped
     """
     from manifold.io.reader import output_path
 
     path = output_path(data_path, name)
     path.parent.mkdir(parents=True, exist_ok=True)
-    df.write_parquet(str(path))
+
+    if not _safe_write(df, path, verbose=verbose):
+        return None
 
     if verbose:
         print(f"  -> {path} ({len(df)} rows)")
@@ -59,7 +85,9 @@ def write_sidecar(
 
     parent_path = output_path(data_path, parent_name)
     sidecar_path = parent_path.parent / f"{sidecar_name}.parquet"
-    df.write_parquet(str(sidecar_path))
+
+    if not _safe_write(df, sidecar_path, verbose=verbose):
+        return None
 
     if verbose:
         print(f"  -> {sidecar_path} ({len(df)} rows, sidecar)")

@@ -329,13 +329,11 @@ def compute_geometry_dynamics(
         print(f"Loaded: {len(state_geometry)} rows")
         print(f"Columns: {state_geometry.columns}")
 
-    # Guard: empty input
+    # Guard: empty input — return without writing an invalid 0-column parquet
     if len(state_geometry) == 0 or 'engine' not in state_geometry.columns:
         if verbose:
             print("  No state geometry data to process (empty input)")
-        empty = pl.DataFrame()
-        empty.write_parquet(output_path)
-        return empty
+        return pl.DataFrame()
 
     # Determine grouping columns - include cohort if present
     has_cohort = 'cohort' in state_geometry.columns
@@ -383,7 +381,7 @@ def compute_geometry_dynamics(
             cfg = _get_collapse_config()
             below = vel < cfg['threshold_velocity']
             if below.any():
-                # Count longest run below threshold for diagnostics
+                # Count longest run below threshold for verbose output
                 changes = np.concatenate(([below[0]], below[:-1] != below[1:], [True]))
                 run_lengths = np.diff(np.where(changes)[0])
                 below_runs = run_lengths[::2] if below[0] else run_lengths[1::2]

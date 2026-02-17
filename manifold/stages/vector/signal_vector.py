@@ -780,7 +780,7 @@ def run(
                 return null_cnt + nan_cnt
             return null_cnt
 
-        # Phase 1: Drop columns >90% dead globally (universally broken engines)
+        # Phase 1: Drop columns >90% dead globally (universally inactive signals)
         dead_cols = [
             c for c in df.columns
             if c not in meta_cols_keep
@@ -791,7 +791,7 @@ def run(
                 print(f"  Pruning {len(dead_cols)} dead columns (>90% null/NaN): {dead_cols}")
             df = df.drop(dead_cols)
 
-        # Phase 2: Drop columns 100% dead for ALL signals (universally broken).
+        # Phase 2: Drop columns 100% dead for ALL signals (universally inactive).
         # Different signal types have different engine sets in the manifest.
         # A column is only pruned if no signal produces any data for it.
         if 'signal_id' in df.columns:

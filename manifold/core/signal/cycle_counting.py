@@ -96,7 +96,7 @@ def compute(y: np.ndarray) -> Dict[str, float]:
         max_range = float(np.max(ranges))
         mean_range = float(np.mean(ranges))
 
-        # Damage calculation (each half-cycle contributes 0.5)
+        # Accumulation calculation (each half-cycle contributes 0.5)
         accumulation = float(np.sum((ranges / max_range) ** 3) * 0.5)
 
         result = {

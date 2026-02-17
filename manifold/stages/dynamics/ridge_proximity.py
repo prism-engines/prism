@@ -14,7 +14,7 @@ A system can be:
 - Far from ridge but heading straight for it → Low FTLE, HIGH urgency. Trouble coming.
 
 The WARNING quadrant (low FTLE, positive urgency) is where this engine
-earns its keep. Every other diagnostic says "fine". This says "not for long."
+earns its keep. Other measures show low FTLE; this detects approach velocity.
 
 Inputs:
     - ftle_rolling.parquet (from stage_22)

@@ -21,7 +21,7 @@ Output:
 
 Each segment gets independent eigendecomp, then deltas computed between
 consecutive segments. This reveals how geometric structure changes
-across boundaries (faults, elections, regime changes).
+across boundaries (perturbations, elections, regime changes).
 """
 
 import argparse

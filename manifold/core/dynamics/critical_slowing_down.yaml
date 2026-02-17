@@ -76,7 +76,7 @@ domains:
   - ecology         # Ecosystem collapse
   - climate         # Climate tipping points
   - biological      # Physiological transitions
-  - mechanical      # Structural failure approach
+  - mechanical      # Structural boundary approach
 
 # Tags
 tags:

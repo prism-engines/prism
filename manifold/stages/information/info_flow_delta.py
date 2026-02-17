@@ -4,7 +4,7 @@ Stage 19: Information Flow Delta Entry Point
 
 Computes Granger causality independently per segment, then computes deltas.
 Shows which causal links appear, disappear, strengthen, or weaken across
-a boundary (fault injection, election, regime change).
+a boundary (perturbation, election, regime change).
 
 Manifest config:
     segments:
@@ -21,7 +21,7 @@ Output:
 
 Link status classification:
     emerged:      not significant pre → significant post (new causal path)
-    broken:       significant pre → not significant post (feedback disrupted)
+    dissolved:    significant pre → not significant post (feedback disrupted)
     strengthened: significant both, F-stat increased >50%
     weakened:     significant both, F-stat decreased >33%
     stable:       significant both, F-stat similar
@@ -298,12 +298,12 @@ def classify_link_change(sig_a: bool, sig_b: bool, f_a: float, f_b: float) -> st
         f_b: F-statistic in segment B
 
     Returns:
-        Link status: emerged, broken, strengthened, weakened, stable, absent
+        Link status: emerged, dissolved, strengthened, weakened, stable, absent
     """
     if not sig_a and sig_b:
         return 'emerged'
     elif sig_a and not sig_b:
-        return 'broken'
+        return 'dissolved'
     elif sig_a and sig_b:
         if f_a is None or f_b is None:
             return 'stable'
@@ -326,9 +326,9 @@ Computes Granger causality per segment and classifies link changes.
 
 Link status:
   emerged:      New causal path appeared after boundary
-  broken:       Existing feedback loop disrupted
+  dissolved:    Existing feedback loop disrupted
   strengthened: Coupling intensified (F-stat +50%)
-  weakened:     Control authority degrading (F-stat -33%)
+  weakened:     Coupling diminishing (F-stat -33%)
   stable:       Causal structure preserved
   absent:       No causal relationship in either segment
 
