@@ -21,9 +21,9 @@ import polars as pl
 from pathlib import Path
 
 from manifold.core.pairwise.causality import compute_all as compute_causality
-from manifold.primitives.pairwise.distance import dynamic_time_warping
+from manifold.core.pairwise.distance import compute_dtw as dynamic_time_warping
 from manifold.core.pairwise.correlation import compute_mutual_info
-from manifold.primitives.information.divergence import kl_divergence, js_divergence
+from manifold.core.pairwise.divergence import kl_divergence, js_divergence
 from manifold.core.pairwise import cointegration, copula
 from manifold.io.writer import write_output
 
