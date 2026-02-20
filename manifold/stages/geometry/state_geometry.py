@@ -255,10 +255,10 @@ def compute_cohort_geometry(
             row['ratio_2_1'] = eigen_result['ratio_2_1']
             row['ratio_3_1'] = eigen_result['ratio_3_1']
 
-            # Bootstrap confidence interval for effective_dim
-            if len(matrix) >= 5:
-                bs = bootstrap_effective_dim(matrix, n_bootstrap=50)
-                row['eff_dim_std'] = np.nan  # not computed by bootstrap; CI bounds suffice
+            # Jackknife confidence interval for effective_dim
+            if len(matrix_clean) >= 4:
+                bs = bootstrap_effective_dim(matrix_clean)
+                row['eff_dim_std'] = bs['effective_dim_std']
                 row['eff_dim_ci_low'] = bs['effective_dim_lower']
                 row['eff_dim_ci_high'] = bs['effective_dim_upper']
             else:
