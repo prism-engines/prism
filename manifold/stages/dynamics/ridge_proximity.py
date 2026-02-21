@@ -116,10 +116,12 @@ def run(
                 continue
 
             ftle_values = sig_ftle['ftle'].to_numpy()
-            ftle_s0_arr = sig_ftle['signal_0_end'].to_numpy()
+            ftle_s0_arr = sig_ftle['signal_0_end'].to_numpy().astype(float)
 
-            # Compute FTLE gradient (temporal gradient)
-            ftle_gradient = np.gradient(ftle_values)
+            # Compute FTLE gradient with actual signal_0_end spacing
+            # np.gradient(y, x) handles non-uniform x natively
+            # On time axis (s0 = 0,24,48,...) this is identical to np.gradient(y)
+            ftle_gradient = np.gradient(ftle_values, ftle_s0_arr)
 
             for idx in range(len(ftle_s0_arr)):
                 s0_val = float(ftle_s0_arr[idx])

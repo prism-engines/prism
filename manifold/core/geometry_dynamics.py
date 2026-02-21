@@ -83,7 +83,8 @@ def _get_phase_space_config() -> Dict[str, Any]:
 def compute_derivatives(
     x: np.ndarray,
     dt: Optional[float] = None,
-    smooth_window: Optional[int] = None
+    smooth_window: Optional[int] = None,
+    coords: Optional[np.ndarray] = None,
 ) -> Dict[str, np.ndarray]:
     """
     Compute derivatives up to third order with optional smoothing.
@@ -92,8 +93,11 @@ def compute_derivatives(
 
     Args:
         x: Ordered series values
-        dt: Index step between consecutive points (from config if not provided)
+        dt: Index step scalar (from config if not provided). Ignored if coords given.
         smooth_window: Smoothing window for noise reduction (from config if not provided)
+        coords: Coordinate array (e.g. signal_0_end values). When provided,
+                handles non-uniform spacing via np.gradient(x, coords). On uniform
+                time axis this produces identical results to scalar dt.
 
     Returns:
         Dict with velocity, acceleration, jerk, curvature, speed
@@ -124,21 +128,22 @@ def compute_derivatives(
         x_smooth = x
 
     # ─────────────────────────────────────────────────
-    # DERIVATIVES → ENGINES PRIMITIVES
+    # DERIVATIVES — coordinate-aware
+    # When coords is provided, np.gradient handles non-uniform spacing.
+    # When coords is None, fall back to scalar dt (original behavior).
     # ─────────────────────────────────────────────────
 
-    # First derivative (velocity) → ENGINES PRIMITIVE
-    dx = first_derivative(x_smooth, dt=dt, method='central')
-
-    # Second derivative (acceleration) → ENGINES PRIMITIVE
-    d2x = second_derivative(x_smooth, dt=dt, method='central')
-
-    # Third derivative (jerk) → ENGINES PRIMITIVE
-    d3x = jerk(x_smooth, dt=dt)
+    if coords is not None:
+        dx = np.gradient(x_smooth, coords)
+        d2x = np.gradient(dx, coords)
+        d3x = np.gradient(d2x, coords)
+    else:
+        dx = first_derivative(x_smooth, dt=dt, method='central')
+        d2x = second_derivative(x_smooth, dt=dt, method='central')
+        d3x = jerk(x_smooth, dt=dt)
 
     # ─────────────────────────────────────────────────
     # 1D CURVATURE: κ = |d²x/dt²| / (1 + (dx/dt)²)^(3/2)
-    # Note: curvature is for 2D trajectories (x, y)
     # For 1D series, we compute curvature directly
     # ─────────────────────────────────────────────────
     denom = (1 + dx**2)**1.5
@@ -358,10 +363,13 @@ def compute_geometry_dynamics(
         eigenvalue_1 = group['eigenvalue_1'].to_numpy()
         total_variance = group['total_variance'].to_numpy()
 
-        # Compute derivatives
-        eff_dim_deriv = compute_derivatives(effective_dim, dt, smooth_window)
-        eigen_1_deriv = compute_derivatives(eigenvalue_1, dt, smooth_window)
-        variance_deriv = compute_derivatives(total_variance, dt, smooth_window)
+        # Compute derivatives with actual signal_0_end spacing
+        # On time axis: s0_values = [0, 24, 48, ...] → uniform → same as scalar dt
+        # On reaxis: s0_values = [390.17, 390.33, 392.0, ...] → correct non-uniform
+        coords = s0_values.astype(float)
+        eff_dim_deriv = compute_derivatives(effective_dim, dt, smooth_window, coords=coords)
+        eigen_1_deriv = compute_derivatives(eigenvalue_1, dt, smooth_window, coords=coords)
+        variance_deriv = compute_derivatives(total_variance, dt, smooth_window, coords=coords)
 
         # Detect collapse (computed values only, no classification)
         collapse = detect_collapse(effective_dim)

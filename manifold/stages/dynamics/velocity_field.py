@@ -123,11 +123,34 @@ def run(
                     x[:, j] = (col - mean) / std
 
         # Smooth before differentiation
+        # savgol_filter assumes uniform spacing — on non-uniform axes,
+        # interpolate to uniform grid, smooth, interpolate back.
         if smooth == 'savgol' and len(x) > smooth_window:
-            for j in range(x.shape[1]):
-                valid = ~np.isnan(x[:, j])
-                if valid.sum() > smooth_window:
-                    x[valid, j] = savgol_filter(x[valid, j], min(smooth_window, valid.sum() - 1 if valid.sum() % 2 == 0 else valid.sum()), 3)
+            spacing = np.diff(s0_values.astype(float))
+            is_uniform = np.allclose(spacing, spacing[0], rtol=1e-6) if len(spacing) > 0 else True
+
+            if is_uniform:
+                # Original fast path for uniform time axis
+                for j in range(x.shape[1]):
+                    valid = ~np.isnan(x[:, j])
+                    if valid.sum() > smooth_window:
+                        win = min(smooth_window, valid.sum() - 1 if valid.sum() % 2 == 0 else valid.sum())
+                        x[valid, j] = savgol_filter(x[valid, j], win, 3)
+            else:
+                # Non-uniform: interpolate → smooth → interpolate back
+                n_pts = len(s0_values)
+                s0_float = s0_values.astype(float)
+                s0_uniform = np.linspace(s0_float[0], s0_float[-1], n_pts)
+                for j in range(x.shape[1]):
+                    valid = ~np.isnan(x[:, j])
+                    if valid.sum() > smooth_window:
+                        x_uniform = np.interp(s0_uniform, s0_float[valid], x[valid, j])
+                        win = min(smooth_window, len(x_uniform) - 1 if len(x_uniform) % 2 == 0 else len(x_uniform))
+                        if win >= 5:
+                            x_smoothed = savgol_filter(x_uniform, win, 3)
+                        else:
+                            x_smoothed = x_uniform
+                        x[valid, j] = np.interp(s0_float[valid], s0_uniform, x_smoothed)
 
         # Replace NaN with interpolated values for differentiation
         for j in range(x.shape[1]):
@@ -137,8 +160,12 @@ def run(
                 col[nans] = np.interp(np.where(nans)[0], np.where(~nans)[0], col[~nans])
                 x[:, j] = col
 
-        # Velocity: first difference
-        v = np.diff(x, axis=0)  # (N-1, n_signals)
+        # Velocity: first difference divided by actual signal_0 spacing
+        # v(i) = (x(i+1) - x(i)) / (s0(i+1) - s0(i))
+        dx = np.diff(x, axis=0)  # (N-1, n_signals)
+        dt = np.diff(s0_values.astype(float))   # (N-1,)
+        dt = np.where(np.abs(dt) < 1e-12, 1e-12, dt)  # floor to prevent inf
+        v = dx / dt[:, np.newaxis]  # (N-1, n_signals)
         speed = np.linalg.norm(v, axis=1)  # (N-1,)
 
         # Direction: normalized velocity
@@ -146,8 +173,11 @@ def run(
         nonzero = speed > 1e-12
         direction[nonzero] = v[nonzero] / speed[nonzero, np.newaxis]
 
-        # Acceleration: second difference
-        a = np.diff(v, axis=0)  # (N-2, n_signals)
+        # Acceleration: derivative of velocity with midpoint spacing
+        dv = np.diff(v, axis=0)  # (N-2, n_signals)
+        dt_mid = (dt[:-1] + dt[1:]) / 2.0
+        dt_mid = np.where(np.abs(dt_mid) < 1e-12, 1e-12, dt_mid)
+        a = dv / dt_mid[:, np.newaxis]  # (N-2, n_signals)
         accel_mag = np.linalg.norm(a, axis=1)  # (N-2,)
 
         # Process each timestep

@@ -134,9 +134,13 @@ def run(
                 energy_std = np.nan
 
             # Compute velocity from effective_dim changes
+            # Divide by actual signal_0_end spacing for correct velocity on non-uniform axes
             if has_effective_dim:
                 eff_dims = cohort_data['effective_dim'].to_numpy()
-                velocities = np.diff(eff_dims)
+                s0_vals = cohort_data['signal_0_end'].to_numpy().astype(float)
+                dt_thermo = np.diff(s0_vals)
+                dt_thermo = np.where(np.abs(dt_thermo) < 1e-12, 1e-12, dt_thermo)
+                velocities = np.diff(eff_dims) / dt_thermo
                 temperature = compute_effective_temperature(velocities)
             else:
                 temperature = np.nan
@@ -169,7 +173,12 @@ def run(
         if has_effective_dim:
             energy = safe_float(sg['effective_dim'].mean())
             energy_std = safe_float(sg['effective_dim'].std())
-            velocities = np.diff(sg['effective_dim'].to_numpy())
+            sg_sorted = sg.sort('signal_0_end')
+            eff_dims_global = sg_sorted['effective_dim'].to_numpy()
+            s0_global = sg_sorted['signal_0_end'].to_numpy().astype(float)
+            dt_global = np.diff(s0_global)
+            dt_global = np.where(np.abs(dt_global) < 1e-12, 1e-12, dt_global)
+            velocities = np.diff(eff_dims_global) / dt_global
             temperature = compute_effective_temperature(velocities)
         else:
             energy = np.nan

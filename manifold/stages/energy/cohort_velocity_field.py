@@ -83,8 +83,13 @@ def run(
             elif nans.all():
                 x[:, j] = 0.0
 
-        # Velocity: first difference
-        v = np.diff(x, axis=0)  # (N-1, D)
+        # Velocity: first difference divided by actual signal_0_end spacing
+        # On time axis: dt = [24, 24, 24, ...] → no change in relative values
+        # On reaxis: dt = [0.17, 0.17, 1.67, ...] → correct derivatives
+        dx = np.diff(x, axis=0)  # (N-1, D)
+        dt = np.diff(s0_values.astype(float))  # (N-1,)
+        dt = np.where(np.abs(dt) < 1e-12, 1e-12, dt)  # floor to prevent inf
+        v = dx / dt[:, np.newaxis]  # (N-1, D)
         speed = np.linalg.norm(v, axis=1)  # (N-1,)
 
         # Direction: normalized velocity
@@ -92,8 +97,11 @@ def run(
         nonzero = speed > 1e-12
         direction[nonzero] = v[nonzero] / speed[nonzero, np.newaxis]
 
-        # Acceleration: second difference
-        a = np.diff(v, axis=0)  # (N-2, D)
+        # Acceleration: derivative of velocity with midpoint spacing
+        dv = np.diff(v, axis=0)  # (N-2, D)
+        dt_mid = (dt[:-1] + dt[1:]) / 2.0
+        dt_mid = np.where(np.abs(dt_mid) < 1e-12, 1e-12, dt_mid)
+        a = dv / dt_mid[:, np.newaxis]  # (N-2, D)
         accel_mag = np.linalg.norm(a, axis=1)
 
         for i in range(len(a)):
